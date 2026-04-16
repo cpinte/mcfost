@@ -114,7 +114,7 @@ module abo
             neff2_0 = BARKLEM_DF_NEFF2
             barklem_data = BARKLEM_DF_DATA
          case default
-            write(*,'((1A2)," Unrocognised Barklem transition")') btype
+            write(*,'((1A2)," Unrecognized Barklem transition")') btype
             res = .false.
             return
       end select
@@ -155,7 +155,7 @@ module abo
    subroutine get_Barklem_cross_data(atom, kr, res)
       !if atom%lines(kr)%cvdWaals(1) > 1.0 = xxx.yyy
       ! use xxx as the cross section and yyy as the exponent.
-      ! Otherwise attempt to obtaine these values from the Barklem data.
+      ! Otherwise attempt to obtain these values from the Barklem data.
       ! If not possible, Unsold is used (like for Helium).
       integer, intent(in) :: kr
       type (AtomType), intent(inout) :: atom
@@ -248,7 +248,7 @@ module abo
          ! so neff = sqrt(E_RYDBERG/dE) * Zeff
          !https://www.nist.gov/pml/atomic-spectroscopy-compendium-basic-ideas-notation-data-and-formulas/atomic-spectroscopy-term
 
-         !swamp double
+         !swap double
          if (Li > Lj) then
             nefftmp = neff1
             neff1 = neff2
@@ -295,7 +295,7 @@ module abo
 
       endif !read from table
 
-      !comptue the actual cross-section with T factorised out.
+      !compute the actual cross-section with T factorised out.
 
       cross = 2.0*sqa0 * (4.0/pi)**(0.5*atom%lines(kr)%cvdWaals(2)) *  &
          vmean * (vmean/vref)**(-atom%lines(kr)%cvdWaals(2))

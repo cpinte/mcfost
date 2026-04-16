@@ -20,8 +20,8 @@ module optical_depth
 
 subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,flag_star,flag_direct_star,&
      extrin,ltot,flag_sortie,lpacket_alive)
-  ! Integration par calcul de la position de l'interface entre cellules
-  ! Ne met a jour xio, ... que si le photon ne sort pas de la nebuleuse (flag_sortie=1)
+  ! Integration by computing the position of the interface between cells
+  ! Only updates xio, ... if the photon does not exit the nebula (flag_sortie=1)
   ! C. Pinte
   ! 05/02/05
 
@@ -61,7 +61,7 @@ subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,fla
 
   ltot = 0.0
 
-  ! Calcule les angles de diffusion pour la direction de propagation donnee
+  ! Calculates the scattering angles for the given propagation direction
   if ((.not.letape_th).and.lscatt_ray_tracing1) call angles_scatt_rt1(id,u,v,w)
 
   ! Will the packet intersect a star
@@ -73,9 +73,9 @@ subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,fla
      p_icell => icell1
   endif
 
-  ! Boucle infinie sur les cellules
-  do ! Boucle infinie
-     ! Indice de la cell
+  ! Infinite loop over cells
+  do ! Infinite loop
+     ! Cell index
      icell_old = icell0
      x_old = x0 ; y_old = y0 ; z_old = z0
 
@@ -83,7 +83,7 @@ subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,fla
      previous_cell = icell0
      icell0 = next_cell
 
-     ! Test sortie
+     ! Exit test
      if (test_exit_grid(icell0, x0, y0, z0)) then
         flag_sortie = .true.
         return
@@ -96,15 +96,15 @@ subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,fla
         endif
      endif
 
-     ! Pour cas avec approximation de diffusion
+     ! For case with diffusion approximation
      if (icell0 <= n_cells) then
         lcell_not_empty=.true.
         opacity = kappa(p_icell,lambda) * kappa_factor(icell0)
 
         if (l_dark_zone(icell0)) then
-           ! On renvoie le paquet dans l'autre sens
+           ! Send the packet back in the other direction
            u = -u ; v = -v ; w=-w
-           ! et on le renvoie au point de depart
+           ! and return it to the starting point
            icell = icell_old
            xio = x_old ; yio = y_old ; zio = z_old
            flag_sortie= .false.
@@ -115,41 +115,41 @@ subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,fla
         opacity = 0.0_dp
      endif
 
-     ! Calcul longeur de vol et profondeur optique dans la cell
+     ! Calculation of flight length and optical depth in the cell
      call cross_cell(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l, l_contrib, l_void_before)
 
      ! opacity wall
      !---if (ri0 == 1) then
-     !---   ! Variation de height du mur en cos(phi/2)
+     !---   ! Wall height variation as cos(phi/2)
      !---   phi = atan2(y0,x0)
      !---   hh = h_wall * abs(cos(phi/2.))
      !---   hhm = -h_wall * abs(cos((phi+pi)/2.))
      !---
-     !---   ! Ajout de l'opacity du mur le cas echeant
+     !---   ! Add wall opacity if applicable
      !---   if ((z0 <= hh).and.(z0 >= hhm)) then
      !---      opacity = opacity + kappa_wall
      !---   endif
      !---endif
 
-     tau = l_contrib * opacity ! opacity constante dans la cell
+     tau = l_contrib * opacity ! constant opacity in the cell
 
-     ! Comparaison integrale avec tau
-     ! et ajustement length de vol eventuellement
-     if(tau > extr) then ! On a fini d'integrer
+     ! Integration comparison with tau
+     ! and eventual flight length adjustment eventuellement
+     if(tau > extr) then ! Finished integrating
         lstop = .true.
-        l_contrib = l_contrib * (extr/tau) ! on rescale l_contrib pour que tau=extr et on ajoute la longeur de vol dans le vide
+        l_contrib = l_contrib * (extr/tau) ! rescale l_contrib so that tau=extr and add flight length in vacuum
         l = l_void_before + l_contrib
         ltot=ltot+l
-     else ! Il reste extr - tau a integrer dans la cell suivante
+     else ! Remaining extr - tau to integrate in the next cell
         extr=extr-tau
         ltot=ltot+l
      endif
 
-     ! Stockage des champs de radiation
+     ! Store the radiation fields
      if (lcell_not_empty) call save_radiation_field(id,lambda,p_lambda, icell0, Stokes, l_contrib, &
           x0,y0,z0, x1,y1,z1, u,v,w, flag_star, flag_direct_star)
 
-     ! On a fini d'integrer : sortie de la routine
+     ! Finished integrating: exit the routine
      if (lstop) then
         flag_sortie = .false.
         xio=x0+l*u
@@ -170,12 +170,12 @@ subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,fla
            !      call verif_cell_position_sph(icell0, xio, yio, zio)
            !   endif
            endif
-        endif ! todo : on ne fait rien dans la cas Voronoi ???
+        endif ! todo: nothing is done in the Voronoi case ???
 
         return
      endif ! lstop
 
-  enddo ! boucle infinie
+  enddo ! Infinite loop
   write(*,*) "BUG"
   return
 
@@ -192,7 +192,7 @@ subroutine integ_tau(lambda)
   integer :: icell!, i
 
   real(kind=dp), dimension(4) :: Stokes
-  ! angle de visee en deg
+  ! viewing angle in deg
   real :: angle
   real(kind=dp) :: x0, y0, z0, u0, v0, w0
   real :: tau
@@ -211,7 +211,7 @@ subroutine integ_tau(lambda)
   !do i=1, n_rad
   !   tau=tau+kappa(cell_map(i,1,1),lambda)*(r_lim(i)-r_lim(i-1))
   !enddo
-  write(*,*) 'Integ tau dans plan eq. = ', tau
+  write(*,*) 'Integ tau in midplane = ', tau
 
   if (.not.lvariable_dust) then
      icell = icell_not_empty
@@ -246,9 +246,9 @@ end subroutine integ_tau
 !***********************************************************
 
 subroutine optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,lmin,lmax)
-! Integration par calcul de la position de l'interface entre cellules
-! de l'opacity totale dans une direction donnée
-! grid a geometrie cylindrique
+! Integration by computing the position of the interface between cells
+! of the total opacity in a given direction
+! grid with cylindrical geometry
 ! C. Pinte
 ! 19/04/05
 
@@ -286,14 +286,14 @@ subroutine optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,
      p_icell => icell1
   endif
 
-  ! Boucle infinie sur les cellules
-  do ! Boucle infinie
-     ! Indice de la cell
+  ! Infinite loop over cells
+  do ! Infinite loop
+     ! Cell index
      previous_cell = icell0
      icell0 = next_cell
      x0=x1;y0=y1;z0=z1
 
-     ! Test sortie
+     ! Exit test
      if (test_exit_grid(icell0, x0, y0, z0)) then
         tau_tot_out=tau_tot
         lmax=ltot
@@ -306,17 +306,17 @@ subroutine optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,
         opacity = 0.0_dp
      endif
 
-     ! Calcul longeur de vol et profondeur optique dans la cell
+     ! Calculation of flight length and optical depth in the cell
      call cross_cell(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l, l_contrib, l_void_before)
 
-     tau=l_contrib*opacity ! opacity constante dans la cell
+     tau=l_contrib*opacity ! constant opacity in the cell
 
      tau_tot = tau_tot + tau
      ltot= ltot + l
 
      if (tau_tot < tiny_real) lmin=ltot
 
-  enddo ! boucle infinie
+  enddo ! Infinite loop
 
   write(*,*) "BUG"
   return
@@ -388,7 +388,7 @@ subroutine compute_column(type, column, lambda)
            icell0 = next_cell
            x0 = x1 ; y0 = y1 ; z0 = z1
 
-           ! Test sortie
+           ! Exit test
            if (test_exit_grid(icell0, x0, y0, z0)) exit inf_loop
 
            call cross_cell(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l, l_contrib, l_void_before)
@@ -417,11 +417,11 @@ end subroutine compute_column
 !***********************************************************
 
 subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_speed, nTrans, tab_Trans)
-  ! Generalisation de la routine physical_length
-  ! pour le cas du transfert dans les raies
-  ! Propage un paquet depuis un point d'origine donne
-  ! et integre l'equation du transfert radiatif
-  ! La propagation doit etre a l'envers pour faire du
+  ! Generalization of routine physical_length
+  ! for the case of line transfer
+  ! Propagates a packet from a given starting point
+  ! and integrates the radiative transfer equation
+  ! The propagation must be in reverse to perform
   ! ray tracing  !!
   !
   ! C. Pinte
@@ -475,10 +475,10 @@ subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_spee
   ! Will the ray intersect a star
   call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
 
-  ! propagation dans la grid
-  ! Boucle infinie sur les cellules
-  infinie : do ! Boucle infinie
-     ! Indice de la cell
+  ! propagation in the grid
+  ! Infinite loop over cells
+  infinie : do ! Infinite loop
+     ! Cell index
      icell = next_cell
      x0=x1 ; y0=y1 ; z0=z1
 
@@ -488,7 +488,7 @@ subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_spee
         lcell_not_empty=.false.
      endif
 
-     ! Test sortie
+     ! Exit test
      if (test_exit_grid(icell, x0, y0, z0)) then
         return
      endif
@@ -498,7 +498,7 @@ subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_spee
 
      n_cell = n_cell + 1
 
-     ! Calcul longeur de vol et profondeur optique dans la cell
+     ! Calculation of flight length and optical depth in the cell
      previous_cell = 0 ! unused, just for Voronoi
      call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell, l, l_contrib, l_void_before)
 
@@ -513,7 +513,7 @@ subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_spee
            Doppler_P_x_freq(:,iray,id) = P(:)
         endif
 
-        ! surface superieure ou inf
+        ! upper or lower surface
         facteur_tau = 1.0
         if (lonly_top    .and. z0 < 0.) facteur_tau = 0.0
         if (lonly_bottom .and. z0 > 0.) facteur_tau = 0.0
@@ -525,11 +525,11 @@ subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_spee
 
            opacity(:) = kappa_mol_o_freq(icell,iTrans) * P(:) * facteur_tau + kappa_cont
 
-           ! Epaisseur optique
+           ! Optical depth
            dtau(:) =  l_contrib * opacity(:)
            dtau_c = l_contrib * kappa_cont
 
-           ! Fonction source
+           ! Source function
            Snu(:) = ( emissivite_mol_o_freq(icell,iTrans) * P(:) * facteur_tau &
                 + emissivite_dust(icell,iTrans) ) / (opacity(:) + 1.0e-300_dp)
            Snu_c = emissivite_dust(icell,iTrans) / (kappa_cont  + 1.0e-300_dp)
@@ -545,7 +545,7 @@ subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_spee
                    exp(-tau(:,i)) * (1.0_dp - exp(-dtau(:))) * Snu(:)
            endif
 
-           ! Mise a jour profondeur optique pour cell suivante
+           ! Updating optical depth for next cell
            ! Warning tau and  tau_c are smaller array (dimension nTrans)
            tau(:,i) = tau(:,i) + dtau(:)
            tau_c(i) = tau_c(i) + dtau_c
@@ -558,14 +558,14 @@ subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_spee
               opacity(:) = kappa_mol_o_freq2(icell,iTrans) * P(:) + kappa_abs_LTE(p_icell,iTrans) * kappa_factor(icell)
               dtau(:) =  l_contrib * opacity(:)
 
-              ! Ajout emission en sortie de cell (=debut car on va a l'envers) ponderee par
+              ! Adding emission at cell exit (=debut car on va a l'envers) ponderee par
               ! la profondeur optique jusqu'a la cell
               Snu(:) = ( emissivite_mol_o_freq2(icell,iTrans) * P(:) + &
                    emissivite_dust(icell,iTrans) ) / (opacity(:) + 1.0e-30_dp)
               I02(:,iTrans,iray,id) = I02(:,iTrans,iray,id) + &
                    exp(-tau2(:,iTrans)) * (1.0_dp - exp(-dtau2(:))) * Snu(:)
 
-              ! Mise a jour profondeur optique pour cell suivante
+              ! Updating optical depth for next cell
               ! Warning tau2 is a smaller array (dimension nTrans)
               tau2(:,i) = tau2(:,i) + dtau2(:)
            enddo
@@ -575,7 +575,7 @@ subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_spee
 
   enddo infinie
 
-  ! Ajout cmb, pondere par la profondeur optique totale
+  ! Adding Cmb, weighted by the total optical depth
   !  tspeed(:) = tab_speed(:) + v_avg0
   !  I0(:,:,iray,id) = I0(:,:,iray,id) + Cmb(ispeed,tspeed) * exp(-tau(:,:))
   !  if (ldouble_RT) then
@@ -601,9 +601,9 @@ end subroutine integ_ray_mol
 !***********************************************************
 
 subroutine physical_length_mol(imol,iTrans,icell_in,x,y,z,u,v,w, ispeed, tab_speed,tau_threshold,flag_sortie)
-  ! Copmputes position where a given optical depth is reached
+  ! Computes position where a given optical depth is reached
   ! This is simplified version of integ_ray_mol (also inspired by physical_length)
-  ! only computes optical depth and stopes where given tau_max is reached
+  ! only computes optical depth and stops where given tau_max is reached
 
   integer, intent(in) :: imol, icell_in
   real(kind=dp), intent(inout) :: x,y,z
@@ -640,9 +640,9 @@ subroutine physical_length_mol(imol,iTrans,icell_in,x,y,z,u,v,w, ispeed, tab_spe
      p_icell => icell1
   endif
 
-  ! Boucle infinie sur les cellules
-  infinie : do ! Boucle infinie
-     ! Indice de la cell
+  ! Infinite loop over cells
+  infinie : do ! Infinite loop
+     ! Cell index
      icell = next_cell
      x0=x1 ; y0=y1 ; z0=z1
 
@@ -652,7 +652,7 @@ subroutine physical_length_mol(imol,iTrans,icell_in,x,y,z,u,v,w, ispeed, tab_spe
         lcell_not_empty=.false.
      endif
 
-     ! Test sortie
+     ! Exit test
      if (test_exit_grid(icell, x0, y0, z0)) then
          flag_sortie = .true.
         return
@@ -660,7 +660,7 @@ subroutine physical_length_mol(imol,iTrans,icell_in,x,y,z,u,v,w, ispeed, tab_spe
 
      n_cell = n_cell + 1
 
-     ! Calcul longeur de vol et profondeur optique dans la cell
+     ! Calculation of flight length and optical depth in the cell
      previous_cell = 0 ! unused, just for Voronoi
      call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell, l, l_contrib, l_void_before)
 
@@ -668,7 +668,7 @@ subroutine physical_length_mol(imol,iTrans,icell_in,x,y,z,u,v,w, ispeed, tab_spe
         ! local line profile mutiplied by frequency
         P(:) = local_line_profile(icell,lsubtract_avg,x0,y0,z0,x1,y1,z1,u,v,w,l_void_before,l_contrib,ispeed,tab_speed)
 
-        ! surface superieure ou inf
+        ! upper or lower surface
         facteur_tau = 1.0
         if (lonly_top    .and. z0 < 0.) facteur_tau = 0.0
         if (lonly_bottom .and. z0 > 0.) facteur_tau = 0.0
@@ -678,10 +678,10 @@ subroutine physical_length_mol(imol,iTrans,icell_in,x,y,z,u,v,w, ispeed, tab_spe
         opacity(:) = kappa_mol_o_freq(icell,iTrans) * P(:) * facteur_tau &
              + kappa_abs_LTE(p_icell,iTrans) * kappa_factor(icell)
 
-        ! Epaisseur optique
+        ! Optical depth
         dtau_mol(:) =  l_contrib * opacity(:)
 
-        ! Mise a jour profondeur optique pour cell suivante
+        ! Updating optical depth for next cell
         ! Warning tau and  tau_c are smaller array (dimension nTrans)
         tau_mol(:) = tau_mol(:) + dtau_mol(:)
         tau_max =  maxval(tau_mol(:))
@@ -704,7 +704,7 @@ subroutine physical_length_mol(imol,iTrans,icell_in,x,y,z,u,v,w, ispeed, tab_spe
      endif  ! lcell_not_empty
 
 
-     ! On a fini d'integrer : sortie de la routine
+     ! Finished integrating: exit the routine
      if (lstop) then
         flag_sortie = .false.
         ! we recompute the position
@@ -716,7 +716,7 @@ subroutine physical_length_mol(imol,iTrans,icell_in,x,y,z,u,v,w, ispeed, tab_spe
            if (l3D) then
               if (lcylindrical) call index_cell(x,y,z, previous_cell)
            endif
-        endif ! todo : on ne fait rien dans la cas Voronoi ???
+        endif ! todo: nothing is done in the Voronoi case ???
 
         return
      endif ! lstop
@@ -730,9 +730,9 @@ end subroutine physical_length_mol
 !********************************************************************
 
 subroutine physical_length_mol_Flux(imol,iTrans,icell_in,x,y,z,u,v,w, ispeed, tab_speed,Flux_threshold,flag_sortie)
-  ! Copmputes position where a given optical depth is reached
+  ! Computes position where a given optical depth is reached
   ! This is simplified version of integ_ray_mol (also inspired by physical_length)
-  ! only computes optical depth and stopes where given tau_max is reached
+  ! only computes optical depth and stops where given tau_max is reached
 
   integer, intent(in) :: imol, icell_in
   real(kind=dp), intent(inout) :: x,y,z
@@ -769,9 +769,9 @@ subroutine physical_length_mol_Flux(imol,iTrans,icell_in,x,y,z,u,v,w, ispeed, ta
      p_icell => icell1
   endif
 
-  ! Boucle infinie sur les cellules
-  infinie : do ! Boucle infinie
-     ! Indice de la cell
+  ! Infinite loop over cells
+  infinie : do ! Infinite loop
+     ! Cell index
      icell = next_cell
      x0=x1 ; y0=y1 ; z0=z1
 
@@ -781,7 +781,7 @@ subroutine physical_length_mol_Flux(imol,iTrans,icell_in,x,y,z,u,v,w, ispeed, ta
         lcell_not_empty=.false.
      endif
 
-     ! Test sortie
+     ! Exit test
      if (test_exit_grid(icell, x0, y0, z0)) then
          flag_sortie = .true.
         return
@@ -789,7 +789,7 @@ subroutine physical_length_mol_Flux(imol,iTrans,icell_in,x,y,z,u,v,w, ispeed, ta
 
      n_cell = n_cell + 1
 
-     ! Calcul longeur de vol et profondeur optique dans la cell
+     ! Calculation of flight length and optical depth in the cell
      previous_cell = 0 ! unused, just for Voronoi
      call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell, l, l_contrib, l_void_before)
 
@@ -802,10 +802,10 @@ subroutine physical_length_mol_Flux(imol,iTrans,icell_in,x,y,z,u,v,w, ispeed, ta
 
         opacity(:) = kappa_mol_o_freq(icell,iTrans) * P(:) + kappa_abs_LTE(p_icell,iTrans) * kappa_factor(icell)
 
-        ! Epaisseur optique
+        ! Optical depth
         dtau_mol(:) =  l_contrib * opacity(:)
 
-        ! Fonction source
+        ! Source function
         Snu(:) = ( emissivite_mol_o_freq(icell,iTrans) * P(:) &
              + emissivite_dust(icell,iTrans) ) / (opacity(:) + 1.0e-300_dp)
 
@@ -813,7 +813,7 @@ subroutine physical_length_mol_Flux(imol,iTrans,icell_in,x,y,z,u,v,w, ispeed, ta
         dI_mol(:) = exp(-tau_mol(:)) * (1.0_dp - exp(-dtau_mol(:))) * Snu(:)
         I_mol(:) = I_mol(:) + dI_mol(:)
 
-        ! Mise a jour profondeur optique pour cell suivante
+        ! Updating optical depth for next cell
         ! Warning tau and  tau_c are smaller array (dimension nTrans)
         tau_mol(:) = tau_mol(:) + dtau_mol(:)
 
@@ -835,7 +835,7 @@ subroutine physical_length_mol_Flux(imol,iTrans,icell_in,x,y,z,u,v,w, ispeed, ta
      endif  ! lcell_not_empty
 
 
-     ! On a fini d'integrer : sortie de la routine
+     ! Finished integrating: exit the routine
      if (lstop) then
         flag_sortie = .false.
         ! we recompute the position
@@ -847,7 +847,7 @@ subroutine physical_length_mol_Flux(imol,iTrans,icell_in,x,y,z,u,v,w, ispeed, ta
            if (l3D) then
               if (lcylindrical) call index_cell(x,y,z, previous_cell)
            endif
-        endif ! todo : on ne fait rien dans la cas Voronoi ???
+        endif ! todo: nothing is done in the Voronoi case ???
 
         return
      endif ! lstop
@@ -870,14 +870,14 @@ function local_line_profile(icell,lsubtract_avg, x0,y0,z0,x1,y1,z1,u,v,w,l_void_
 
   real(kind=dp), dimension(ispeed(1):ispeed(2)) :: local_line_profile
 
-  integer, parameter :: n_vpoints_max = 200 ! pas super critique
-  ! presque OK avec 2 pour la simu Herbig de Peter (2x plus vite)
+  integer, parameter :: n_vpoints_max = 200 ! not very critical
+  ! almost OK with 2 for la simu Herbig de Peter (2x faster)
   real(kind=dp), dimension(n_vpoints_max) :: velocity
   real(kind=dp), dimension(ispeed(1):ispeed(2)) :: tspeed
   real(kind=dp) ::  v0, v1, v_avg0, delta_vol_phi, xphi, yphi, zphi
   integer :: ivpoint, n_vpoints
 
-  ! Differentiel de velocity au travers de la cell
+  ! Velocity differential across the cell
   !dv = dv_proj(ri0,zj0,x0,y0,z0,x1,y1,z1,u,v,w)
   v0 = v_proj(icell,x0,y0,z0,u,v,w)
 
@@ -888,11 +888,11 @@ function local_line_profile(icell,lsubtract_avg, x0,y0,z0,x1,y1,z1,u,v,w,l_void_
      v1 = v_proj(icell,x1,y1,z1,u,v,w)
      dv = abs(v1 - v0)
 
-     ! Nbre de points d'integration en fct du differentiel de velocity
-     ! compare a la width de raie de la cell de depart
+     ! Number of integration points as a function of the velocity differential
+     ! compared to the line width of the starting cell
      n_vpoints  = min(max(2,nint(dv/dv_line(icell)*20.)),n_vpoints_max)
 
-     ! velocity projete le long du trajet dans la cell
+     ! velocity projected along the path in the cell
      do ivpoint=2, n_vpoints-1
         delta_vol_phi = l_void_before + (real(ivpoint,kind=dp))/(real(n_vpoints,kind=dp)) * l_contrib
         xphi=x0+delta_vol_phi*u
@@ -914,7 +914,7 @@ function local_line_profile(icell,lsubtract_avg, x0,y0,z0,x1,y1,z1,u,v,w,l_void_
      v_avg0 = 0.0_dp
   endif
 
-  ! Profil de raie local integre a multiplier par la frequence de la transition
+  ! Local line profile integrated to be multiplied by the transition frequency
   local_line_profile(:) = 0.0_dp
   do ivpoint=1,n_vpoints
      tspeed(:) = tab_speed(:) - (velocity(ivpoint) - v_avg0)
@@ -1042,9 +1042,9 @@ subroutine optical_length_tot_mol(imol,icell_in,x,y,z,u,v,w, ispeed, tab_speed, 
 
   !*** propagation dans la grid
 
-  ! Boucle infinie sur les cellules
-  infinie : do ! Boucle infinie
-     ! Indice de la cell
+  ! Infinite loop over cells
+  infinie : do ! Infinite loop
+     ! Cell index
      icell = next_cell
      x0=x1 ; y0=y1 ; z0=z1
 
@@ -1054,14 +1054,14 @@ subroutine optical_length_tot_mol(imol,icell_in,x,y,z,u,v,w, ispeed, tab_speed, 
         lcell_not_empty=.false.
      endif
 
-     ! Test sortie
+     ! Exit test
      if (test_exit_grid(icell, x0, y0, z0)) then
         return
      endif
 
      n_cell = n_cell + 1
 
-     ! Calcul longeur de vol et profondeur optique dans la cell
+     ! Calculation of flight length and optical depth in the cell
      previous_cell = 0 ! unused, just for Voronoi
      call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell, l, l_contrib, l_void_before)
 
@@ -1074,11 +1074,11 @@ subroutine optical_length_tot_mol(imol,icell_in,x,y,z,u,v,w, ispeed, tab_speed, 
 
            opacity(:) = kappa_mol_o_freq(icell,iTrans) * P(:) + kappa_abs_LTE(p_icell,iTrans) * kappa_factor(icell)
 
-           ! Epaisseur optique
+           ! Optical depth
            dtau_mol(:) =  l_contrib * opacity(:)
            dtau_c = l_contrib * kappa_abs_LTE(p_icell,iTrans) * kappa_factor(icell)
 
-           ! Mise a jour profondeur optique pour cell suivante
+           ! Updating optical depth for next cell
            ! Warning tau and  tau_c are smaller array (dimension nTrans)
            tau_mol(:,i) = tau_mol(:,i) + dtau_mol(:)
            tau_c(i) = tau_c(i) + dtau_c
@@ -1127,15 +1127,15 @@ end subroutine optical_length_tot_mol
 
       ! Will the ray intersect a star
       call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
-      ! Boucle infinie sur les cellules (we go over the grid.)
-      infinie : do ! Boucle infinie
-      ! Indice de la cell
+      ! Infinite loop over cells (we go over the grid.)
+      infinie : do ! Infinite loop
+      ! Cell index
          icell = next_cell
          x0=x1 ; y0=y1 ; z0=z1
 
          lcell_not_empty = (icell <= n_cells)
 
-         ! Test sortie ! "The ray has reach the end of the grid"
+         ! Exit test ! "The ray has reached the end of the grid"
          if (test_exit_grid(icell, x0, y0, z0)) return
 
          if (lintersect_stars) then !"will interesct"
@@ -1160,7 +1160,7 @@ end subroutine optical_length_tot_mol
 
          n_cell = n_cell + 1
 
-         ! Calcul longeur de vol et profondeur optique dans la cell
+         ! Calculation of flight length and optical depth in the cell
          previous_cell = 0 ! unused, just for Voronoi
          call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
 
@@ -1211,9 +1211,9 @@ end subroutine optical_length_tot_mol
    end subroutine integ_ray_atom
 
 subroutine physical_length_atom(id,icell_in,x,y,z,u,v,w,N,lambda,tau_threshold,flag_sortie)
-  ! Copmputes position where a given optical depth is reached
+  ! Computes position where a given optical depth is reached
   ! This is simplified version of integ_ray_atom (also inspired by physical_length, physical_length_mol)
-  ! only computes optical depth and stopes where given tau_max is reached
+  ! only computes optical depth and stops where given tau_max is reached
   !
   !
   ! B. Tessore: Cannot leave until the propagation is done, as we follow many (uncorrelated) frequencies.
@@ -1255,15 +1255,15 @@ subroutine physical_length_atom(id,icell_in,x,y,z,u,v,w,N,lambda,tau_threshold,f
 
    ! Will the ray intersect a star
    call intersect_stars(x0,y0,z0, u,v,w, lintersect_stars, i_star, icell_star)
-   ! Boucle infinie sur les cellules (we go over the grid.)
-   infinie : do ! Boucle infinie
-   ! Indice de la cell
+   ! Infinite loop over cells (we go over the grid.)
+   infinie : do ! Infinite loop
+   ! Cell index
       icell = next_cell
       x0=x1 ; y0=y1 ; z0=z1
 
       lcell_not_empty = (icell <= n_cells)
 
-      ! Test sortie ! "The ray has reach the end of the grid"
+      ! Exit test ! "The ray has reached the end of the grid"
       if (test_exit_grid(icell, x0, y0, z0)) return
 
       if (lintersect_stars) then !"will interesct"
@@ -1276,7 +1276,7 @@ subroutine physical_length_atom(id,icell_in,x,y,z,u,v,w,N,lambda,tau_threshold,f
 
       n_cell = n_cell + 1
 
-      ! Calcul longeur de vol et profondeur optique dans la cell
+      ! Calculation of flight length and optical depth in the cell
       previous_cell = 0 ! unused, just for Voronoi
       call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
 
@@ -1295,7 +1295,7 @@ subroutine physical_length_atom(id,icell_in,x,y,z,u,v,w,N,lambda,tau_threshold,f
 
          dtau(:) = l_contrib * chi(:) * AU_to_m !au * m^-1 * au_to_m
          tau(:) = tau(:) + dtau(:) !for next cell
-        ! Mise a jour profondeur optique pour cell suivante
+        ! Updating optical depth for next cell
 
         !follow many frequencies
         where ((tau > tau_threshold).and..not.lstop)
@@ -1325,16 +1325,16 @@ end subroutine physical_length_atom
 !********************************************************************
 
 function integ_ray_dust(lambda,icell_in,x,y,z,u,v,w)
-  ! Generalisation de la routine physical_length
-  ! Propage un paquet depuis un point d'origine donne
-  ! et integre l'equation du transfert radiatif
-  ! La propagation doit etre a l'envers pour faire du
+  ! Generalization of routine physical_length
+  ! Propagates a packet from a given starting point
+  ! and integrates the radiative transfer equation
+  ! The propagation must be in reverse to perform
   ! ray tracing  !!
   !
   ! C. Pinte
   ! 23/01/08
 
-  ! TODO : faire peter le phi ??? Ne sert que pour les champs de velocity
+  ! TODO: get rid of phi.?? Only used for velocity fields
 
   implicit none
 
@@ -1370,10 +1370,10 @@ function integ_ray_dust(lambda,icell_in,x,y,z,u,v,w)
   ! Will the ray intersect a star
   call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
 
-  ! propagation dans la grid
-  ! Boucle infinie sur les cellules
-  infinie : do ! Boucle infinie
-     ! Indice de la cell
+  ! propagation in the grid
+  ! Infinite loop over cells
+  infinie : do ! Infinite loop
+     ! Cell index
      icell=next_cell
      x0=x1 ; y0=y1 ; z0=z1
 
@@ -1383,34 +1383,34 @@ function integ_ray_dust(lambda,icell_in,x,y,z,u,v,w)
         lcell_not_empty=.false.
      endif
 
-     ! Test sortie
+     ! Exit test
      if (test_exit_grid(icell, x0, y0, z0)) return
      if (lintersect_stars) then
         if (icell == icell_star) return
      endif
 
-     ! Calcul longeur de vol et profondeur optique dans la cell
+     ! Calculation of flight length and optical depth in the cell
      previous_cell = 0 ! unused, just for Voronoi
      call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell, l, l_contrib, l_void_before)
 
      if (lcell_not_empty) then
-        ! Epaisseur optique de la cell
+        ! Optical depth of the cell
         dtau =  l_contrib * kappa(p_icell,lambda) * kappa_factor(icell)
 
-        ! Fct source au milieu du parcours dans la cell
+        ! Source function in the middle of the path in the cell
         xm = 0.5 * (x0 + x1)
         ym = 0.5 * (y0 + y1)
         zm = 0.5 * (z0 + z1)
 
-        ! Ajout emission en sortie de cell (=debut car on va a l'envers) ponderee par
+        ! Adding emission at cell exit (=debut car on va a l'envers) ponderee par
         ! la profondeur optique jusqu'a la cell
         integ_ray_dust(:) = integ_ray_dust(:) + &
              exp(-tau) * (1.0_dp - exp(-dtau)) * dust_source_fct(icell, xm,ym,zm)
 
-        ! Mise a jour profondeur optique pour cell suivante
+        ! Updating optical depth for next cell
         tau = tau + dtau
 
-        ! Pas besoin d'integrer trop profond
+        ! No need to integrate too deep
         if (tau > tau_dark_zone_obs) return
      endif  ! lcell_not_empty
 
@@ -1423,9 +1423,9 @@ end function integ_ray_dust
 !***********************************************************
 
 subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
-! Definition l'etendue de la zone noire
-! definie le tableau logique l_dark_zone
-! et les rayons limites r_in_opacite pour le premier radius
+! Definition of the extent of the dark zone
+! defines the logical array l_dark_zone
+! and the limiting radii r_in_opacite for the first radius
 ! C. Pinte
 ! 22/04/05
 
@@ -1528,25 +1528,25 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
            icell = cell_map(i,j,1)
            do n=1,nbre_angle
               id=1
-              ! position et direction vol
-              angle= pi * real(n)/real(nbre_angle+1)! entre 0 et pi
-              x0=r_grid(icell) !x0=1.00001*r_lim(i-1) ! cell 1 traitee a part
+              ! position and flight direction
+              angle= pi * real(n)/real(nbre_angle+1)! between 0 and pi
+              x0=r_grid(icell) !x0=1.00001*r_lim(i-1) ! cell 1 processed separately
               y0=0.0
               z0=z_grid(icell) !z0=0.99999*z_lim(i,j+1)
               u0=cos(angle)
               v0=0.0
               w0=sin(angle)
-              Stokes(:) = 0.0_dp ; !Stokes(1) = 1.0_dp ; ! Pourquoi c'etait a 1 ?? ca fausse les chmps de radiation !!!
+              Stokes(:) = 0.0_dp ; !Stokes(1) = 1.0_dp ; ! Why was it at 1?? it messes up the radiation fields!!!
               call physical_length(id,lambda,p_lambda,Stokes,icell, x0,y0,z0,u0,v0,w0, &
                    flag_star,flag_direct_star,tau_max,dvol1,flag_sortie,lpacket_alive)
-              if (.not.flag_sortie) then ! le photon ne sort pas
-                 ! la cell et celles en dessous sont dans la zone noire
+              if (.not.flag_sortie) then ! the photon does not exit
+                 ! the cell and those below are in the dark zone
                  do jj=1,j
                     icell = cell_map(i,jj,1)
                     l_dark_zone(icell) = .true.
                  enddo
                  l_is_dark_zone = .true.
-                 ! on passe a la cell suivante
+                 ! proceed to the next cell
                  cycle cell
               endif
            enddo
@@ -1560,9 +1560,9 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
               icell = cell_map(i,j,pk)
               do n=1,nbre_angle
                  id=1
-                 ! position et direction vol
-                 angle= pi * real(n)/real(nbre_angle+1)! entre 0 et pi
-                 r0=r_grid(icell)!1.00001*r_lim(i-1) ! cell 1 traitee a part
+                 ! position and flight direction
+                 angle= pi * real(n)/real(nbre_angle+1)! between 0 and pi
+                 r0=r_grid(icell)!1.00001*r_lim(i-1) ! cell 1 processed separately
                  x0 = r0 *cos(phi)
                  y0 = r0 * sin(phi)
                  z0=z_grid(icell)!z0.99999*z_lim(i,j+1)
@@ -1572,13 +1572,13 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
                  Stokes(:) = 0.0_dp ; Stokes(1) = 1.0_dp ;
                  call physical_length(id,lambda,p_lambda,Stokes,icell,x0,y0,z0,u0,v0,w0, &
                       flag_star,flag_direct_star,tau_max,dvol1,flag_sortie,lpacket_alive)
-                 if (.not.flag_sortie) then ! le photon ne sort pas
-                    ! la cell et celles en dessous sont dans la zone noire
+                 if (.not.flag_sortie) then ! the photon does not exit
+                    ! the cell and those below are in the dark zone
                     do jj=1,j
                        icell = cell_map(i,jj,pk)
                        l_dark_zone(icell) = .true.
                     enddo
-                    ! on passe a la cell suivante
+                    ! proceed to the next cell
                     cycle cell_3D
                  endif
               enddo
@@ -1590,9 +1590,9 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
               icell = cell_map(i,j,pk)
               do n=1,nbre_angle
                  id=1
-                 ! position et direction vol
-                 angle= pi * real(n)/real(nbre_angle+1)! entre 0 et pi
-                 r0=r_grid(icell)!1.00001*r_lim(i-1) ! cell 1 traitee a part
+                 ! position and flight direction
+                 angle= pi * real(n)/real(nbre_angle+1)! between 0 and pi
+                 r0=r_grid(icell)!1.00001*r_lim(i-1) ! cell 1 processed separately
                  x0 = r0 *cos(phi)
                  y0 = r0 * sin(phi)
                  z0=-z_grid(icell)!-0.99999*z_lim(i,abs(j)+1)
@@ -1602,14 +1602,14 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
                  Stokes(:) = 0.0_dp ; Stokes(1) = 1.0_dp ;
                  call physical_length(id,lambda,p_lambda,Stokes,icell,x0,y0,z0,u0,v0,w0, &
                       flag_star,flag_direct_star,tau_max,dvol1,flag_sortie,lpacket_alive)
-                 if (.not.flag_sortie) then ! le photon ne sort pas
-                    ! la cell et celles en dessous sont dans la zone noire
+                 if (.not.flag_sortie) then ! the photon does not exit
+                    ! the cell and those below are in the dark zone
                     do jj=1,-1
                        icell = cell_map(i,j,pk)
                        l_dark_zone(icell) = .true.
                     enddo
                     l_is_dark_zone=.true.
-                    ! on passe a la cell suivante
+                    ! proceed to the next cell
                     cycle cell_3D_2
                  endif
               enddo
@@ -1653,7 +1653,7 @@ end subroutine define_dark_zone
 !***********************************************************
 
 subroutine no_dark_zone()
-! Definie les variables quand il n'y a pas de zone noire
+! Defines variables when there is no dark zone
 ! C . Pinte
 ! 22/04/05
 

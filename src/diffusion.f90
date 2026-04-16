@@ -15,9 +15,9 @@ module diffusion
   contains
 
 subroutine setDiffusion_coeff(i)
-  ! calcule les coefficients de diffusion pour
-  ! les cellules dans la zone ou est utilisee
-  ! l'approximation de diffusion
+  ! Computes the diffusion coefficients for
+  ! the cells in the zone where the
+  ! diffusion approximation is used
   ! C. Pinte
   ! 15/02/07
 
@@ -26,8 +26,8 @@ subroutine setDiffusion_coeff(i)
   real(kind=dp) :: cst_Dcoeff, wl, delta_wl, cst, cst_wl, coeff_exp, dB_dT, Temp, total_sum
   integer :: j, k, lambda, icell, p_icell
 
-  real(kind=dp), parameter :: precision = 1.0e-1_dp ! Variation de temperature au dela de laquelle le coeff de diff et mis a jour
-  ! le mettre a 0, evite le drole de BUG
+  real(kind=dp), parameter :: precision = 1.0e-1_dp ! Temperature variation beyond which the diffusion coefficient is updated
+  ! Setting it to 0 avoids a peculiar BUG
 
   cst_Dcoeff = pi/(12.*sigma)
 
@@ -40,14 +40,14 @@ subroutine setDiffusion_coeff(i)
         if (lvariable_dust) p_icell = icell
         !Temp=Tdust(i,j,k)
         if (abs(DensE(i,j,k) - DensE_m1(i,j,k)) > precision * DensE_m1(i,j,k)) then
-           ! On met a jour le coeff
+           ! Update the coefficient
        !    write(*,*) "update", i,j, DensE(i,j,k), DensE_m1(i,j,k)
            Temp = DensE(i,j,k)**0.25
 
            cst=thermal_const/Temp
            total_sum=0.0_dp
            do lambda=1, n_lambda
-              ! length d'onde en metre
+              ! wavelength in metres
               wl = tab_lambda(lambda)*1.e-6
               delta_wl=tab_delta_lambda(lambda)*1.e-6
               cst_wl=cst/wl
@@ -66,7 +66,7 @@ subroutine setDiffusion_coeff(i)
      enddo
   enddo
 
-  ! Condition limite
+  ! Boundary condition
   Dcoeff(:,0,:) = Dcoeff(:,1,:)
 
   return
@@ -76,9 +76,9 @@ end subroutine setDiffusion_coeff
 !************************************************************
 
 subroutine setDiffusion_coeff0(i)
-  ! calcule les coefficients de diffusion pour
-  ! les cellules dans la zone ou est utilisee
-  ! l'approximation de diffusion
+  ! Computes the diffusion coefficients for
+  ! the cells in the zone where the
+  ! diffusion approximation is used
   ! C. Pinte
   ! 15/02/07
 
@@ -101,7 +101,7 @@ subroutine setDiffusion_coeff0(i)
         cst=thermal_const/Temp
         total_sum=0.0_dp
         do lambda=1, n_lambda
-           ! length d'onde en metre
+           ! wavelength in metres
            wl = tab_lambda(lambda)*1.e-6
            delta_wl=tab_delta_lambda(lambda)*1.e-6
            cst_wl=cst/wl
@@ -119,7 +119,7 @@ subroutine setDiffusion_coeff0(i)
      enddo
   enddo
 
-  ! Condition limite
+  ! Boundary condition
   ! Dcoeff(:,0,:) = Dcoeff(:,1,:)
 
   return
@@ -129,10 +129,10 @@ end subroutine setDiffusion_coeff0
 !************************************************************
 
 subroutine Temperature_to_DensE(ri)
-  ! Calcule la densite d'energie des cellules a partir de leur
+  ! Computes the energy density of cells from their
   ! temperature
-  ! Converti toute la grid pour avoir les cellules sur le bord
-  ! Execute une seule fois donc pas de soucis
+  ! Converts the whole grid to have cells on the boundary
+  ! Executed only once, so no performance concern
   ! C. Pinte
   ! 15/02/07
 
@@ -144,11 +144,11 @@ subroutine Temperature_to_DensE(ri)
      if (j==0) cycle
      do k=1,n_az
         icell = cell_map(ri,j,k)
-        DensE(ri,j,k) =  Tdust(icell)**4 ! On se tappe de la constante non ??? 4.*sigma/c
+        DensE(ri,j,k) =  Tdust(icell)**4 ! The constant does not matter here (4.*sigma/c)
      enddo
   enddo
 
-  ! Condition limite : pas de flux au niveau du plan median
+  ! Boundary condition: no flux at the mid-plane
   DensE(ri,0,:) = DensE(ri,1,:)
 
   DensE_m1(ri,:,:) = DensE(ri,:,:)
@@ -160,8 +160,8 @@ end subroutine Temperature_to_DensE
 !************************************************************
 
 subroutine DensE_to_temperature()
-  ! Calcule la temperature des cellules dans le zone de diffusion
-  ! a partir de leur densite d'energie
+  ! Computes the temperature of cells in the diffusion zone
+  ! from their energy density
   ! C. Pinte
   ! 15/02/07
 
@@ -181,7 +181,7 @@ end subroutine DensE_to_temperature
 !***********************************************************
 
 subroutine clean_temperature()
-  ! Met la temperature a Tmin dans la zone sombre
+  ! Set the temperature to Tmin in the dark zone
   ! C. Pinte
   ! 15/02/07
 
@@ -201,11 +201,11 @@ end subroutine clean_temperature
 !***********************************************************
 
 subroutine Temp_approx_diffusion()
-  ! Calcul de la temperature dans les zones profondes du disque a l'aide
-  ! d'une equation de diffusion (equation parabolique).
-  ! Le coeff de diffusion depend de T donc pb non linaire
-  ! => resolution par le schema explicite d'integration : la solution stationnaire
-  ! est la limite a t --> inf de la solution non stationnaire
+  ! Compute the temperature in the deep disk zones using
+  ! a diffusion equation (parabolic equation).
+  ! The diffusion coefficient depends on T, making this a nonlinear problem.
+  ! => solved with an explicit integration scheme: the steady-state solution
+  ! is the limit as t --> inf of the transient solution
   ! C. Pinte
   ! 15/02/07
 
@@ -217,7 +217,7 @@ subroutine Temp_approx_diffusion()
 
   write(*,*) "Computing 2D diffusion approx. in central parts of the disk"
 
-  ! Pour initier la premiere boucle
+  ! To initialise the first loop iteration
   lconverged=.false.
 
   precision = 1.0e-6
@@ -234,7 +234,7 @@ subroutine Temp_approx_diffusion()
         call temperature_to_DensE(i)
      enddo
 
-     ! Calcul coeff de diffusion : condition limite
+     ! Compute diffusion coefficients: boundary condition
      do i=1,n_rad
         call setDiffusion_coeff0(i)
      enddo
@@ -250,7 +250,7 @@ subroutine Temp_approx_diffusion()
      infinie : do
         n_iter = n_iter + 1
 
-        ! Un pas de temps de l'equation de diffusion
+        ! One time step of the diffusion equation
         call iter_Temp_approx_diffusion(stabilite,max_delta_E_r,lconverged)
 
         !test divergence
@@ -262,7 +262,7 @@ subroutine Temp_approx_diffusion()
            exit infinie
         endif
 
-        ! C'est debile : temp pas definie
+        ! This is wrong: temperature is undefined here
 !        Tdust_old = Tdust
 
 !        write(*,*) n_iter, max_delta_E_r, precision  !, maxval(DensE)
@@ -270,7 +270,7 @@ subroutine Temp_approx_diffusion()
         ! Test_convergence
         if (max_delta_E_r < precision) exit infinie
 
-        ! Calcul des nouveaux coeff de diffusion pour iteration suivante
+        ! Computes new diffusion coefficients for the next iteration
         do i=1, n_rad
            call setDiffusion_coeff(i)
         enddo
@@ -290,11 +290,11 @@ end subroutine Temp_approx_diffusion
 !************************************************************
 
 subroutine Temp_approx_diffusion_vertical()
-  ! Calcul de la temperature dans les zones profondes du disque a l'aide
-  ! d'une equation de diffusion (equation parabolique).
-  ! Le coeff de diffusion depend de T donc pb non linaire
-  ! => resolution par le schema explicite d'integration : la solution stationnaire
-  ! est la limite a t --> inf de la solution non stationnaire
+  ! Compute the temperature in the deep disk zones using
+  ! a diffusion equation (parabolic equation).
+  ! The diffusion coefficient depends on T, making this a nonlinear problem.
+  ! => solved with an explicit integration scheme: the steady-state solution
+  ! is the limit as t --> inf of the transient solution
   ! C. Pinte
   ! 15/02/07
 
@@ -307,7 +307,7 @@ subroutine Temp_approx_diffusion_vertical()
 
   call clean_temperature()
 
-  ! Pour initier la premiere boucle
+  ! To initialise the first loop iteration
   !-- Tdust_old = T_min
   !-- Temp0 = Tdust
 
@@ -327,7 +327,7 @@ subroutine Temp_approx_diffusion_vertical()
         ! Passage temperature -> densite d'energie
         call temperature_to_DensE(i)
 
-        ! Calcul coeff de diffusion : condition limite
+        ! Compute diffusion coefficients: boundary condition
         call setDiffusion_coeff0(i)
 
         if (stabilite < 0.01) call error("diffusion approximation does not seem to converge")
@@ -337,7 +337,7 @@ subroutine Temp_approx_diffusion_vertical()
         infinie : do
            n_iter = n_iter + 1
 
-           ! Un pas de temps de l'equation de diffusion
+           ! One time step of the diffusion equation
            call iter_Temp_approx_diffusion_vertical(i,stabilite,max_delta_E_r,lconverged)
 
            !test divergence
@@ -354,7 +354,7 @@ subroutine Temp_approx_diffusion_vertical()
            ! Test_convergence
            if (max_delta_E_r < precision) exit infinie
 
-           ! Calcul des nouveaux coeff de diffusion pour iteration suivante
+           ! Computes new diffusion coefficients for the next iteration
            call setDiffusion_coeff(i)
 
         enddo infinie
@@ -376,9 +376,9 @@ end subroutine Temp_approx_diffusion_vertical
 !***********************************************************
 
 subroutine iter_Temp_approx_diffusion(stabilite,max_delta_E_r,lconverge)
-  ! Realise une iteration du schema explicite d'integration
-  ! de l'equation de diffusion sur la densite d'energie des cellules
-  ! ie : un pas de temps de l'equation non stationnaire
+  ! Performs one iteration of the explicit integration scheme
+  ! of the diffusion equation on the cell energy density
+  ! ie: one time step of the non-stationary equation
   ! C. Pinte
   ! 15/02/07
 
@@ -408,18 +408,18 @@ subroutine iter_Temp_approx_diffusion(stabilite,max_delta_E_r,lconverge)
      enddo !i
   enddo !k
 
-  ! On prend le mini + un factor de securite
+  ! We take the minimum + a safety factor
   dt = stabilite * 0.5 * minval(tab_dt)
 
  ! write(*,*) "dt", dt
 
-  ! Sauvegarde densite d'energie
+  ! Saves the energy density
   DensE_m1 = DensE
 
-  ! Boucle sur les celules de la zone de diffusion
+  ! Loop over the cells in the diffusion zone
   max_delta_E_r = 0.0
 
-  ! TODO : Boucle croisee a chaque iteration pour mieux lisser le bruit ??
+  ! TODO : Cross loop at each iteration to better smooth the noise ??
 
 
   do k=1, n_az
@@ -432,9 +432,9 @@ subroutine iter_Temp_approx_diffusion(stabilite,max_delta_E_r,lconverge)
      do i=max(ri_in_dark_zone(k) -delta_cell_dark_zone,3), min(ri_out_dark_zone(k)+ delta_cell_dark_zone,n_rad-2)
         do j=1, zj_sup_dark_zone(i,k) + delta_cell_dark_zone
 
-           ! Calcul du Laplacien en cylindrique
-           ! Attention D rentre dans le laplacien car il depend de laposition
-           ! Ne marche qu'en 2D pour le moment
+           ! Computes the Laplacian in cylindrical coordinates
+           ! Warning: D enters the Laplacian since it depends on the position
+           ! Only works in 2D for now
            dE_dr_m1 = (DensE_m1(i,j,k) - DensE_m1(i-1,j,k))/(r_grid(cell_map(i,j,k))-r_grid(cell_map(i-1,j,k)))
            dE_dr_p1 = (DensE_m1(i+1,j,k) - DensE_m1(i,j,k))/(r_grid(cell_map(i+1,j,k))-r_grid(cell_map(i,j,k)))
 
@@ -469,14 +469,14 @@ subroutine iter_Temp_approx_diffusion(stabilite,max_delta_E_r,lconverge)
            ! Laplacien
            D_Laplacien_E = d2E_dr2 + d2E_dz2
 
-           ! On avance d'un pas de temps
+           ! We advance by one time step
            delta_E =  D_Laplacien_E * dt
 
            DensE(i,j,k) = DensE_m1(i,j,k) + delta_E
 
            if (DensE(i,j,k) < 0.) write(*,*) DensE(i,j,k), DensE_m1(i,j,k), delta_E
 
-           ! Augmentation relative de la densite d'energie
+           ! Relative energy density increase
            delta_E_r = delta_E/DensE(i,j,k)
            if (delta_E_r > max_delta_E_r) max_delta_E_r = delta_E_r
         enddo !j
@@ -485,7 +485,7 @@ subroutine iter_Temp_approx_diffusion(stabilite,max_delta_E_r,lconverge)
      !$omp end parallel
   enddo !k
 
-  ! Condition limite : pas de flux au niveau du plan median
+  ! Boundary condition: no flux at the mid-plane
   DensE(:,0,:) = DensE(:,1,:)
 
 
@@ -502,9 +502,9 @@ end subroutine iter_Temp_approx_diffusion
 !************************************************************
 
 subroutine iter_Temp_approx_diffusion_vertical(ri,stabilite,max_delta_E_r,lconverge)
-  ! Realise une iteration du schema explicite d'integration
-  ! de l'equation de diffusion sur la densite d'energie des cellules
-  ! ie : un pas de temps de l'equation non stationnaire
+  ! Performs one iteration of the explicit integration scheme
+  ! of the diffusion equation on the cell energy density
+  ! ie: one time step of the non-stationary equation
   ! C. Pinte
   ! 15/02/07
 
@@ -530,17 +530,17 @@ subroutine iter_Temp_approx_diffusion_vertical(ri,stabilite,max_delta_E_r,lconve
      tab_dt(j) = dz**2/Dcoeff(ri,j,k)
   enddo !j
 
-  ! On prend le mini + un factor de securite
+  ! We take the minimum + a safety factor
   dt = stabilite * 0.5 * minval(tab_dt)
 
 
 !  write(*,*) "dt", dt
 
 
-  ! Sauvegarde densite d'energie
+  ! Saves the energy density
   DensE_m1(ri,:,:) = DensE(ri,:,:)
 
-  ! Boucle sur les celules de la zone de diffusion
+  ! Loop over the cells in the diffusion zone
   max_delta_E_r = 0.0
 
   do j=1, zj_sup_dark_zone(ri,k) + delta_cell_dark_zone
@@ -549,7 +549,7 @@ subroutine iter_Temp_approx_diffusion_vertical(ri,stabilite,max_delta_E_r,lconve
      dE_dz_m1 = (DensE_m1(ri,j,k) - DensE_m1(ri,j-1,k))
 
 
-     ! Ca rend le truc instable
+     ! It makes things unstable
     ! Dcoeff_p = 0.5_dp * (Dcoeff(ri,j,k) + Dcoeff(ri,j+1,k))
     ! Dcoeff_m = 0.5_dp * (Dcoeff(ri,j,k) + Dcoeff(ri-1,j-1,k))
      ! Plus stable
@@ -568,19 +568,19 @@ subroutine iter_Temp_approx_diffusion_vertical(ri,stabilite,max_delta_E_r,lconve
      ! Laplacien
      D_Laplacien_E =  d2E_dz2
 
-     ! On avance d'un pas de temps
+     ! We advance by one time step
      delta_E =  D_Laplacien_E * dt
 
    !  write(*,*) "DeltaE", j, delta_E
 
      DensE(ri,j,k) = DensE_m1(ri,j,k) + delta_E
 
-     ! Augmentation relative de la densite d'energie
+     ! Relative energy density increase
      delta_E_r = delta_E/DensE(ri,j,k)
      if (delta_E_r > max_delta_E_r) max_delta_E_r = delta_E_r
   enddo !j
 
-  ! Condition limite : pas de flux au niveau du plan median
+  ! Boundary condition: no flux at the mid-plane
   DensE(ri,0,:) = DensE(ri,1,:)
 
   if (maxval(DensE) > 1.0e30) then
@@ -667,7 +667,7 @@ subroutine compute_Planck_opacities(icell, Planck_opacity,rec_Planck_opacity)
      norm = 0.0_dp
      cst    = thermal_const/T
      do lambda = 1,n_lambda
-        ! length d'onde en metre
+        ! wavelength in metres
         wl       = tab_lambda(lambda)*1.e-6
         delta_wl = tab_delta_lambda(lambda)*1.e-6
         cst_wl   = cst/wl

@@ -84,7 +84,7 @@ module atom_transfer
       write(100) shape(tau_surface_map)
       ! write(100) shape(image)
       write(100) vacuum2air(n_lambda,tab_lambda_nm)
-      ! Boucles car ca ne passe pas avec sum directement (ifort sur mac)
+      ! Loops because it does not work with sum directly (ifort sur mac)
       ! do ibin=1,RT_n_incl
       !    do iaz=1,RT_n_az
       !       do j=1,npix_y
@@ -131,12 +131,12 @@ module atom_transfer
    ! ------------------------------------------------------------------------------------ !
       integer :: etape, etape_start, etape_end, iray
       integer :: n_iter, id, i, alloc_status, n_rayons
-      ! integer :: , iray_start, n_rayons_max
+      ! integer :: , iray_start, n_radiuss_max
       integer :: nact
       integer :: icell, ilevel, nb, nr, unconverged_cells
       integer, parameter :: maxIter = 300!150!, maxIter3 = 10
       !ray-by-ray integration of the SEE
-      integer, parameter :: one_ray = 1!, n_rayons_start3 = 100
+      integer, parameter :: one_ray = 1!, n_radiuss_start3 = 100
       logical :: lfixed_Rays, lconverged, lprevious_converged
       real :: rand, rand2, rand3, unconverged_fraction
       real(kind=dp) :: precision, vth
@@ -209,14 +209,14 @@ module atom_transfer
       mem_alloc_local = mem_alloc_local + 4*sizeof(dM)
 
 
-      !How many steps and which one
+      !How many steps nd which one
       etape_start = istep_start
       etape_end = istep_end
       ! lprecise_pop = .false.
       ! if (lprecise_pop) then
       ! !iray_start reset to 1 we recompute with twice has much rays but from the start
       !    etape_end = 3
-      !    n_rayons_max =  n_rayons_start3 * (2**(maxIter3-1))
+      !    n_radiuss_max =  n_radiuss_start3 * (2**(maxIter3-1))
       ! endif
       if (allocated(stream)) deallocate(stream)
       allocate(stream(nb_proc),stat=alloc_status)
@@ -277,7 +277,7 @@ module atom_transfer
          ! else if (etape==3) then
          ! !or solution with fixed rays that increase after each iteration??
          !    lfixed_rays = .false.
-         !    n_rayons = n_rayons_start3 !start, same as step 2
+         !    n_radiuss = n_radiuss_start3 !start, same as step 2
          !    conv_speed_limit = conv_speed_limit_mc
          !    precision = min(1d-1,10.0*dpops_max_error)
          !    !only once for all iterations on this step
@@ -345,7 +345,7 @@ module atom_transfer
             ! else
             !    !update rays weight
             !    if (allocated(wmu)) deallocate(wmu)
-            !    allocate(wmu(n_rayons));wmu(:) = 1.0_dp / real(n_rayons,kind=dp)
+            !    allocate(wmu(n_radiuss));wmu(:) = 1.0_dp / real(n_radiuss,kind=dp)
             end if
 
             !init here, to be able to stop/start electronic density iterations within MALI iterations
@@ -362,9 +362,9 @@ module atom_transfer
             !$omp private(l_iterate,weight,diff)&
             !$omp private(nact, at) & ! Acceleration of convergence
             !$omp shared(ne,ngpop,ng_index,Ng_Norder, accelerated, lng_turned_on, Jnu, iloc) & ! Ng's Acceleration of convergence
-            !$omp shared(etape,lforce_lte,n_cells,voronoi,r_grid,z_grid,phi_grid,n_rayons,xmu,wmu,xmux,xmuy) &
+            !$omp shared(etape,lforce_lte,n_cells,voronoi,r_grid,z_grid,phi_grid,n_radiuss,xmu,wmu,xmux,xmuy) &
             !$omp shared(pos_em_cell,labs,n_lambda,tab_lambda_nm, icompute_atomRT,lcell_converged,diff_loc,seed,nb_proc,gtype) &
-            !$omp shared(stream,n_rayons_mc,lvoronoi,ibar,n_cells_done,l_iterate_ne,Itot,precision,lcswitch_enabled)
+            !$omp shared(stream,n_radiuss_mc,lvoronoi,ibar,n_cells_done,l_iterate_ne,Itot,precision,lcswitch_enabled)
             !$omp do schedule(static,omp_chunk_size)
             do icell=1, n_cells
                !$ id = omp_get_thread_num() + 1
@@ -411,7 +411,7 @@ module atom_transfer
 
 
                   else
-                   ! Position aleatoire dans la cell
+                   ! Random position in the cell
                      do iray=1,n_rayons
 
                         rand  = sprng(stream(id))
@@ -420,7 +420,7 @@ module atom_transfer
 
                         call pos_em_cell(icell ,rand,rand2,rand3,x0,y0,z0)
 
-                        ! Direction de propagation aleatoire
+                        ! Random propagation direction
                         rand = sprng(stream(id))
                         W0 = 2.0_dp * rand - 1.0_dp !nz
                         W02 =  1.0_dp - W0*W0 !1-mu**2 = sin(theta)**2
@@ -606,7 +606,7 @@ module atom_transfer
                   write(*,*) " *** dne", dne
                   write(*,*) " *** stopping electronic density convergence at iteration ", n_iter
                   n_iterate_ne = 0
-                  !beware, it is stopped for all subsequent steps or calls of the subroutine.
+                  !beware, it is stopped for all subsequent steps r calls of the subroutine.
                endif
             end if
             !***********************************************************!
@@ -670,7 +670,7 @@ module atom_transfer
                      if (.not.lng_acceleration) &
                         ngpop(1:at%Nlevel,nact,icell,ng_index) = at%n(:,icell)
 
-                     !Recompute damping and profiles once with have set the new non-LTE pops (and new ne) for next ieration.
+                     !Recompute damping and profiles once with have set the new non-LTE pops (and new ne) for next iteration.
                      !Only for Active Atoms here. PAssive Atoms are updated only if electronic density is iterated.
                      !Also need to change if profile interp is used or not! (a and phi)
                      do ilevel=1,at%nline
@@ -749,10 +749,10 @@ module atom_transfer
                   end if
                ! else
                !    !increase number of rays only if it converges already ?
-               !    n_rayons = n_rayons * 2
-               !       ! On continue en calculant 2 fois plus de rayons
-               !       ! On les ajoute a l'ensemble de ceux calcules precedemment
-               !       ! iray_start = iray_start + n_rayons
+               !    n_radiuss = n_radiuss * 2
+               !       ! On continue en calculant 2 fois plus de radiuss
+               !       ! Add them to the set of those previously calculated
+               !       ! iray_start = iray_start + n_radiuss
                !    if (n_iter >= maxIter3) then
                !       call warning("not enough rays to converge in step 3!!")
                !       lconverged = .true.
@@ -854,12 +854,12 @@ module atom_transfer
       ! write(100) Jnu
       ! close(100); deallocate(jnu)
       ! open(100, file="inu.b",form="unformatted",status='unknown',access="stream")
-      ! write(100) n_lambda,n_rayons_max,n_cells
+      ! write(100) n_lambda,n_radiuss_max,n_cells
       ! write(100) tab_lambda_nm
       ! if (lhealpix) then
       !    write(100) healpix_weight(healpix_lorder)
       ! else
-      !    write(100) 1.0/real(n_rayons,kind=dp)!n_rayons is max here at the moment
+      !    write(100) 1.0/real(n_radiuss,kind=dp)!n_radiuss is max here at the moment
       ! endif
       ! write(100) iloc
       ! deallocate(iloc); close(100)
@@ -955,7 +955,7 @@ module atom_transfer
             x0=x;y0=y;z0=z
             next_cell = i1
             v1 = v_proj(i1,x0,y0,z0,u,v,w)
-            infinie : do ! Boucle infinie
+            infinie : do ! Infinite loop
                i2 = next_cell
                x0=x1 ; y0=y1 ; z0=z1
                lcell_not_empty = (i2 <= n_cells)
@@ -1105,7 +1105,7 @@ module atom_transfer
          tab_lambda_sed = tab_lambda
       endif
 
-      !associate the temperature in the regions where the dusty of dust is non-zero (if any) to the dust
+      !associate the temperature in the regions where the density of dust is non-zero (if any) to the dust
       !temperature.
       if (ldust_atom) then
          call deallocate_em_th_mol()
@@ -1285,13 +1285,13 @@ module atom_transfer
          return ! no dust
       endif
 
-      ! On n'est interesse que par les prop d'abs : pas besoin des matrices de mueller
-      ! -> pas de polarisation, on utilise une HG
+      ! We are only interested in absorption properties : no need for Mueller matrices
+      ! -> no polarization, using an HG
       scattering_method=1 ; lscattering_method1 = .true. ; p_lambda = 1
       aniso_method = 2 ; lmethod_aniso1 = .false.
       lsepar_pola = .false.
       ltemp = .false.
-      lmono = .true. ! equivalent au mode sed2
+      lmono = .true. ! equivalent to sed2 mode
 
       if (lvariable_dust) then
          p_icell => icell
@@ -1352,34 +1352,34 @@ module atom_transfer
       iray = 1
       ri = 2*n_rad ; zj=1 ; phik=1
 
-      ! le nbre de subpixel en x est 2^(iter-1)
+      ! the number of subpixels in x is 2^(iter-1)
       subpixels = 1
       iter = 1
       diff = 0.
       I0 = 0.0_dp
 
-      infinie : do ! Boucle infinie tant que le pixel n'est pas converge
+      infinie : do ! Infinite loop until pixel is converged
          npix2 =  real(subpixels)**2
          Iold = I0
          I0 = 0.0_dp
-         ! Vecteurs definissant les sous-pixels
+         ! Vectors defining sub-pixels
          sdx(:) = dx(:) / real(subpixels,kind=dp)
          sdy(:) = dy(:) / real(subpixels,kind=dp)
 
-       !      !L'obs est en dehors de la grid
+       !      !The observer is outside the grid
        !      ri = 2*n_rad ; zj=1 ; phik=1
 
-         ! Boucle sur les sous-pixels qui calcule l'intensite au centre
-         ! de chaque sous pixel
+         ! Loop over sub-pixels that calculate l'intensite au centre
+         ! of each sub-pixel
          do i = 1,subpixels
             do j = 1,subpixels
-            ! Centre du sous-pixel
+            ! Sub-pixel center
                x0 = pixelcorner(1) + (i - 0.5_dp) * sdx(1) + (j-0.5_dp) * sdy(1)
                y0 = pixelcorner(2) + (i - 0.5_dp) * sdx(2) + (j-0.5_dp) * sdy(2)
                z0 = pixelcorner(3) + (i - 0.5_dp) * sdx(3) + (j-0.5_dp) * sdy(3)
-               ! On se met au bord de la grid : propagation a l'envers
+               ! Put ourselves at the grid boundary:  reverse propagation
                call move_to_grid(id, x0,y0,z0,u0,v0,w0, icell,lintersect)
-               if (lintersect) then ! On rencontre la grid, on a potentiellement du flux
+               if (lintersect) then ! We encounter the grid, we potentially have flux
                   call integ_ray_atom(id,icell,x0,y0,z0,u0,v0,w0,iray,labs,n_lambda,tab_lambda_nm)
 
                   I0 = I0 + Itot(:,iray,id)
@@ -1392,18 +1392,18 @@ module atom_transfer
          I0 = I0 / npix2
 
          if (iter < n_iter_min) then
-            ! On itere par defaut
+            ! Iterate by default
             subpixels = subpixels * 2
          else if (iter >= n_iter_max) then
-            ! On arrete pour pas tourner dans le vide
+            ! Stop to avoid empty cycles
             exit infinie
          else
-            ! On fait le test sur a difference
+            ! Test on the difference
             diff = maxval( abs(I0 - Iold) / (I0 + 1e-300_dp) )
             ! There is no iteration for Q, U, V, assuming that if I is converged, then Q, U, V also.
             ! Can be added and then use diff with I = (sqrt(I**2 + Q**2 + U**2 + V**2))
             if (diff > precision ) then
-               ! On est pas converge
+               ! Not converged
                subpixels = subpixels * 2
             else
              !write(*,*) "Pixel converged", ipix, jpix, i, j, iter, diff
@@ -1413,7 +1413,7 @@ module atom_transfer
          iter = iter + 1
       end do infinie
 
-      ! Prise en compte de la surface du pixel (en sr)
+      ! Taking into account the pixel surface (in sr)
 
       ! Flux out of a pixel in W/m2/Hz/pix
       normF = ( pixelsize / (distance*pc_to_AU) )**2
@@ -1465,33 +1465,33 @@ module atom_transfer
       u = tab_u_RT(ibin,iaz) ;  v = tab_v_RT(ibin,iaz) ;  w = tab_w_RT(ibin)
       uvw = (/u,v,w/) !vector position
 
-      ! Definition des vecteurs de base du plan image dans le repere universel
-      ! Vecteur x image sans PA : il est dans le plan (x,y) et orthogonal a uvw
+      ! Definition of basis vectors for the image plane in the universal frame
+      ! Image x-vector without PA:  it is in the (x,y) plane and orthogonal to uvw
       x = (/cos(tab_RT_az(iaz) * deg_to_rad),sin(tab_RT_az(iaz) * deg_to_rad),0._dp/)
 
-      ! Vecteur x image avec PA
+      ! Image x-vector with PA
       if (abs(ang_disque) > tiny_real) then
-         ! Todo : on peut faire plus simple car axe rotation perpendiculaire a x
+         ! Todo : it can be simpler since rotation axis is perpendicular to x
          x_plan_image = rotation_3d(uvw, ang_disque, x)
       else
          x_plan_image = x
       endif
 
-      ! Vecteur y image avec PA : orthogonal a x_plan_image et uvw
+      ! Image y-vector with PA:  orthogonal to x_plan_image and uvw
       y_plan_image = -cross_product(x_plan_image, uvw)
 
       write(*,*) "x-image =           ", real(x_plan_image(:))
       write(*,*) "y-image =           ", real(y_plan_image(:))
 
-      ! position initiale hors modele (du cote de l'observateur)
-      ! = centre de l'image
-      l = 10.*Rmax  ! on se met loin ! in AU
+      ! initial position outside model (on observer side)
+      ! = center of the image
+      l = 10.*Rmax  ! go far! in AU
 
       x0 = u * l  ;  y0 = v * l  ;  z0 = w * l
       center(1) = x0 ; center(2) = y0 ; center(3) = z0
       center(:) = center(:) - image_offset_centre(:)
 
-      ! Coin en bas gauche de l'image
+      ! Bottom-left corner of the image
       Icorner(:) = center(:) - 0.5 * map_size * (x_plan_image + y_plan_image)
 
       if (RT_line_method==1) then !log pixels
@@ -1519,13 +1519,13 @@ module atom_transfer
          fact_A = sqrt(pi * (fact_r - 1.0_dp/fact_r)  / n_phi_RT )
 
 
-         ! Boucle sur les rayons d'echantillonnage
+         ! Loop over sampling radii
          !$omp parallel &
          !$omp default(none) &
          !$omp private(ri_RT,id,r,taille_pix,phi_RT,phi,pixelcorner) &
          !$omp shared(tab_r,fact_A,x,x_plan_image,y_plan_image,center,dx,dy,u,v,w,i,j) &
          !$omp shared(n_iter_min,n_iter_max,l_sym_ima,cst_phi,ibin,iaz,fact_r)
-         id = 1 ! pour code sequentiel
+         id = 1 ! for sequential code
 
          if (l_sym_ima) then
             cst_phi = pi  / real(n_phi_RT,kind=dp)
@@ -1538,11 +1538,11 @@ module atom_transfer
             !$ id = omp_get_thread_num() + 1
             r = tab_r(ri_RT)
             taille_pix =  fact_A * r ! racine carree de l'aire du pixel
-            do phi_RT=1,n_phi_RT ! de 0 + eps Ã  2pi - eps (eps = pi/n_phi_RT)
+            do phi_RT=1,n_phi_RT ! from 0  eps   2pi - eps eps  pi/n_phi_RT)
                phi = cst_phi * (real(phi_RT,kind=dp) -0.5_dp)
 
                pixelcorner(:,id) = center(:) + r * sin(phi) * x_plan_image + r * cos(phi) * y_plan_image
-               ! C'est le centre en fait car dx = dy = 0.
+               ! Actually the center since dx = dy = 0.
                call intensite_pixel_atom(id,ibin,iaz,n_iter_min,n_iter_max, i,j,pixelcorner(:,id),taille_pix,dx,dy,u,v,w)
             end do !j
          end do !i
@@ -1556,7 +1556,7 @@ module atom_transfer
 
 
       elseif (RT_line_method == 2) then !method 2
-         ! Vecteurs definissant les pixels (dx,dy) dans le repere universel
+         ! Vectors defining pixels (dx,dy) in the universal frame
          taille_pix = (map_size/zoom) / real(max(npix_x,npix_y),kind=dp) ! en AU
          lresolved = .true.
 
@@ -1579,7 +1579,7 @@ module atom_transfer
          !$omp shared(n_iter_min,n_iter_max,ibin,iaz)
 
          ! loop on pixels
-         id = 1 ! pour code sequentiel
+         id = 1 ! for sequential code
          n_iter_min = 1
          n_iter_max = 1
          !$omp do schedule(dynamic,1)
@@ -1615,7 +1615,7 @@ module atom_transfer
          ! !$omp shared(dx, dy, npix_x_max,l,healpix_lorder,tab_pix_healpix)
 
          ! ! loop on pixels
-         ! id = 1 ! pour code sequentiel
+         ! id = 1 ! for sequential code
          ! !$omp do schedule(dynamic,1)
          ! do i=1, npix_x_max !from healpix
          !    !$ id = omp_get_thread_num() + 1
@@ -1658,7 +1658,7 @@ module atom_transfer
          x_plan_image = x
       endif
 
-      ! Vecteur y image avec PA : orthogonal a x_plan_image et uvw
+      ! Image y-vector with PA:  orthogonal to x_plan_image and uvw
       y_plan_image = -cross_product(x_plan_image, uvw)
 
       l = 10.*Rmax
@@ -1673,7 +1673,7 @@ module atom_transfer
       dx(:) = x_plan_image * taille_pix
       dy(:) = y_plan_image * taille_pix
 
-      ! Coin en bas gauche de l'image
+      ! Bottom-left corner of the image
       Icorner(:) = center(:) - ( 0.5 * npix_x * dx(:) +  0.5 * npix_y * dy(:))
 
 
@@ -1685,7 +1685,7 @@ module atom_transfer
       !$omp shared(ibin,iaz,tau_surface_map,move_to_grid,pixelcenter,tab_lambda_nm,n_lambda)
 
       ! loop on pixels
-      id = 1 ! pour code sequentiel
+      id = 1 ! for sequential code
       !$omp do schedule(dynamic,1)
       do i = 1,npix_x
          !$ id = omp_get_thread_num() + 1
@@ -1700,7 +1700,7 @@ module atom_transfer
             u0 = -u ; v0 = -v ; w0 = -w
             !at init x0 is the same everywhere
             call move_to_grid(id, x0(1),y0(1),z0(1),u0,v0,w0, icell,lintersect)
-            if (lintersect) then ! On rencontre la grid, on a potentiellement du flux
+            if (lintersect) then ! We encounter the grid, we potentially have flux
                call physical_length_atom(id,icell,x0,y0,z0,u0,v0,w0,n_lambda,tab_lambda_nm,tau,flag_sortie)
                !flag_sortie always .false. at the moment. x0,y0,z0 set to 0 before integrating.
                if (flag_sortie) then

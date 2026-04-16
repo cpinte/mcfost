@@ -213,7 +213,7 @@ module escape
         !but also mean solid angle subtended by each cell to the different stars, including
         !shock regions if any. These are used to weight the contributions from the star in the escape prob.
         !SEE.
-        !TO DO: occulation by dust should be included somehow.
+        !TO DO: occultation by dust should be included somehow.
 
         ibar = 0
         n_cells_done = 0
@@ -294,7 +294,7 @@ module escape
                 u = (x1 - x0) / dist; v = (y1 - y0) / dist; w = (z1 - z0) / dist !direction vector
                 !move only to the edge in principle, not the centre
                 call cross_cell(x0,y0,z0, u,v,w,icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
-                dist = l_contrib !corect the distance
+                dist = l_contrib !correct the distance
                 ! v0 = v_proj(icell,x0,y0,z0,u,v,w)
                 ! v1 = v_proj(icell,x1,y1,z1,u,v,w)
                 mean_length_scale(icell) = mean_length_scale(icell) + dist * AU_to_m
@@ -323,7 +323,7 @@ module escape
             stream = 0.0
             stream(:) = [(init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT),i=1,nb_proc)]
             n_rays_shock = 0 !actual rays touching the shock
-            n_rays_star = 0 !should be  n_rayons_sob_step in that case
+            n_rays_star = 0 !should be  n_radiuss_sob_step in that case
             f_shock(:) = 0.0
             domega_shock = 0.0; Tchoc_average = 0.0; domega_star = 0.0
             rho_shock(:) = 1d-100
@@ -431,7 +431,7 @@ module escape
         !but also mean solid angle subtended by each cell to the different stars, including
         !shock regions if any. These are used to weight the contributions from the star in the escape prob.
         !SEE.
-        !TO DO: occulation by dust should be included somehow.
+        !TO DO: occultation by dust should be included somehow.
 
         ibar = 0
         n_cells_done = 0
@@ -465,7 +465,7 @@ module escape
         !$omp shared(Wdi,d_to_star, dOmega_core,star,Tchoc_average,rho_shock,nHtot,cross_cell,test_exit_grid)&
         !$omp shared(phi_grid,r_grid,z_grid,pos_em_cell,ibar, n_cells_done,stream,n_cells)&
         !$omp shared (mean_grad_v,mean_length_scale,icompute_atomRT,n_stars,f_shock)&
-        !$omp shared(laccretion_shock,domega_shock,domega_star,n_rays_shock,n_rayons,n_rays_star)
+        !$omp shared(laccretion_shock,domega_shock,domega_star,n_rays_shock,n_radiuss,n_rays_star)
         !$omp do schedule(static,1)
         do icell=1, n_cells
             !$ id = omp_get_thread_num() + 1
@@ -491,7 +491,7 @@ module escape
                     !  wdi(icell,i_star) = wdi(icell,i_star) + wei * 0.5*(1.0 - sqrt(1.0 - (star(i_star)%r/r0)**2))
                 enddo
 
-                ! Direction de propagation aleatoire
+                ! Random propagation direction
                 rand = sprng(stream(id))
                 W = 2.0_dp * rand - 1.0_dp !nz
                 W02 =  1.0_dp - W*W !1-mu**2 = sin(theta)**2
@@ -513,7 +513,7 @@ module escape
                 v0 = v_proj(icell,x0,y0,z0,u,v,w)
                 v1 = v_proj(icell,x1,y1,z1,u,v,w)
 
-                if (lintersect_stars) then !"will interesct"
+                if (lintersect_stars) then !"will intersect"
                     dOmega_core(icell,i_star) = dOmega_core(icell,i_star) + wei
                     icell_in = icell
                     !can I move directly at the stellar surface ?
@@ -712,7 +712,7 @@ module escape
             allocate(Ishock(n_lambda, n_stars))
             do i=1, n_stars
                 Ishock(:,i) = Bpnu(n_lambda, tab_lambda_nm, Tchoc_average(i))
-                !par of the spectrum is due to the pre-shock region.
+                !part of the spectrum is due to the pre-shock region.
                 if (T_preshock > 0.0 ) then
                     Ishock(:,i) = 0.0
                     where (tab_lambda_nm > 364.2096)
@@ -788,7 +788,7 @@ module escape
 
 !use less in Sobolev ?
             !TO DO:
-            !in principle we don't need that if only atoms with Sobolev itterated
+            !in principle we don't need that if only atoms with Sobolev iterated
             if (lcswitch_enabled) then
                !deactivate
                if (maxval_cswitch_atoms()==1.0_dp) then
@@ -818,9 +818,9 @@ module escape
             !$omp default(none) &
             !$omp private(id,icell,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02,argmt)&
             !$omp private(l_iterate,weight,diff)&
-            !$omp shared(lforce_lte,n_cells,voronoi,r_grid,z_grid,phi_grid,wmu,n_rayons) &
+            !$omp shared(lforce_lte,n_cells,voronoi,r_grid,z_grid,phi_grid,wmu,n_radiuss) &
             !$omp shared(pos_em_cell,labs,n_lambda,tab_lambda_nm, icompute_atomRT,lcell_converged,diff_loc,seed,nb_proc,gtype) &
-            !$omp shared(stream,n_rayons_mc,lvoronoi,ibar,n_cells_done,l_iterate_ne,Itot,precision,lcswitch_enabled)
+            !$omp shared(stream,n_radiuss_mc,lvoronoi,ibar,n_cells_done,l_iterate_ne,Itot,precision,lcswitch_enabled)
             !$omp do schedule(static,1)
             do icell=1, n_cells
                 !$ id = omp_get_thread_num() + 1
@@ -838,8 +838,8 @@ module escape
                 !Init upward radiative rates to 0 and downward radiative rates to 0 or "Aji_cont" for Sobolev.
                 !Init collisional rates
                 call init_rates_escape(id,icell)
-                ! ! Position aleatoire dans la cell
-                ! do iray=1,n_rayons
+                ! ! Random position in the cell
+                ! do iray=1,n_radiuss
 
                 !     rand  = sprng(stream(id))
                 !     rand2 = sprng(stream(id))
@@ -847,7 +847,7 @@ module escape
 
                 !     call pos_em_cell(icell ,rand,rand2,rand3,x0,y0,z0)
 
-                !     ! Direction de propagation aleatoire
+                !     ! Random propagation direction
                 !     rand = sprng(stream(id))
                 !     W0 = 2.0_dp * rand - 1.0_dp !nz
                 !     W02 =  1.0_dp - W0*W0 !1-mu**2 = sin(theta)**2
@@ -999,7 +999,7 @@ module escape
                      !Then, store Neq_ng previous iterations. index 1 is for the current one.
                      ngpop(1:at%Nlevel,nact,icell,ng_index) = at%n(:,icell)
 ! !use less in Sobolev ?
-!                      !Recompute damping and profiles once with have set the new non-LTE pops (and new ne) for next ieration.
+!                      !Recompute damping and profiles once with have set the new non-LTE pops (and new ne) for next iteration.
 !                      !Only for Active Atoms here. PAssive Atoms are updated only if electronic density is iterated.
 !                      !Also need to change if profile interp is used or not! (a and phi)
 !                      do ilevel=1,at%nline
@@ -1357,18 +1357,18 @@ module escape
 
       ! Will the ray intersect a star
       call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
-      ! Boucle infinie sur les cellules (we go over the grid.)
-      infinie : do ! Boucle infinie
-      ! Indice de la cell
+      ! Infinite loop over the cells (we go over the grid.)
+      infinie : do ! Infinite loop
+      ! Cell index
          icell = next_cell
          x0=x1 ; y0=y1 ; z0=z1
 
          lcell_not_empty = (icell <= n_cells)
 
-         ! Test sortie ! "The ray has reach the end of the grid"
+         ! Test sortie ! "The ray has reached the end of the grid"
          if (test_exit_grid(icell, x0, y0, z0)) return
 
-         if (lintersect_stars) then !"will interesct"
+         if (lintersect_stars) then !"will intersect"
             if (icell == icell_star) then!"has intersected"
             !spectrally flat across each line intensities for ray-by-ray Sobolev.
                 Icore(:) = star_rad(id,iray,i_star,icell_prev,x0,y0,z0,u,v,w,N,lambda)
@@ -1397,7 +1397,7 @@ module escape
 
          n_cell = n_cell + 1
 
-         ! Calcul longeur de vol et profondeur optique dans la cell
+         ! Calculation of path length and optical depth in the cell
          previous_cell = 0 ! unused, just for Voronoi
          call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
 

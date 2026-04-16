@@ -22,7 +22,7 @@ module constants
   real(kind=dp), parameter :: hp = 6.626070040e-34_dp  ! Planck (J.s) CODATA 2014
   real(kind=dp), parameter :: kb = 1.38064852e-23_dp   ! Boltzmann (J.K^-1) CODATA 2014
   real(kind=dp), parameter :: c_light = 299792458._dp  ! velocity lumiere (m.s^-1) CODATA 2014
-  real, parameter :: thermal_const=c_light*hp/kb  ! pour calcul de (h c)/(lambda k T)
+  real, parameter :: thermal_const=c_light*hp/kb  ! pour Calculation of (h c)/(lambda k T)
   real, parameter :: sigma = 5.670367e-8     ! Stefan (en W/(m^2.K^4)) CODATA 2014
   real, parameter :: Ggrav = 6.67428e-11   ! (m^3.s^-2.kg^-1) e-8 en cgs, CODATA 2016, value recommended by IAU 2015 B3
   real(kind=dp), parameter :: electron_charge = 1.6021766208e-19_dp  ! Coulombs CODATA 2014
@@ -50,7 +50,7 @@ module constants
   !lamD = lambda0 * vbroad/c --> vB = lamB/lamD = nuL/c * lambda0**2 * c / lambda0 / vbroad
   !vB = nuL * lambda0 / vbroad in T^-1
 
-  ! Changements d'unites
+  ! Changements d'units
   ! Angles
   real(kind=dp), parameter :: deg_to_rad = pi/180.0_dp
   real(kind=dp), parameter :: rad_to_deg = 1.0/deg_to_rad

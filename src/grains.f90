@@ -19,7 +19,7 @@ module grains
      real :: avg_grain_mass, mass, sblow, rho1g_avg, T_sub, dhs_maxf
 
      character(len=3) :: type ! Mie or DHS
-     integer ::  mixing_rule, n_components ! en cas de coating, composant 1 est le coeur 2 est le manteau
+     integer ::  mixing_rule, n_components ! for coated grains, component 1 is the core and 2 is the mantle
      ! mixing rule : 1 = EMT, 2 = coating
      character(len=512), dimension(10) :: indices
      real, dimension(10) :: component_rho1g, component_volume_fraction, component_T_sub
@@ -30,8 +30,8 @@ module grains
 
   type(dust_pop_type), dimension(:), allocatable, target :: dust_pop
 
-  ! Nombre de taille de grains
-  ! le pas et (amax - amin)/n_grains
+  ! Number of grain sizes
+  ! the step is (amax - amin)/n_grains
   integer :: n_grains_tot , n_grains_RE_LTE, n_grains_RE_nLTE, n_grains_nRE
   integer :: grain_RE_LTE_start, grain_RE_LTE_end, grain_RE_nLTE_start, grain_RE_nLTE_end, grain_nRE_start, grain_nRE_end
 
@@ -39,7 +39,7 @@ module grains
   real, dimension(:), allocatable :: r_grain, r_grain_min, r_grain_max, r_core, S_grain, M_grain !n_grains_tot
   real, dimension(:,:), allocatable :: frac_mass_pop !n_zones, n_pop
 
-  ! Pour lecture des fichiers d'opacity, par exemple PAH de B.Draine
+  ! For reading opacity files, e.g. PAH from B. Draine
   integer, dimension(:), allocatable :: op_file_na,  op_file_n_lambda ! n_pop
   real, dimension(:,:,:), allocatable :: op_file_Qext, op_file_Qsca, op_file_g ! op_file_n_lambda,op_file_na, n_pop
   real, dimension(:,:), allocatable :: op_file_log_r_grain ! op_file_na, n_pop

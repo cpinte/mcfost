@@ -15,7 +15,7 @@ module molecular_emission
   real, dimension(:), allocatable :: Level_energy
   character(len=12), dimension(:), allocatable ::  j_qnb, v_qnb
 
-  ! g est dp car les calculs utilisant g sont en dp
+  ! g is dp because calculations using g are in double precision
   real(kind=dp), dimension(:), allocatable :: stat_weight_g
   integer :: nTrans_tot
 
@@ -29,7 +29,7 @@ module molecular_emission
   integer, dimension(:,:), pointer :: iCollUpper, iCollLower
   real, dimension(:,:,:), pointer :: collRates
 
-  real, dimension(:), allocatable :: Tcin ! Temperature cinetique
+  real, dimension(:), allocatable :: Tcin ! Kinetic temperature
   real :: correct_Tgas
   logical :: lcorrect_Tgas
 
@@ -48,7 +48,7 @@ module molecular_emission
 
   real(kind=dp), dimension(:,:), allocatable :: ds!, gradv !local velocity difference between two cells in a specific direction
   real(kind=dp), dimension(:,:,:,:), allocatable :: I0, I02 ! nSpeed,nTrans,iray,ncpus
-  real(kind=dp), dimension(:,:,:), allocatable :: I0c ! Intensite dans le continu: nTrans,iray,ncpus
+  real(kind=dp), dimension(:,:,:), allocatable :: I0c ! Continuum intensity: nTrans,iray,ncpus
   real(kind=dp), dimension(:,:,:), allocatable :: Doppler_P_x_freq
 
   real(kind=dp), dimension(:,:), allocatable :: Jmol, Jmol2 ! nTrans, n_cpu
@@ -88,12 +88,12 @@ module molecular_emission
 
   !real, dimension(:,:), allocatable :: maser_map ! n_cells, n_trans
 
-  real(kind=dp), dimension(:,:), allocatable :: emissivite_dust ! emissivite en SI (pour mol)
+  real(kind=dp), dimension(:,:), allocatable :: emissivite_dust ! emissivity in SI units (for molecules)
 
   contains
 
 real function tau_collision(temperature, iPart, iTrans)
-  ! Interpolation lineaire des taux de collisions avec dichotomie
+  ! Linear interpolation of collision rates with bisection
   ! C. Pinte
   ! 25/06/07
 
@@ -107,9 +107,9 @@ real function tau_collision(temperature, iPart, iTrans)
 
   if (nCollTemps(iPart) == 1) then ! Pas d'interpolation
      tau_collision = collRates(iPart, iTrans, 1)
-  else if (temperature < collTemps(iPart,1)) then ! extrapolation cubique
+  else if (temperature < collTemps(iPart,1)) then ! cubic extrapolation
      tau_collision = collRates(iPart, iTrans, 1) * sqrt(temperature/collTemps(iPart,1))
-  else ! interpolation lineaire
+  else ! linear interpolation
      ! dichotomie
      kmin=1
      kmax=nCollTemps(iPart)
@@ -139,8 +139,8 @@ end function tau_collision
 !***********************************************************
 
 subroutine init_Doppler_profiles(imol)
-  ! Creation des constants pour les profiles Doppler dans chaque cell
-  ! a velocity systematique nulle + tableau de vitesses
+  ! Create constants for Doppler profiles in each cell
+  ! at zero systematic velocity + velocity array
   ! C. Pinte
   ! 18/03/07
 
@@ -154,8 +154,8 @@ subroutine init_Doppler_profiles(imol)
   n_speed = mol(imol)%n_speed_rt
 
   do icell=1, n_cells
-     ! Utilisation de la temperature LTE de la poussiere comme temperature cinetique
-     ! WARNING : c'est pas un sigma mais un delta, cf Cours de Boisse p47
+     ! Using the LTE dust temperature as the kinetic temperature
+     ! WARNING : this is a delta, not a sigma; see Boisse lecture notes p47
      ! Consistent avec benchmark
      sigma2 =  2.0_dp * (kb*Tcin(icell) / (mol(imol)%molecularWeight * mH  * g_to_kg)) + v_turb2(icell)
      dv_line(icell) = sqrt(sigma2)
@@ -163,15 +163,15 @@ subroutine init_Doppler_profiles(imol)
      !  write(*,*) "FWHM", sqrt(sigma2 * log(2.)) * 2.  ! Teste OK bench water 1
      sigma2_m1 = 1.0_dp / sigma2
      sigma2_phiProf_m1(icell) = sigma2_m1
-     ! phi(nu) et non pas phi(v) donc factor c_light et il manque 1/f0
-     ! ATTENTION : il ne faut pas oublier de diviser par la freq apres
+     ! phi(nu) not phi(v), hence factor c_light and missing 1/f0
+     ! WARNING: must divide by the frequency afterwards
      norme_phiProf_m1(icell) = c_light / sqrt(pi * sigma2)
 
-     ! Echantillonage du profil de velocity dans la cell
-     ! 2.15 correspond a l'enfroit ou le profil de la raie faut 1/100 de
+     ! Sampling of the velocity profile in the cell
+     ! 2.15 corresponds to where the line profile reaches 1/100 of
      ! sa valeur au centre : exp(-2.15^2) = 0.01
      tab_dnu_o_freq(icell) = profile_width * dv_line(icell) / (real(n_speed))
-     deltaVmax(icell) = profile_width * dv_line(icell) !* 2.0_dp  ! factor 2 pour tirage aleatoire
+     deltaVmax(icell) = profile_width * dv_line(icell) !* 2.0_dp  ! factor 2 for random sampling
   enddo !icell
 
   return
@@ -181,9 +181,9 @@ end subroutine init_Doppler_profiles
 !***********************************************************
 
 function phiProf(icell,ispeed,tab_speed)
-  ! renvoie le profil de raie local a une cell (ri, zj)
-  ! sur le tableau de velocity tab_speed
-  ! Il faut diviser par la frequence de la transition pour que la normalisation soit OK !!!
+  ! Returns the local line profile at a cell (ri, zj)
+  ! on the velocity array tab_speed
+  ! Must divide by the transition frequency for correct normalisation!!!
   ! C. Pinte
   ! 13/07/07
 
@@ -197,7 +197,7 @@ function phiProf(icell,ispeed,tab_speed)
 
   real(kind=dp) :: norme_m1, sigma2_m1
 
-  norme_m1 = norme_phiProf_m1(icell) ! ATTENTION : il manque la frequence ici !!!!
+  norme_m1 = norme_phiProf_m1(icell) ! WARNING: frequency is missing here!!!!
   sigma2_m1 = sigma2_phiProf_m1(icell)
 
   phiProf(:) =  norme_m1 * exp(- sigma2_m1 * tab_speed(:)**2)
@@ -209,8 +209,8 @@ end function phiProf
 !***********************************************************
 
 ! --- function Cmb(ispeed,tab_speed)
-! --- ! Loi de Planck aux differentes frequences de la
-! --- ! molecule etudiee
+! --- ! Planck's law at the different frequencies of the
+! --- ! studied molecule
 ! --- ! Bnu en SI : W.m-2.Hz-1.sr-1
 ! --- ! C. Pinte
 ! --- ! 17/07/7
@@ -228,7 +228,7 @@ end function phiProf
 ! ---
 ! ---   cst = 2.0_dp*hp/c_light**2
 ! ---
-! ---   ! On ne calcule le Cmb qu'aux frequences specifiees
+! ---   ! We only compute the CMB at the specified frequencies
 ! ---   do i=1,nTrans
 ! ---      iTrans = index_trans(i)
 ! ---      do iv=ispeed(1),ispeed(2)
@@ -250,10 +250,10 @@ end function phiProf
 !***********************************************************
 
 subroutine init_tab_Cmb_mol()
-  ! Loi de Planck aux differentes frequences de la
-  ! molecule etudiee
-  ! Bnu en SI : W.m-2.Hz-1.sr-1
-  ! Sans prendre en compte le champ de velocity << c
+  ! Planck's law at the different frequencies of the
+  ! studied molecule
+  ! Bnu in SI : W.m-2.Hz-1.sr-1
+  ! Without taking into account the velocity field << c
   ! C. Pinte
   ! 17/07/7
 
@@ -282,8 +282,8 @@ end subroutine init_tab_Cmb_mol
 !***********************************************************
 
 subroutine opacite_mol(imol)
-  ! Calcule la fonction source dans chaque cell
-  ! etant donne les populations des niveaux
+  ! Computes the source function in each cell
+  ! given the level populations
   ! C. Pinte
   ! 20/03/07
 
@@ -303,8 +303,8 @@ end subroutine opacite_mol
 !***********************************************************
 
 subroutine opacite_mol_loc(icell,imol)
-  ! Calcule la fonction source dans chaque cell
-  ! etant donne les populations des niveaux
+  ! Computes the source function in each cell
+  ! given the level populations
   ! C. Pinte
   ! 01/07/07
 
@@ -319,7 +319,7 @@ subroutine opacite_mol_loc(icell,imol)
      nu = tab_nLevel(icell,iTransUpper(iTrans))
      nl = tab_nLevel(icell,iTransLower(iTrans))
 
-     ! opacity et emissivite raie
+     ! opacity and line emissivity
      kap = (nl*fBlu(iTrans) - nu*fBul(iTrans))
      eps =  nu*fAul(iTrans)
 
@@ -331,7 +331,7 @@ subroutine opacite_mol_loc(icell,imol)
         !     (stat_weight_g(iTransUpper(iTrans)) * nl)
      endif
 
-     ! length de vol en AU, a multiplier par le profil de raie
+     ! flight length in AU, to be multiplied by the line profile
      kappa_mol_o_freq(icell,iTrans) = kap / Transfreq(iTrans) * AU_to_m
      emissivite_mol_o_freq(icell,iTrans) = eps /  Transfreq(iTrans) * AU_to_m
   enddo
@@ -353,11 +353,11 @@ subroutine opacite_mol_loc(icell,imol)
         nu = tab_nLevel2(icell,iTransUpper(iTrans))
         nl = tab_nLevel2(icell,iTransLower(iTrans))
 
-        ! opacity et emissivite raie
+        ! opacity and line emissivity
         kap = (nl*fBlu(iTrans) - nu*fBul(iTrans))
         eps =  nu*fAul(iTrans)
 
-        ! length de vol en AU, a multiplier par la profil de raie
+        ! flight length in AU, to be multiplied by the line profile
         kappa_mol_o_freq2(icell,iTrans) = kap / Transfreq(iTrans) * AU_to_m
         emissivite_mol_o_freq2(icell,iTrans) = eps /  Transfreq(iTrans) * AU_to_m
      enddo
@@ -370,10 +370,10 @@ end subroutine opacite_mol_loc
 !***********************************************************
 
 subroutine equilibre_LTE_mol(imol)
-  ! Calcul les niveaux d'une molecule dans le cas LTE
-  ! Pour initialisation
-  ! Calcule au passage le nombre total de mol dans chaque cell
-  ! reutilise par equilibre_rad_mol
+  ! Computes the molecule levels in the LTE case
+  ! For initialization
+  ! Computes the total number of molecules in each cell simultaneously
+  ! reused by equilibre_rad_mol
   ! C. Pinte
   ! 18/03/07
 
@@ -397,11 +397,11 @@ subroutine equilibre_LTE_mol(imol)
   do icell=1, n_cells
      pop_levels(1) = 1.0
      do l=2, nLevels
-        ! Utilisation de la temperature de la poussiere comme temperature LTE
+        ! Use of the dust temperature as LTE temperature
         pop_levels(l) = pop_levels(l-1) * stat_weight_g(l)/stat_weight_g(l-1) * &
              exp(- hp * Transfreq(l-1)/ (kb*Tcin(icell)))
      enddo
-     ! Teste OK : (Nu*Bul) / (Nl*Blu) = exp(-hnu/kT)
+     ! Test OK : (Nu*Bul) / (Nl*Blu) = exp(-hnu/kT)
      ! write(*,*) "Verif", i, j, tab_nLevel(i,j,l) * Bul(l-1) / (tab_nLevel(i,j,l-1) * Blu(l-1)) ,  exp(- hp * Transfreq(l-1)/ (kb*Tdust(i,j,1)))
      ! read(*,*)
 
@@ -427,11 +427,12 @@ end subroutine equilibre_LTE_mol
 !********************************************************************
 
 subroutine equilibre_rad_mol_loc(id,icell)
-  ! Calcul les populations sur les differents niveaux a l'aide de
-  ! l'equilibre radiatif et collisionnel
-  ! C. Pinte
-  ! 01/07/07
-  ! 11/10/07 : modif pour traiter simultanement 2 champs de radiation
+  ! Computes the populations on the different levels using
+  ! radiative and collisional equilibrium
+  ! C. Pinte  16/2/06
+  !
+  !
+  ! 11/10/07 : modification to handle 2 radiation fields simultaneously
 
   implicit none
 
@@ -452,7 +453,7 @@ subroutine equilibre_rad_mol_loc(id,icell)
      n_eq = 1
   endif
 
-  ! Matrice d'excitations/desexcitations collisionnelles
+  ! Collisional excitation/de-excitation matrix
   Temp = Tcin(icell)
   nH2 = gas_density(icell) * cm_to_m**3
 
@@ -473,7 +474,7 @@ subroutine equilibre_rad_mol_loc(id,icell)
   enddo ! iPart
 
   ! Test
-  !C = 0. ! OK : je retouve le niveau d'exitation par le Cmb en zone externe
+  !C = 0. ! OK : I retrieve the excitation level by the CMB in the outer zone
 
   cTot = 0.
   do k = 1, nLevels
@@ -483,10 +484,10 @@ subroutine equilibre_rad_mol_loc(id,icell)
   enddo
 
 
-  ! Calcul des populations de niveaux en eq avec 1 ou 2 champs de radiation
+  ! Computes the level populations in equilibrium with 1 or 2 radiation fields
   do eq=1,n_eq
 
-     ! Matrice de transitions radiatives
+     ! Radiative transition matrix
      B = 0.0_dp
      A = 0.0_dp
      do iTrans = 1, nTrans_tot
@@ -510,7 +511,7 @@ subroutine equilibre_rad_mol_loc(id,icell)
      enddo
 
      ! Test
-     !A=0.0 ! Ok : je retombe sur le LTE
+     !A=0.0 ! Ok : I revert to LTE
 
      ! Matrice totale
      do i = 1, nLevels
@@ -522,9 +523,9 @@ subroutine equilibre_rad_mol_loc(id,icell)
         enddo
      enddo
 
-     ! On remplace la derniere equations (qui est une CL des autres)
-     ! par l'equation de conservation
-     A(nLevels,:) = 1.0_dp ! la total_sum de toutes les pops
+     ! We replace the last equation (which is a LC of the others)
+     ! by the conservation equation
+     A(nLevels,:) = 1.0_dp ! the total sum of all populations
      B(nLevels) = 1.0_dp   ! = 1
 
      ! Resolution systeme matriciel par methode Gauss-Jordan
@@ -558,12 +559,12 @@ subroutine equilibre_othin_mol()
 
   id = 1 ! TODO : parallelisation
 
-  ! Equilibre avec Cmb pour toutes les cellules
+  ! Equilibrium with the CMB for all cells
   do icell=1, n_cells
-     ! Le champ de radiation est egal au Cmb
+     ! The radiation field is equal to the CMB
      Jmol(:,id) = tab_Cmb_mol(:)
 
-     ! Equilibre
+     ! Equilibrium
      call equilibre_rad_mol_loc(id,icell)
   enddo !icell
 
@@ -574,27 +575,27 @@ end subroutine equilibre_othin_mol
 !***********************************************************
 
 subroutine equilibre_othin_mol_pop2()
-  ! Calcul les populations dans le cas optiquement mince
-  ! equilibre avec le champ de radiation externe et sauvegarde
-  ! dans la seconde population
+  ! Computes the populations in the optically thin case
+  ! equilibrium with the external radiation field and stored
+  ! in the second population
   ! C. Pinte
   ! 15/10/07
 
   implicit none
 
-  real(kind=dp) :: tab_nLevel_tmp(n_cells,nLevels)  ! pas 3D
+  real(kind=dp) :: tab_nLevel_tmp(n_cells,nLevels)  ! not 3D
   logical :: ldouble_RT_tmp
 
   Jmol(:,:) = 0.0_dp
 
-  ! Par securite : sauvegarde population 1
+  ! For safety: safeguard population 1
   tab_nLevel_tmp(:,:) =  tab_nLevel(:,:)
   ldouble_RT_tmp = ldouble_RT
   ldouble_RT = .false.
 
   call equilibre_othin_mol()
 
-  ! Initialisation de la population 2
+  ! Initialisation of population 2
   tab_nLevel2(:,:) = tab_nLevel(:,:)
 
   ! Restauration population 1
@@ -640,8 +641,8 @@ subroutine J_mol_loc(id,icell,n_rayons,ispeed)
 
   enddo ! iTrans
 
-  ! Normalisation par le nombre de rayons utilises
-!  Jmol(:,id) = Jmol(:,id) / n_rayons
+  ! Normalization par le nombre de radiuss utilises
+!  Jmol(:,id) = Jmol(:,id) / n_radiuss
 
   if (ldouble_RT) then
      Jmol2(:,id) = 0.0_dp
@@ -661,7 +662,7 @@ subroutine J_mol_loc(id,icell,n_rayons,ispeed)
         enddo ! iTrans
      enddo ! iray
 
-     ! Normalisation par le nombre de rayons utilises
+     ! Normalisation by the number of rays used
      Jmol2(:,id) = Jmol2(:,id) / n_rayons
   endif !ldouble_RT
 
@@ -672,7 +673,7 @@ end subroutine J_mol_loc
 !***********************************************************
 
 function v_proj(icell,x,y,z,u,v,w) !
-  ! velocity projete en 1 point d'une cell
+  ! projected velocity at 1 point of a cell
   ! C. Pinte
   ! 13/07/07
 
@@ -753,7 +754,7 @@ function v_proj(icell,x,y,z,u,v,w) !
            endif
         else if (linfall) then
            r = sqrt(x*x+y*y+z*z)
-           !  if (lbenchmark_water2)  velocity = -r  * 1e5 * AU_to_pc    ! TMP pour bench water2 : ca change rien !!!????
+           !  if (lbenchmark_water2)  velocity = -r  * 1e5 * AU_to_pc    ! TMP for bench water2 : it changes nothing !!!????
            if (r > tiny_dp) then
               norm = 1.0_dp/r
               vx = x * norm * velocity
@@ -776,7 +777,7 @@ end function v_proj
 !***********************************************************
 
 real(kind=dp) function dv_proj(icell,x0,y0,z0,x1,y1,z1,u,v,w)
-  ! Differentiel de velocity projete entre 2 points
+  ! Projected velocity differential between 2 points
   ! au sein d'une cell
   ! C. Pinte
   ! 13/07/07

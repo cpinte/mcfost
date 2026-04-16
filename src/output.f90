@@ -174,14 +174,14 @@ subroutine allocate_mol_maps(imol)
   nTrans_raytracing = mol(imol)%nTrans_raytracing
 
  if (npix_x_save > 1) then
-     RT_line_method = 2 ! creation d'une carte avec pixels carres
+     RT_line_method = 2 ! creation of a map with square pixels
      npix_x = npix_x_save ; npix_y = npix_y_save ! we update the value after the SED calculation
 
      write(*,*) "WARNING : memory size if lots of pixels"
      allocate(spectrum(npix_x,npix_y,n_speed_rt,nTrans_raytracing,RT_n_incl,RT_n_az), &
           continu(npix_x,npix_y,nTrans_raytracing,RT_n_incl,RT_n_az), stars_map(npix_x,npix_y,1), stat=alloc_status)
   else
-     RT_line_method = 1 ! utilisation de pixels circulaires
+     RT_line_method = 1 ! use of circular pixels
      allocate(spectrum(1,1,n_speed_rt,nTrans_raytracing,RT_n_incl,RT_n_az), &
           continu(1,1,nTrans_raytracing,RT_n_incl,RT_n_az), stars_map(1,1,1), stat=alloc_status)
   endif
@@ -324,7 +324,7 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
   u1=uin ; v1=vin ; w1=win
   stok=stokin
 
-  ! Utilisation de la symetrie centrale
+  ! Use of central symmetry
   if (w1 < 0.0) then
      if (l_sym_centrale) then
         x1 = -x1
@@ -345,7 +345,7 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
      CAPT = N_thet
   endif
 
-  ! Origine du paquet
+  ! Packet origin
   if (lorigine) then
      if (capt == capt_interet) then
         if (flag_star) then
@@ -363,23 +363,23 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
      if ((capt > capt_sup).or.(capt < capt_inf)) return
   endif
 
-  if (l_sym_axiale) then ! symetrie axiale du systeme
-     ! Utilisation de la symetrie Est-Ouest
-     ! (le centre du mur est dans la direction u)
+  if (l_sym_axiale) then ! axial symmetry of the system
+     ! Use of East-West symmetry
+     ! (the wall centre is in direction u)
      if (v1 < 0.0) then
         v1 = - v1
         y1 = - y1
         stok(3) = -stok(3)
      endif
-     ! Selection angle phi
-     ! (atan2 renvoie dans [-Pi,Pi] mais ici dans [0,Pi] car v1 > 0)
+     ! Selection of angle phi
+     ! (atan2 returns [-Pi,Pi] but here [0,Pi] since v1 > 0)
      if (w1==1.0) then
         c_phi=1
      else
         c_phi = int(atan2(v1,u1)/pi*N_phi) + 1
      endif
   else !l_sym_axiale
-     ! Pas de sym : on regarde entre 0 et 2Pi
+     ! No symmetry: look between 0 and 2Pi
      if (w1==1.0) then
         c_phi=1
      else
@@ -393,11 +393,11 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
      c_phi=1
   endif
 
-  if (lmono0) then ! Creation carte
+  if (lmono0) then ! Map creation
      !*****************************************************
      !*----DETERMINATION DE LA POSITION SUR LA CARTE
      !*----IL FAUT FAIRE UNE ROTATION DU POINT
-     !*    (X1,Y1,Z1) POUR RAMENER LES COORDONNEES DANS
+     !* (X1,Y1,Z1) to bring the coordinates back to
      !*    LE SYSTEME OU (U1,V1,W1)=(1,0,0)
      !*
      !*    utilisation de la symetrie gauche-droite pour
@@ -421,7 +421,7 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
      !        if (IMAP <= 0 ) IMAP = 1
      !        if (IMAP >= (NPIX_X + 1)) IMAP = NPIX_X
 
-     ! Rotation eventuelle du disque
+     ! Possible rotation of the disk
      ytmp = yprim
      ztmp = zprim
      yprim = ytmp * cos_disk + ztmp * sin_disk
@@ -446,7 +446,7 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
         endif
 
         if (lsepar_contrib) then
-           if (flag_star) then ! photon �toile
+           if (flag_star) then ! stellar photon
               if (flag_scatt) then
                  STOKEI_star_scat(lambda,IMAP1,JMAP1,capt,c_phi,id) = &
                       STOKEI_star_scat(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(1)
@@ -454,7 +454,7 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
                  STOKEI_star(lambda,IMAP1,JMAP1,capt,c_phi,id) = &
                       STOKEI_star(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(1)
               endif
-           else ! photon thermique
+           else ! thermal photon
               if (flag_scatt) then
                  STOKEI_disk_scat(lambda,IMAP1,JMAP1,capt,c_phi,id) = &
                       STOKEI_disk_scat(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(1)
@@ -462,10 +462,10 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
                  STOKEI_disk(lambda,IMAP1,JMAP1,capt,c_phi,id) = &
                       STOKEI_disk(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(1)
               endif
-           endif ! type de photon
+           endif ! photon type
         endif !lsepar
 
-        ! 1/2 photon symetrique
+        ! 1/2 symmetrical photon
         ytmp = - ytmp
         yprim = ytmp * cos_disk - ztmp * sin_disk
         zprim = ztmp * cos_disk + ytmp * sin_disk
@@ -480,8 +480,8 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
         if (JMAP2 > NPIX_Y) return !cycle photon
 
 
-        if ((IMAP1==IMAP2).and.(JMAP1==JMAP2)) then ! Pas de sym on est dans le meme pixel
-           ! on rajoute la 2eme moitie du photon
+        if ((IMAP1==IMAP2).and.(JMAP1==JMAP2)) then ! No symmetry: we are in the same pixel
+           ! add the 2nd half of the photon
            STOKEI(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEI(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(1)
 
            if (lsepar_pola) then
@@ -491,7 +491,7 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
            endif
 
            if (lsepar_contrib) then
-              if (flag_star) then ! photon �toile
+              if (flag_star) then ! stellar photon
                  if (flag_scatt) then
                     STOKEI_star_scat(lambda,IMAP1,JMAP1,capt,c_phi,id) = &
                          STOKEI_star_scat(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(1)
@@ -499,7 +499,7 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
                     STOKEI_star(lambda,IMAP1,JMAP1,capt,c_phi,id) = &
                          STOKEI_star(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(1)
                  endif
-              else ! photon thermique
+              else ! thermal photon
                  if (flag_scatt) then
                     STOKEI_disk_scat(lambda,IMAP1,JMAP1,capt,c_phi,id) = &
                          STOKEI_disk_scat(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(1)
@@ -507,10 +507,10 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
                     STOKEI_disk(lambda,IMAP1,JMAP1,capt,c_phi,id) = &
                          STOKEI_disk(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(1)
                  endif
-              endif ! type de photon
+              endif ! photon type
            endif ! lsepar
         else ! symetrie
-           ! on rajoute la 2eme moitie du photon dans le pix oppose avec prop symetrie du vecteur de Stokes
+           ! add the 2nd half of the photon to the opposite pixel using Stokes vector symmetry
            STOKEI(lambda,IMAP2,JMAP2,capt,c_phi,id) = STOKEI(lambda,IMAP2,JMAP2,capt,c_phi,id) + 0.5 * STOK(1)
 
            if (lsepar_pola) then
@@ -520,7 +520,7 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
            endif
 
            if (lsepar_contrib) then
-              if (flag_star) then ! photon �toile
+              if (flag_star) then ! stellar photon
                  if (flag_scatt) then
                     STOKEI_star_scat(lambda,IMAP2,JMAP2,capt,c_phi,id) = &
                          STOKEI_star_scat(lambda,IMAP2,JMAP2,capt,c_phi,id) + 0.5 * STOK(1)
@@ -528,7 +528,7 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
                     STOKEI_star(lambda,IMAP2,JMAP2,capt,c_phi,id) = &
                          STOKEI_star(lambda,IMAP2,JMAP2,capt,c_phi,id) + 0.5 * STOK(1)
                  endif
-              else ! photon thermique
+              else ! thermal photon
                  if (flag_scatt) then
                     STOKEI_disk_scat(lambda,IMAP2,JMAP2,capt,c_phi,id) = &
                          STOKEI_disk_scat(lambda,IMAP2,JMAP2,capt,c_phi,id) + 0.5 * STOK(1)
@@ -536,11 +536,11 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
                     STOKEI_disk(lambda,IMAP2,JMAP2,capt,c_phi,id) = &
                          STOKEI_disk(lambda,IMAP2,JMAP2,capt,c_phi,id) + 0.5 * STOK(1)
                  endif
-              endif ! type de photon
+              endif ! photon type
            endif !lsepar
         endif
      else
-        ! Pas de symetrie
+        ! No symmetry
         STOKEI(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEI(lambda,IMAP1,JMAP1,capt,c_phi,id) + STOK(1)
 
         if (lsepar_pola) then
@@ -549,7 +549,7 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
            STOKEV(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEV(lambda,IMAP1,JMAP1,capt,c_phi,id) + STOK(4)
         endif
         if (lsepar_contrib) then
-           if (flag_star) then ! photon �toile
+           if (flag_star) then ! stellar photon
               if (flag_scatt) then
                  STOKEI_star_scat(lambda,IMAP1,JMAP1,capt,c_phi,id) = &
                       STOKEI_star_scat(lambda,IMAP1,JMAP1,capt,c_phi,id) + STOK(1)
@@ -557,7 +557,7 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
                  STOKEI_star(lambda,IMAP1,JMAP1,capt,c_phi,id) = &
                       STOKEI_star(lambda,IMAP1,JMAP1,capt,c_phi,id) + STOK(1)
               endif
-           else ! photon thermique
+           else ! thermal photon
               if (flag_scatt) then
                  STOKEI_disk_scat(lambda,IMAP1,JMAP1,capt,c_phi,id) = &
                       STOKEI_disk_scat(lambda,IMAP1,JMAP1,capt,c_phi,id) + STOK(1)
@@ -565,29 +565,29 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
                  STOKEI_disk(lambda,IMAP1,JMAP1,capt,c_phi,id) = &
                       STOKEI_disk(lambda,IMAP1,JMAP1,capt,c_phi,id) + STOK(1)
               endif
-           endif ! type de photon
+           endif ! photon type
         endif !lsepar
      endif
 
-  else ! Creation sed
+  else ! SED calculation
      sed(lambda,capt,c_phi,id) = sed(lambda,capt,c_phi,id) + stok(1)
      sed_q(lambda,capt,c_phi,id) = sed_q(lambda,capt,c_phi,id) + stok(2)
      sed_u(lambda,capt,c_phi,id) = sed_u(lambda,capt,c_phi,id) + stok(3)
      sed_v(lambda,capt,c_phi,id) = sed_v(lambda,capt,c_phi,id) + stok(4)
      n_phot_sed(lambda,capt,c_phi,id) = n_phot_sed(lambda,capt,c_phi,id) + 1.0_dp
-     if (flag_star) then ! photon �toile
+     if (flag_star) then ! stellar photon
         if (flag_scatt) then
            sed_star_scat(lambda,capt,c_phi,id) = sed_star_scat(lambda,capt,c_phi,id) + stok(1)
         else
            sed_star(lambda,capt,c_phi,id) = sed_star(lambda,capt,c_phi,id) + stok(1)
         endif
-     else ! photon thermique
+     else ! thermal photon
         if (flag_scatt) then
            sed_disk_scat(lambda,capt,c_phi,id) = sed_disk_scat(lambda,capt,c_phi,id) + stok(1)
         else
            sed_disk(lambda,capt,c_phi,id) = sed_disk(lambda,capt,c_phi,id) + stok(1)
         endif
-     endif ! type de photon
+     endif ! photon type
   endif
 
   return
@@ -640,7 +640,7 @@ subroutine write_stokes_fits()
 
       !  Initialize parameters about the FITS image
      simple=.true.
-      ! le signe - signifie que l'on ecrit des reels dans le fits
+      ! the - sign means we write reals in the fits
      bitpix=-32
      extend=.true.
 
@@ -655,7 +655,7 @@ subroutine write_stokes_fits()
      fpixel=1
      nelements=naxes(1)
 
-      ! le e signifie real*4
+      ! the e means real*4
      call ftppre(unit,group,fpixel,nelements,o_disk,status)
 
       !  Close the file and free the unit number.
@@ -720,7 +720,7 @@ subroutine write_stokes_fits()
 
   !  Initialize parameters about the FITS image
   simple=.true.
-  ! le signe - signifie que l'on ecrit des reels dans le fits
+  ! the - sign means we write reals in the fits
   bitpix=-32
   naxis=5
   naxes(1)=npix_x
@@ -740,7 +740,7 @@ subroutine write_stokes_fits()
   !  wavelength
   call ftpkyd(unit,'WAVE',tab_lambda(lambda),-7,'wavelength [microns]',status)
 
-  ! RAC, DEC, reference pixel & pixel scale en degres
+  ! RA, DEC, reference pixel & pixel scale in degrees
   call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
   call ftpkye(unit,'CRVAL1',0.,-7,'RAD',status)
   call ftpkyj(unit,'CRPIX1',npix_x/2+1,'',status)
@@ -779,7 +779,7 @@ subroutine write_stokes_fits()
   fpixel=1
   nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
 
-  ! le e signifie real*4
+  ! the e means real*4
   call ftppre(unit,group,fpixel,nelements,stoke_io,status)
 
   ! Close the file and free the unit number.
@@ -810,15 +810,15 @@ subroutine ecriture_map_ray_tracing()
 
 
 
-  ! Allocation dynamique pour passer en stack
+  ! Dynamic allocation to use stack
   real, dimension(:,:,:,:,:), allocatable :: image
   real, dimension(:,:,:,:), allocatable :: image_casa
 
   if (lcasa) then
      if (lsepar_pola) then
-        allocate(image_casa(npix_x, npix_y, 4, 1), stat=alloc_status) ! 3eme axe : pola, 4eme axe : frequence
+        allocate(image_casa(npix_x, npix_y, 4, 1), stat=alloc_status) ! 3rd axis: pola, 4th axis: frequency
      else
-        allocate(image_casa(npix_x, npix_y, 1, 1), stat=alloc_status) ! 3eme axe : pola, 4eme axe : frequence
+        allocate(image_casa(npix_x, npix_y, 1, 1), stat=alloc_status) ! 3rd axis: pola, 4th axis: frequency
      endif
      if (alloc_status > 0) call error('Allocation error RT image_casa')
      image_casa = 0.0 ;
@@ -876,7 +876,7 @@ subroutine ecriture_map_ray_tracing()
   !  wavelength
   call ftpkyd(unit,'WAVE',tab_lambda(lambda),-7,'wavelength [microns]',status)
 
-  ! RAC, DEC, reference pixel & pixel scale en degres
+  ! RA, DEC, reference pixel & pixel scale in degrees
   call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
   call ftpkye(unit,'CRVAL1',0.,-7,'RAD',status)
   call ftpkyj(unit,'CRPIX1',npix_x/2+1,'',status)
@@ -896,14 +896,14 @@ subroutine ecriture_map_ray_tracing()
      call ftpkyd(unit,'RESTFREQ',c_light/(tab_lambda(lambda)*1e-6),-14,'Hz',status)
      call ftpkys(unit,'BTYPE',"Intensity",' ',status)
 
-     ! 3eme axe
+     ! 3rd axis
      call ftpkys(unit,'CTYPE3',"STOKES",' ',status)
      call ftpkye(unit,'CRVAL3',1.0,-7,'',status)
      call ftpkye(unit,'CDELT3',1.0,-7,'',status)
      call ftpkyj(unit,'CRPIX3',1,'',status)
      call ftpkys(unit,'CUNIT3',"",'',status)
 
-     ! 4eme axe
+     ! 4th axis
      call ftpkys(unit,'CTYPE4',"FREQ",' ',status)
      call ftpkyd(unit,'CRVAL4',c_light/(tab_lambda(lambda)*1e-6),-14,'Hz',status)
      call ftpkye(unit,'CDELT4',2e9,-7,'Hz',status) ! 2GHz by default
@@ -938,7 +938,7 @@ subroutine ecriture_map_ray_tracing()
   endif
 
   !----- Images
-  ! Boucles car ca ne passe pas avec sum directement (ifort sur mac)
+  ! Loops because sum directly does not work (ifort sur mac)
   if (lcasa) then
      if (lsepar_pola) then
         ntypes=4 ;
@@ -970,9 +970,9 @@ subroutine ecriture_map_ray_tracing()
         enddo
      endif
 
-     ! le e signifie real*4
+     ! the e means real*4
      call ftppre(unit,group,fpixel,nelements,image_casa,status)
-  else ! mode non casa
+  else ! non-casa mode
      if (lJy) then
         factor = 1e26 * (tab_lambda(lambda)*1e-6)/c_light;
      else
@@ -1024,7 +1024,7 @@ subroutine ecriture_map_ray_tracing()
         enddo
      endif ! l_sym_image
 
-     ! le e signifie real*4
+     ! the e means real*4
      call ftppre(unit,group,fpixel,nelements,image,status)
   endif
 
@@ -1063,7 +1063,7 @@ subroutine write_tau_surface(imol)
   logical :: simple, extend
   real :: pixel_scale_x, pixel_scale_y
 
-  ! Allocation dynamique pour passer en stack
+  ! Dynamic allocation to use stack
   real, dimension(:,:,:,:,:), allocatable :: image
 
   allocate(image(npix_x, npix_y, RT_n_incl, RT_n_az, 3), stat=alloc_status)
@@ -1116,7 +1116,7 @@ subroutine write_tau_surface(imol)
   !  wavelength
   call ftpkyd(unit,'WAVE',tab_lambda(lambda),-7,'wavelength [microns]',status)
 
-  ! RAC, DEC, reference pixel & pixel scale en degres
+  ! RA, DEC, reference pixel & pixel scale in degrees
   call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
   call ftpkye(unit,'CRVAL1',0.,-7,'RAD',status)
   call ftpkyj(unit,'CRPIX1',npix_x/2+1,'',status)
@@ -1136,7 +1136,7 @@ subroutine write_tau_surface(imol)
   call ftpkys(unit,'COORD_3',"z",' ',status)
 
   !----- Images
-  ! Boucles car ca ne passe pas avec sum directement (ifort sur mac)
+  ! Loops because sum directly does not work (ifort sur mac)
   do ibin=1,RT_n_incl
      do iaz=1,RT_n_az
         do j=1,npix_y
@@ -1177,7 +1177,7 @@ subroutine write_tau_map(imol)
   logical :: simple, extend
   real :: pixel_scale_x, pixel_scale_y
 
-  ! Allocation dynamique pour passer en stack
+  ! Dynamic allocation to use stack
   real, dimension(:,:,:,:), allocatable :: image
 
   allocate(image(npix_x, npix_y, RT_n_incl, RT_n_az), stat=alloc_status)
@@ -1225,7 +1225,7 @@ subroutine write_tau_map(imol)
   !  wavelength
   call ftpkyd(unit,'WAVE',tab_lambda(lambda),-7,'wavelength [microns]',status)
 
-  ! RAC, DEC, reference pixel & pixel scale en degres
+  ! RA, DEC, reference pixel & pixel scale in degrees
   call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
   call ftpkye(unit,'CRVAL1',0.,-7,'RAD',status)
   call ftpkyj(unit,'CRPIX1',npix_x/2+1,'',status)
@@ -1241,7 +1241,7 @@ subroutine write_tau_map(imol)
   call ftpkys(unit,'BUNIT',"",'',status)
 
   !----- Images
-  ! Boucles car ca ne passe pas avec sum directement (ifort sur mac)
+  ! Loops because sum directly does not work (ifort sur mac)
   do ibin=1,RT_n_incl
      do iaz=1,RT_n_az
         do j=1,npix_y
@@ -1295,7 +1295,7 @@ subroutine ecriture_sed_ray_tracing()
 
   !  Initialize parameters about the FITS image
   simple=.true.
-  ! le signe - signifie que l'on ecrit des reels dans le fits
+  ! the - sign means we write reals in the fits
   bitpix=-32
   naxis=4
   naxes(1)=n_lambda2
@@ -1326,12 +1326,12 @@ subroutine ecriture_sed_ray_tracing()
   fpixel=1
   nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
 
-  ! le e signifie real*4
+  ! the e means real*4
   call ftppre(unit,group,fpixel,nelements,sed_rt,status)
 
   call ftpkys(unit,'BUNIT',"W.m-2",'lambda.F_lambda',status)
 
-  ! Second HDU avec length d'onde
+  ! Second HDU with wavelength
   call FTCRHD(unit, status)
   bitpix=-32
   naxis=1
@@ -1345,7 +1345,7 @@ subroutine ecriture_sed_ray_tracing()
   group=1
   fpixel=1
 
-  ! le e signifie real*4
+  ! the e means real*4
   call ftppre(unit,group,fpixel,nelements,real(tab_lambda,kind=sp),status)
 
   call ftpkys(unit,'BUNIT',"micron",' ',status)
@@ -1379,7 +1379,7 @@ subroutine write_origin()
 
   filename = trim(data_dir)//"/origine.fits.gz"
 
-  ! Normalisation
+  ! Normalization
   o_star = sum(star_origin(1,:))
   o_disk(:) = o_disk(:) / (sum(o_disk) + o_star)
 
@@ -1392,7 +1392,7 @@ subroutine write_origin()
 
   !  Initialize parameters about the FITS image
   simple=.true.
-  ! le signe - signifie que l'on ecrit des reels dans le fits
+  ! the - sign means we write reals in the fits
   bitpix=-32
   naxis=1
   naxes(1)=n_cells
@@ -1408,7 +1408,7 @@ subroutine write_origin()
   fpixel=1
   nelements=naxes(1)
 
-  ! le e signifie real*4
+  ! the e means real*4
   call ftppre(unit,group,fpixel,nelements,o_disk,status)
 
   !  Close the file and free the unit number.
@@ -1497,7 +1497,7 @@ subroutine write_column(type, filename, lambda)
 
   !  Initialize parameters about the FITS image
   simple=.true.
-  ! le signe - signifie que l'on ecrit des reels dans le fits
+  ! the - sign means we write reals in the fits
   bitpix=-32
   extend=.true.
 
@@ -1533,7 +1533,7 @@ subroutine write_column(type, filename, lambda)
   group=1
   fpixel=1
 
-  ! le e signifie real*4
+  ! the e means real*4
   call ftppre(unit,group,fpixel,nelements,column,status)
 
   !  Close the file and free the unit number.
@@ -1574,7 +1574,7 @@ subroutine reemission_stats()
 
   !  Initialize parameters about the FITS image
   simple=.true.
-  ! le signe - signifie que l'on ecrit des reels dans le fits
+  ! the - sign means we write reals in the fits
   bitpix=-32
   naxis=1
   naxes(1)=n_cells
@@ -1590,7 +1590,7 @@ subroutine reemission_stats()
   fpixel=1
   nelements=naxes(1)
 
-  ! le e signifie real*4
+  ! the e means real*4
   call ftppre(unit,group,fpixel,nelements,N_reemission,status)
 
   !  Close the file and free the unit number.
@@ -1604,10 +1604,10 @@ end subroutine reemission_stats
 !********************************************************************************
 
 subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
-! Ecrit les table de densite du gaz en g/cm^3
-! de la poussiere en g/cm^3 et en particules
-! + coordonnees r et z en AU
-! + les tailles et mass des grains
+! Writes the gas density table in g/cm^3
+! and dust in g/cm^3 and particles
+! + r and z coordinates in AU
+! + grain sizes and masses
 ! C. Pinte
 ! 3/06/06
 
@@ -1644,7 +1644,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
 
   !  Initialize parameters about the FITS image
   simple=.true.
-  ! le signe - signifie que l'on ecrit des reels dans le fits
+  ! the - sign means we write reals in the fits
   bitpix=-32
   extend=.true.
 
@@ -1682,7 +1682,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
 
   dens(:) = gas_density(1:n_cells) * mu_mH / m3_to_cm3 ! nH2/m**3 --> g/cm**3
 
-  ! le e signifie real*4
+  ! the e means real*4
   call ftppre(unit,group,fpixel,nelements,dens,status)
 
   !  Close the file and free the unit number.
@@ -1706,7 +1706,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
 
      !  Initialize parameters about the FITS image
      simple=.true.
-     ! le signe - signifie que l'on ecrit des reels dans le fits
+     ! the - sign means we write reals in the fits
      bitpix=-64
      extend=.true.
      group=1
@@ -1771,7 +1771,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
 
   !  Initialize parameters about the FITS image
   simple=.true.
-  ! le signe - signifie que l'on ecrit des reels dans le fits
+  ! the - sign means we write reals in the fits
   bitpix=-32
   extend=.true.
   group=1
@@ -1831,7 +1831,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
 
   !  Initialize parameters about the FITS image
   simple=.true.
-  ! le signe - signifie que l'on ecrit des reels dans le fits
+  ! the - sign means we write reals in the fits
   bitpix=-32
   extend=.true.
 
@@ -1850,7 +1850,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
   fpixel=1
   nelements=naxes(1)
 
-  ! le e signifie real*4
+  ! the e means real*4
   call ftppre(unit,group,fpixel,nelements,r_grain,status)
 
   !  Close the file and free the unit number.
@@ -1873,7 +1873,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
 
   !  Initialize parameters about the FITS image
   simple=.true.
-  ! le signe - signifie que l'on ecrit des reels dans le fits
+  ! the - sign means we write reals in the fits
   bitpix=-32
   extend=.true.
 
@@ -1892,7 +1892,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
   fpixel=1
   nelements=naxes(1)
 
-  ! le e signifie real*4
+  ! the e means real*4
   call ftppre(unit,group,fpixel,nelements,r_grain_min,status)
 
   !  Close the file and free the unit number.
@@ -1915,7 +1915,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
 
   !  Initialize parameters about the FITS image
   simple=.true.
-  ! le signe - signifie que l'on ecrit des reels dans le fits
+  ! the - sign means we write reals in the fits
   bitpix=-32
   extend=.true.
 
@@ -1934,7 +1934,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
   fpixel=1
   nelements=naxes(1)
 
-  ! le e signifie real*4
+  ! the e means real*4
   call ftppre(unit,group,fpixel,nelements,r_grain_max,status)
 
   !  Close the file and free the unit number.
@@ -1957,7 +1957,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
 
   !  Initialize parameters about the FITS image
   simple=.true.
-  ! le signe - signifie que l'on ecrit des reels dans le fits
+  ! the - sign means we write reals in the fits
   bitpix=-32
   extend=.true.
 
@@ -1976,7 +1976,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
   fpixel=1
   nelements=naxes(1)
 
-  ! le e signifie real*4
+  ! the e means real*4
   call ftppre(unit,group,fpixel,nelements,M_grain,status)
 
   !  Close the file and free the unit number.
@@ -1999,7 +1999,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
 
   !  Initialize parameters about the FITS image
   simple=.true.
-  ! le signe - signifie que l'on ecrit des reels dans le fits
+  ! the - sign means we write reals in the fits
   bitpix=-64
   extend=.true.
   group=1
@@ -2055,7 +2055,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
 
   !  Initialize parameters about the FITS image
   simple=.true.
-  ! le signe - signifie que l'on ecrit des reels dans le fits
+  ! the - sign means we write reals in the fits
   bitpix=-64
   extend=.true.
   group=1
@@ -2149,7 +2149,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
 
      !  Initialize parameters about the FITS image
      simple=.true.
-     ! le signe - signifie que l'on ecrit des reels dans le fits
+     ! the - sign means we write reals in the fits
      bitpix=-64
      extend=.true.
      group=1
@@ -2241,7 +2241,7 @@ end subroutine write_disk_struct
 !********************************************************************
 
 subroutine ecriture_J(step)
-! Ecrit la table du champ de radiation
+! Writes the radiation field table
 ! C. Pinte
 ! 26/09/07
 
@@ -2261,10 +2261,10 @@ subroutine ecriture_J(step)
 
 
   ! Step1
-  ! xJ_abs est par bin de lambda donc Delta_lambda.F_lambda
+  ! xJ_abs is per lambda bin, so Delta_lambda.F_lambda
   ! Jio en W.m-2 (lambda.F_lambda)
-  ! 1/4pi est inclus dans n_phot_l_tot
-  ! teste OK par rapport a fct bb de yorick
+  ! 1/4pi is included in n_phot_L_tot
+  ! tested OK compared to Yorick.s bb function
   if (step==1) then
      filename = trim(data_dir)//"/J_step1.fits.gz"
      do lambda=1, n_lambda
@@ -2297,7 +2297,7 @@ subroutine ecriture_J(step)
 
   !  Initialize parameters about the FITS image
   simple=.true.
-  ! le signe - signifie que l'on ecrit des reels dans le fits
+  ! the - sign means we write reals in the fits
   bitpix=-32
   extend=.true.
 
@@ -2331,12 +2331,12 @@ subroutine ecriture_J(step)
   group=1
   fpixel=1
 
-  ! le e signifie real*4
+  ! the e means real*4
   call ftppre(unit,group,fpixel,nelements,Jio,status)
 
   call ftpkys(unit,'BUNIT',"W.m-2",'lambda.F_lambda',status)
 
-  ! Second HDU avec length d'onde
+  ! Second HDU with wavelength
   call FTCRHD(unit, status)
   bitpix=-32
   naxis=1
@@ -2350,7 +2350,7 @@ subroutine ecriture_J(step)
   group=1
   fpixel=1
 
-  ! le e signifie real*4
+  ! the e means real*4
   call ftppre(unit,group,fpixel,nelements,real(tab_lambda,kind=sp),status)
 
   call ftpkys(unit,'BUNIT',"micron",' ',status)
@@ -2369,7 +2369,7 @@ end subroutine ecriture_J
 !********************************************************************
 
 subroutine ecriture_UV_field()
-! Ecrit la table du champ de radiation
+! Writes the radiation field table
 ! C. Pinte
 ! 26/09/07
 
@@ -2385,7 +2385,7 @@ subroutine ecriture_UV_field()
   real, dimension(n_cells) :: G
 
   ! D'apr�s van Dishoeck et al. (2008) le champs FUV de Draine est de 2.67e-3 erg cm-2 s-1
-  ! Soit 2.67e-6 W / m2
+  ! That is 2.67e-6 W / m2
   ! C'est entre 912 et 2000 Angstr�ms (la borne sup�rieure varie un peu d'un papier � l'autre).
 
   filename = trim(data_dir)//"/UV_field.fits.gz"
@@ -2404,7 +2404,7 @@ subroutine ecriture_UV_field()
 
   !  Initialize parameters about the FITS image
   simple=.true.
-  ! le signe - signifie que l'on ecrit des reels dans le fits
+  ! the - sign means we write reals in the fits
   bitpix=-32
   extend=.true.
 
@@ -2435,7 +2435,7 @@ subroutine ecriture_UV_field()
   group=1
   fpixel=1
 
-  ! le e signifie real*4
+  ! the e means real*4
   call ftppre(unit,group,fpixel,nelements,G,status)
 
   call ftpkys(unit,'BUNIT',"Habing",'[912-2000] AA, following formulae by van Dischoeck et al 2008',status)
@@ -2554,7 +2554,7 @@ subroutine ecriture_temperature(iTemperature)
 
      !  Initialize parameters about the FITS image
      simple=.true.
-     ! le signe - signifie que l'on ecrit des reels dans le fits
+     ! the - sign means we write reals in the fits
      bitpix=-32
      extend=.true.
 
@@ -2585,7 +2585,7 @@ subroutine ecriture_temperature(iTemperature)
      group=1
      fpixel=1
 
-     ! le e signifie real*4
+     ! the e means real*4
      call ftppre(unit,group,fpixel,nelements,Tdust(1:n_cells),status)
 
      !  Close the file and free the unit number.
@@ -2613,7 +2613,7 @@ subroutine ecriture_temperature(iTemperature)
 
      !  Initialize parameters about the FITS image
      simple=.true.
-     ! le signe - signifie que l'on ecrit des reels dans le fits
+     ! the - sign means we write reals in the fits
      bitpix=-32
      extend=.true.
 
@@ -2647,7 +2647,7 @@ subroutine ecriture_temperature(iTemperature)
      group=1
      fpixel=1
 
-     ! le e signifie real*4
+     ! the e means real*4
      call ftppre(unit,group,fpixel,nelements,Tdust_1grain,status)
 
      !  Close the file and free the unit number.
@@ -2680,7 +2680,7 @@ subroutine ecriture_temperature(iTemperature)
      fpixel=1
 
      !------------------------------------------------------------------------------
-     ! 1er HDU : Temperature d'equilibre
+     ! 1st HDU: Equilibrium temperature
      !------------------------------------------------------------------------------
      bitpix=-32
 
@@ -2709,11 +2709,11 @@ subroutine ecriture_temperature(iTemperature)
      !  Write the required header keywords.
      call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
-     ! le e signifie real*4
+     ! the e means real*4
      call ftppre(unit,group,fpixel,nelements,Tdust_1grain_nRE,status)
 
      !------------------------------------------------------------------------------
-     ! 2eme HDU : is the grain at equilibrium ?
+     ! 2nd HDU : is the grain at equilibrium ?
      !------------------------------------------------------------------------------
      bitpix=32
      if (lVoronoi) then
@@ -2760,7 +2760,7 @@ subroutine ecriture_temperature(iTemperature)
      call ftpprj(unit,group,fpixel,nelements,tmp,status)
 
      !------------------------------------------------------------------------------
-     ! 3eme HDU temperature table
+     ! 3rd HDU temperature table
      !------------------------------------------------------------------------------
      bitpix=-32
      naxis=1
@@ -2773,11 +2773,11 @@ subroutine ecriture_temperature(iTemperature)
      !  Write the required header keywords.
      call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
-     ! le e signifie real*4
+     ! the e means real*4
      call ftppre(unit,group,fpixel,nelements,tab_Temp,status)
 
      !------------------------------------------------------------------------------
-     ! 4eme HDU : Proba Temperature
+     ! 4th HDU : Proba Temperature
      !------------------------------------------------------------------------------
      bitpix=-32
      if (lVoronoi) then
@@ -2811,7 +2811,7 @@ subroutine ecriture_temperature(iTemperature)
      !  Write the required header keywords.
      call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
-     ! le e signifie real*4
+     ! the e means real*4
      call ftppre(unit,group,fpixel,nelements,Proba_Tdust,status)
 
      !  Close the file and free the unit number.
@@ -2851,7 +2851,7 @@ subroutine ecriture_Tex(imol,ext)
   if (alloc_status > 0) call error('Allocation error Tex in ecriture_Tex')
   Tex = 0.0
 
-  k=1 ! Cette version n'est pas en 3D
+  k=1 ! This version is not in 3D
 
   do iTrans=1,nTrans_tot
      iUp = iTransUpper(iTrans)
@@ -2883,7 +2883,7 @@ subroutine ecriture_Tex(imol,ext)
 
   !  Initialize parameters about the FITS image
   simple=.true.
-  ! le signe - signifie que l'on ecrit des reels dans le fits
+  ! the - sign means we write reals in the fits
   bitpix=-32
   extend=.true.
 
@@ -2900,7 +2900,7 @@ subroutine ecriture_Tex(imol,ext)
   fpixel=1
   nelements=naxes(1)*naxes(2)
 
-  ! le e signifie real*4
+  ! the e means real*4
   call ftppre(unit,group,fpixel,nelements,Tex,status)
 
   !  Close the file and free the unit number.
@@ -2965,7 +2965,7 @@ subroutine taille_moyenne_grains()
 
   !  Initialize parameters about the FITS image
   simple=.true.
-  ! le signe - signifie que l'on ecrit des reels dans le fits
+  ! the - sign means we write reals in the fits
   bitpix=-32
   extend=.true.
 
@@ -2981,7 +2981,7 @@ subroutine taille_moyenne_grains()
   fpixel=1
   nelements=naxes(1)
 
-  ! le e signifie real*4
+  ! the e means real*4
   call ftppre(unit,group,fpixel,nelements,a_moyen,status)
 
   !  Close the file and free the unit number.
@@ -3018,7 +3018,7 @@ subroutine ecriture_sed(ised)
   real, save :: L_bol1
   real :: L_bol2, E_photon1
 
-  !! Ecriture SED
+  !! SED writing
   if (ised ==1) then
      filename = trim(data_dir)//"/.sed_th.fits.gz"
   else
@@ -3036,16 +3036,16 @@ subroutine ecriture_sed(ised)
 
   !  Initialize parameters about the FITS image
   simple=.true.
-  ! le signe - signifie que l'on ecrit des reels dans le fits
+  ! the - sign means we write reals in the fits
   bitpix=-32
   extend=.true.
   group=1
   fpixel=1
 
-  ! Energie d'un photon / Temps
-  ! Ca donne lambda Flambda a une distance = R_etoile
-  ! E_photon = sigma*T_etoile**4  / (real(n_photons_loop)*real(n_photons_eq_th)) * real(N_thet)*real(N_phi)
-  ! Ca donne lambda Flambda sur le detecteur
+  ! Photon energy / Time
+  ! It gives lambda Flambda at a distance = R_star
+  ! E_photon = sigma*T_star**4  / (real(n_photons_loop)*real(n_photons_eq_th)) * real(N_thet)*real(N_phi)
+  ! It gives lambda Flambda on the detector
   if (l_sym_centrale) then
      !E_photon = L_tot  / (real(n_photons_loop)*real(n_photons_eq_th)*(distance*pc_to_AU)**2) * real(N_thet)*real(N_phi)
      E_photon1 = L_packet_th * (real(N_thet)*real(N_phi)/four_pi) / (distance*pc_to_AU)**2
@@ -3054,7 +3054,7 @@ subroutine ecriture_sed(ised)
   endif
 
   if (ised == 1) then
-     ! Ca donne lambda Flambda sur le detecteur
+     ! It gives lambda Flambda on the detector
 
      naxis=3
      naxes(1)=n_lambda
@@ -3072,13 +3072,13 @@ subroutine ecriture_sed(ised)
         sed1_io(lambda,:,:) = sum(sed(lambda,:,:,:),dim=3) * factor
      enddo
 
-     ! le e signifie real*4
+     ! the e means real*4
      call ftppre(unit,group,fpixel,nelements,sed1_io,status)
 
      L_bol1 = sum(sed) * E_photon1
   else
-     ! Energie totale emise a une distance emise egale au radius stellaire
-     ! on chosit cette distance pour calibrer le flux / pi*B(lambda)
+     ! Total energy emitted at a distance equal to the stellar radius
+     ! we choose this distance to calibrate the flux / pi*B(lambda)
      do lambda=1, n_lambda2
         n_sent_photons(lambda) = real(sum(n_phot_envoyes(lambda,:)))
         E_totale(lambda) = E_totale(lambda)/n_sent_photons(lambda)
@@ -3139,7 +3139,7 @@ subroutine ecriture_sed(ised)
 
   call ftpkys(unit,'BUNIT',"W.m-2",'lambda.F_lambda',status)
 
-  ! Second HDU avec length d'onde
+  ! Second HDU with wavelength
   call FTCRHD(unit, status)
   bitpix=-32
   naxis=1
@@ -3153,7 +3153,7 @@ subroutine ecriture_sed(ised)
   group=1
   fpixel=1
 
-  ! le e signifie real*4
+  ! the e means real*4
   call ftppre(unit,group,fpixel,nelements,real(tab_lambda,kind=sp),status)
 
   call ftpkys(unit,'BUNIT',"micron",' ',status)
@@ -3201,7 +3201,7 @@ subroutine ecriture_pops(imol,ext)
   call ftinit(unit,trim(filename),blocksize,status)
 
   simple=.true.
-  ! le signe - signifie que l'on ecrit des reels dans le fits
+  ! the - sign means we write reals in the fits
   bitpix=-32
   extend=.true.
 
@@ -3298,7 +3298,7 @@ subroutine ecriture_spectre(imol)
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
-  ! RAC, DEC, reference pixel & pixel scale en degres
+  ! RA, DEC, reference pixel & pixel scale in degrees
   call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
   call ftpkye(unit,'CRVAL1',0.,-7,'RAD',status)
   call ftpkyj(unit,'CRPIX1',npix_x/2+1,'',status)
@@ -3334,29 +3334,29 @@ subroutine ecriture_spectre(imol)
   endif
   !  call ftpkye(unit,'vmax_center',mol(imol)%vmax_center_output,-8,'m/s',status)
 
-  if (mol(imol)%l_sym_ima) then ! BUG : ca inverse aussi la pente du Cmb mais c'est pas tres grave
+  if (mol(imol)%l_sym_ima) then ! BUG : it also reverses the Cmb slope but it is not very serious
      if (RT_line_method==1) then
-        ! On ajoute les 2 parties du spectres
+        ! Add the 2 parts of the spectrum
         do iv = -mol(imol)%n_speed_rt, -1
            spectrum(1,1,iv,:,:,:) = spectrum(1,1,iv,:,:,:) + spectrum(1,1,-iv,:,:,:)
         enddo
-        ! On symetrise
+        ! Symmetrize
         do iv = 1, mol(imol)%n_speed_rt
            spectrum(1,1,iv,:,:,:) = spectrum(1,1,-iv,:,:,:)
         enddo
         spectrum(1,1,0,:,:,:) = spectrum(1,1,0,:,:,:) * 2.
-        ! On divise par deux
+        ! Divide by two
         spectrum = spectrum * 0.5
      else
         xcenter = npix_x/2 + modulo(npix_x,2)
-        if (lkeplerian) then ! profil de raie inverse des 2 cotes
+        if (lkeplerian) then ! line profile inverted on both sides
            !iv_center = mol(imol)%n_speed_rt/2
            do i=xcenter+1,npix_x
               do iv=1, mol(imol)%n_speed_rt
                  spectrum(i,:,iv,:,:,:) = spectrum(npix_x-i+1,:,mol(imol)%n_speed_rt-iv+1,:,:,:)
               enddo
            enddo
-        else ! infall : meme profil de raie des 2 cotes
+        else ! infall : same line profile on both sides
            do i=xcenter+1,npix_x
               spectrum(i,:,:,:,:,:) = spectrum(npix_x-i+1,:,:,:,:,:)
            enddo
@@ -3489,7 +3489,7 @@ subroutine ecriture_spectre(imol)
   if (status > 0) call print_error(status)
 
   !------------------------------------------------------------------------------
-  ! Origine
+  ! Origin
   !------------------------------------------------------------------------------
   if (lorigine) then
      allocate(O(mol(imol)%n_speed_rt,mol(imol)%nTrans_rayTracing,n_cells))
@@ -3509,7 +3509,7 @@ subroutine ecriture_spectre(imol)
      call ftinit(unit,trim(filename),blocksize,status)
 
      simple=.true.
-     ! le signe - signifie que l'on ecrit des reels dans le fits
+     ! the - sign means we write reals in the fits
      bitpix=-32
      extend=.true.
 

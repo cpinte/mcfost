@@ -15,7 +15,7 @@ function specific_heat(T, igrain)
   ! C. Pinte
   ! 30/01/07
 
-  integer, intent(in) :: igrain ! indice taille de grain
+  integer, intent(in) :: igrain ! grain size index
   real(kind=dp), dimension(:), intent(in) :: T
   real(kind=dp), dimension(size(T)) :: specific_heat
   integer :: pop
@@ -42,7 +42,7 @@ function astrosil_specific_heat(T, igrain)
   ! C. Pinte
   ! 26/01/07
 
-  integer, intent(in) :: igrain ! indice taille de grain
+  integer, intent(in) :: igrain ! grain size index
   real(kind=dp), dimension(:), intent(in) :: T
   real(kind=dp), dimension(size(T)) :: astrosil_specific_heat
 
@@ -220,7 +220,7 @@ end subroutine test_PAH_specific_heat
 function Misselt_specific_heat(T,igrain)
   ! return the specific heat capacity in [erg/K]
 
-  integer, intent(in) :: igrain ! indice taille de grain
+  integer, intent(in) :: igrain ! grain size index
   real(kind=dp), dimension(:), intent(in) :: T
   real(kind=dp), dimension(size(T)) :: Misselt_specific_heat
 
@@ -243,7 +243,7 @@ end function Misselt_specific_heat
 function DustEM_specific_heat(T,igrain)
   ! return the specific heat capacity in [erg/K]
 
-  integer, intent(in) :: igrain ! indice taille de grain
+  integer, intent(in) :: igrain ! grain size index
   real(kind=dp), dimension(:), intent(in) :: T
   real(kind=dp), dimension(size(T)) :: DustEM_specific_heat
 

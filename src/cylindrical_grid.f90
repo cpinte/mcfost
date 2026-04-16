@@ -23,13 +23,13 @@ module cylindrical_grid
   real(kind=dp), dimension(:), allocatable :: zmax !n_rad
   real(kind=dp), dimension(:), allocatable :: volume !n_rad en AU^3
   real(kind=dp), dimension(:,:), allocatable :: cell_height ! n_rad, nz, taille verticale des cellules cylindriques
-  real(kind=dp), dimension(:), allocatable :: r_grid, z_grid ! Position en cylindrique !!! des cellules
+  real(kind=dp), dimension(:), allocatable :: r_grid, z_grid ! Cylindrical position of cells
   real(kind=dp), dimension(:), allocatable :: phi_grid
-  real(kind=dp), dimension(:), allocatable :: r_lim, r_lim_2, r_lim_3 ! lim rad sup de la cell (**2) !0:n_rad
-  real(kind=dp), dimension(:,:), allocatable :: z_lim ! lim vert inf de la cell !n_rad,nz+1
-  real(kind=dp), dimension(:), allocatable :: tan_phi_lim, cos_phi_lim, sin_phi_lim ! lim azimuthale de la cell ! n_az
-  real(kind=dp), dimension(:), allocatable :: w_lim, theta_lim, tan_theta_lim, cos_theta_lim ! lim theta sup de la cell ! 0:nz
-  integer, dimension(:), allocatable :: region_map ! n_rad : indice de region pour chaque cell
+  real(kind=dp), dimension(:), allocatable :: r_lim, r_lim_2, r_lim_3 ! upper radial boundary of cell (**2), index 0:n_rad
+  real(kind=dp), dimension(:,:), allocatable :: z_lim ! lower vertical boundary of cell, size n_rad,nz+1
+  real(kind=dp), dimension(:), allocatable :: tan_phi_lim, cos_phi_lim, sin_phi_lim ! azimuthal boundary of cell, size n_az
+  real(kind=dp), dimension(:), allocatable :: w_lim, theta_lim, tan_theta_lim, cos_theta_lim ! upper theta boundary of cell, index 0:nz
+  integer, dimension(:), allocatable :: region_map ! n_rad : region index for each cell
 
   integer, dimension(:,:,:), allocatable :: cell_map
   integer, dimension(:), allocatable :: cell_map_i, cell_map_j, cell_map_k
@@ -181,10 +181,10 @@ contains
 !******************************************************************************
 
 subroutine define_cylindrical_grid()
-  ! Definit la grid du code
-  ! Calcule les tableaux zmax, volume, r_lim, r_lim_2, z_lim
-  ! et la variable Rmax2
-  ! Version 4 gere les subdivisions pour les zones multiples
+  ! Defines the simulation grid
+  ! Computes the arrays zmax, volume, r_lim, r_lim_2, z_lim
+  ! and the variable Rmax2
+  ! Version 4 handles subdivisions for multiple zones
   ! C. Pinte
   ! 03/05/11, version 3 :  27/04/05
 
@@ -214,7 +214,7 @@ subroutine define_cylindrical_grid()
 
 
   ! **************************************************
-  ! Tableaux relatifs a la grid
+  ! Arrays related to the grid
   ! **************************************************
   if (.not.allocated(r_grid)) then
      allocate(r_lim(0:n_rad), r_lim_2(0:n_rad), r_lim_3(0:n_rad), &
@@ -255,7 +255,7 @@ subroutine define_cylindrical_grid()
 
   n_rad_in = max(n_rad_in,1) ! in case n_rad_in is set to 0 by user
 
-  ! Definition du nombre de chaques cellules
+  ! Definition of the number of cells per zone
   n_empty = 3
   n_rad_region = (n_rad - (n_regions -1) * n_empty) / n_regions
   n_rad_in_region = n_rad_in
@@ -268,10 +268,10 @@ subroutine define_cylindrical_grid()
      regions(ir)%iRmin = istart ; regions(ir)%iRmax = min(istart+n_rad_region-1, n_rad) ;
 
      if (ir == n_regions) then
-        n_rad_region = n_rad - n_cells_tmp ! On prend toutes les celles restantes
+        n_rad_region = n_rad - n_cells_tmp ! Take all remaining cells
      endif
 
-     ! Pour eviter d'avoir 2 cellules a la meme position si les regions se touchent
+     ! To avoid 2 cells at the same position when regions touch
      R0 =  regions(ir)%Rmin
      if (ir > 1) then
         if (regions(ir)%Rmin == regions(ir-1)%Rmax) then
@@ -279,8 +279,8 @@ subroutine define_cylindrical_grid()
         endif
      endif
 
-     ! Calcul recursif hors boucle //
-     ! Calcul les rayons separant les cellules de (1 a n_rad + 1)
+     ! Recursive computation outside the parallel loop
+     ! Compute the radii separating cells (from 1 to n_rad + 1)
      tab_r(istart) = R0
 
      if (llinear_rgrid) then
@@ -291,7 +291,7 @@ subroutine define_cylindrical_grid()
 
         n_cells_tmp = istart+n_rad_region
 
-        ! Cellules vides
+        ! Empty cells
         if (ir < n_regions) then
            if ( (regions(ir+1)%Rmin > regions(ir)%Rmax) ) then
               delta_r = (regions(ir+1)%Rmin - regions(ir)%Rmax)/n_empty
@@ -304,7 +304,7 @@ subroutine define_cylindrical_grid()
 
         istart = n_cells_tmp+1
      else
-        ! grid log avec subdivision cell interne
+        ! Log grid with internal cell subdivision
         !delta_r = (rout/rmin)**(1.0/(real(n_rad-n_rad_in+1)))
         ln_delta_r = (1.0_dp/real(n_rad_region-n_rad_in_region+1,kind=dp))*log(regions(ir)%Rmax/R0)
         delta_r = exp(ln_delta_r)
@@ -312,7 +312,7 @@ subroutine define_cylindrical_grid()
         ln_delta_r_in = (1.0_dp/real(n_rad_in_region,kind=dp))*log(delta_r)
         delta_r_in = exp(ln_delta_r_in)
 
-        ! Selection de la zone correspondante : pente la plus forte
+        ! Select the corresponding zone: steepest slope
         puiss = 0.0_dp
         do iz=1, n_zones
            if (disk_zone(iz)%region == ir) then
@@ -344,14 +344,14 @@ subroutine define_cylindrical_grid()
            enddo
         endif
 
-        ! grid log apres subdivision "1ere" cell
+        ! Log grid after subdivision of the first cell
         do i=istart + n_rad_in_region+1, istart+n_rad_region
            tab_r(i) = tab_r(i-1) * delta_r
         enddo
 
         n_cells_tmp = istart+n_rad_region
 
-        ! Cellules vides
+        ! Empty cells
         if (ir < n_regions) then
            if ( (regions(ir+1)%Rmin > regions(ir)%Rmax) ) then
               ln_delta_r = (1.0_dp/real(n_empty+1,kind=dp))*log(regions(ir+1)%Rmin/regions(ir)%Rmax)
@@ -408,17 +408,17 @@ subroutine define_cylindrical_grid()
   endif
 
   if (lcylindrical) then
-     ! Calcul volume des cellules (pour calculer leur mass)
-     ! On prend ici le radius au milieu de la cell
+     ! Compute cell volumes (to calculate their mass)
+     ! Here we take the radius at the cell centre
      ! factor 2 car symétrie
-     ! tab_r est en cylindrique ici
+     ! tab_r is in cylindrical coordinates here
 
      do i=1, n_rad
         rcyl = 0.5*(r_lim(i) +r_lim(i-1))
         r_grid_tmp(i,:) = rcyl!sqrt(r_lim(i) +r_lim(i-1)))
 
-        ! Estimation du zmax proprement
-        ! Recherche de l'echelle de height max des zones pertinentes au radius donne
+        ! Proper estimation of zmax
+        ! Find the maximum scale height of the relevant zones at the given radius
         H = 0.
         do izone=1,n_zones
            dz=disk_zone(izone)
@@ -431,7 +431,7 @@ subroutine define_cylindrical_grid()
      enddo ! i
 
      do i=1, n_rad
-        ! Interpolation pour les cellules ou H n'est pas defini (ie entre les zones)
+        ! Interpolation for cells where H is not defined (i.e. between zones)
         if (zmax(i) < tiny_real)  then
            search_min: do ii = i-1, 1, -1
               if (zmax(ii) > tiny_real) then
@@ -447,7 +447,7 @@ subroutine define_cylindrical_grid()
               endif
            enddo search_max !ii
 
-           ! Interpolation lineaire en log(r)
+           ! Linear interpolation in log(r)
            rcyl = r_grid_tmp(i,1) ; rcyl_min =  r_grid_tmp(ii_min,1)  ; rcyl_max =  r_grid_tmp(ii_max,1)
            frac = (log(rcyl) - log(rcyl_min)) / (log(rcyl_max) - log(rcyl_min))
            zmax(i) = exp(log(zmax(ii_max)) * frac + log(zmax(ii_min)) * (1.0 - frac))
@@ -457,7 +457,7 @@ subroutine define_cylindrical_grid()
 
      do i=1,n_rad
         cell_height(i,:)=zmax(i)/real(nz) ! default grid is regular in z
-        ! Pas d'integration = moitie + petite dimension cell
+        ! No integration = half + small cell dimension
         z_lim(i,nz+1)=zmax(i)
         do j=1,nz
            z_lim(i,j) = (real(j,kind=dp)-1.0_dp)*cell_height(i,j)
@@ -494,7 +494,7 @@ subroutine define_cylindrical_grid()
      zmaxmax = maxval(zmax)
 
   else ! lspherical
-     ! tab_r est en spherique ici
+     ! tab_r is in spherical coordinates here
      w_lim(0) = 0.0_dp
      theta_lim(0) = 0.0_dp
      tan_theta_lim(0) = 1.0e-10_dp
@@ -582,7 +582,7 @@ subroutine define_cylindrical_grid()
   endif ! cylindrique ou spherique
   phi_grid_tmp(:) = 0.0_dp
 
-  ! Version 3D
+  ! 3D version
   if (l3D) then
      delta_phi = 2.0*pi/real(n_az)
      do k=1, n_az
@@ -731,7 +731,7 @@ end subroutine define_cylindrical_grid
                    call exit(1)
                 endif
              else
-                if ((i/=i2)) then ! seul i est defini ds la cas 0
+                if ((i/=i2)) then ! only i is defined in case 0
                    write(*,*) "PB test convert"
                    write(*,*) i,j,k, "-->", icell
                    write(*,*) icell, "-->", i2,j2,k2
@@ -892,7 +892,7 @@ end subroutine define_cylindrical_grid
   !******************************************************************************
 
   subroutine index_cell_3d_phi(xin,yin,zin,phik_out)
-    ! ok : not necessary anymore, included directly dans cross_cylindrical_cell
+    ! ok: not necessary anymore, included directly in cross_cylindrical_cell
 
     implicit none
 
@@ -955,13 +955,13 @@ end subroutine define_cylindrical_grid
     ! 3D cell indices
     call cell2cylindrical(cell, ri0,zj0,k0)
 
-    ! Detection interface
+    ! Interface detection
     r_2=x0*x0+y0*y0
     b=(x0*u+y0*v)*inv_a
 
     if (ri0==0) then
-       ! Si on est avant le bord interne,  on passe forcement par rmin
-       ! et on cherche forcement la racine positive (unique)
+       ! If we are inside the inner boundary, we must pass through rmin
+       ! and we must find the unique positive root
        c=(r_2-r_lim_2(0))*inv_a
        delta=b*b-c
        rac=sqrt(delta)
@@ -971,24 +971,24 @@ end subroutine define_cylindrical_grid
        delta_rad=1
     else
        ! 1) position interface radiale
-       ! on avance ou recule en r ? -> produit scalaire
+       ! Are we moving inward or outward in r? -> dot product
        dotprod=u*x0+v*y0  ! ~ b
        if (dotprod < 0.0_dp) then
-          ! on recule : on cherche radius inférieur
+          ! Moving inward: looking for the lower boundary radius
           c=(r_2-r_lim_2(ri0-1)*correct_moins)*inv_a
           delta=b*b-c
-          if (delta < 0.0_dp) then ! on ne rencontre pas le radius inférieur
-             ! on cherche le radius supérieur
+          if (delta < 0.0_dp) then ! We do not encounter the lower boundary radius
+             ! Looking for the upper boundary radius
              c=(r_2-r_lim_2(ri0)*correct_plus)*inv_a
-             delta=max(b*b-c,0.0_dp) ! on force 0.0 si pb de precision qui donnerait delta=-epsilon
+             delta=max(b*b-c,0.0_dp) ! force 0.0 to handle precision issues that could give delta=-epsilon
              delta_rad=1
           else
              delta_rad=-1
           endif
        else
-          ! on avance : on cherche le radius supérieur
+          ! Moving outward: looking for the upper boundary radius
           c=(r_2-r_lim_2(ri0)*correct_plus)*inv_a
-          delta=max(b*b-c,0.0_dp) ! on force 0.0 si pb de precision qui donnerait delta=-epsilon
+          delta=max(b*b-c,0.0_dp) ! force 0.0 to handle precision issues that could give delta=-epsilon
           delta_rad=1
        endif !dotprod
        rac=sqrt(delta)
@@ -1001,13 +1001,13 @@ end subroutine define_cylindrical_grid
 
 
        ! 2) position interface verticale
-       ! on monte ou on descend par rapport au plan équatorial ?
+       ! Are we moving toward or away from the midplane?
        dotprod=w*z0
        if (dotprod == 0.0_dp) then
           t=1.0e10
        else
           if (dotprod > 0.0_dp) then
-             ! on s'eloigne du midplane (ou on monte en 2D)
+             ! Moving away from the midplane (or upward in 2D)
              if (abs(zj0)==nz+1) then
                 delta_zj=0
                 zlim=sign(1.0e10_dp,z0)
@@ -1030,8 +1030,8 @@ end subroutine define_cylindrical_grid
                 endif
              else ! 2D
                 if (zj0==1) then
-                   ! on traverse le plan eq donc on va remonter
-                   ! et z va changer de signe
+                   ! We cross the mid-plane and will bounce back
+                   ! and z will change sign
                    delta_zj=1
                    if (z0 > 0.0_dp) then
                       zlim=-z_lim(ri0,2)*correct_moins
@@ -1039,7 +1039,7 @@ end subroutine define_cylindrical_grid
                       zlim=z_lim(ri0,2)*correct_moins
                    endif
                 else !(zj0==1)
-                   ! on ne traverse pas z=0.
+                   ! We do not cross z=0.
                    if (z0 > 0.0_dp) then
                       zlim=z_lim(ri0,zj0)*correct_moins
                    else
@@ -1059,10 +1059,10 @@ end subroutine define_cylindrical_grid
        if (l3D) then
           dotprod =  x0*v - y0*u
           if (abs(dotprod) < 1.0e-10) then
-             ! on ne franchit pas d'interface azimuthale
+             ! No azimuthal interface is crossed
              t_phi = 1.0e30
           else
-             ! Quelle cell on va franchir
+             ! Which cell boundary will be crossed
              if (dotprod > 0.0) then
                 tan_angle_lim = tan_phi_lim(k0)
                 delta_phi=1
@@ -1282,7 +1282,7 @@ end subroutine define_cylindrical_grid
 !**********************************************************************
 
   subroutine move_to_grid_cyl(id, x,y,z,u,v,w, icell,lintersect)
-    ! Calcule la position au bord de la grid dans
+    ! Calculates la position au bord de la grid dans
     ! la direction donnee pour grid cylindrique
     ! C. Pinte
     ! 19/09/07

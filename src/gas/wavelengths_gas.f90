@@ -24,7 +24,7 @@ module wavelengths_gas
    real, parameter    :: vcore_on_vth = 0.9!0.7 !line core goes from -vcore_on_vth * vth to vcore_on_vth * vth km/s.
    real, parameter    :: peak_voigt_limit = 1e-10 ! the profile expands up to peak * peak_voigt_limit
    ! real, parameter    :: vwing_on_vth = 10.0 ! 5.0!local (Voigt) line goes from 0 to vwing_on_vth * vth km/s
-!make assym gauss
+!make asym gauss
    ! integer, parameter :: Nlambda_line_gauss = 21 !11 !if linear
    !-> if Gauss is linear it is the sum of the two, and it is the full size ! (not half)
    integer, parameter :: Nlambda_line_gauss_log = 3!15!5 !log wings
@@ -53,7 +53,7 @@ module wavelengths_gas
    function make_sub_wavelength_grid_cont_log_nu(cont)
    ! ----------------------------------------------------------------- !
    ! Make an individual wavelength grid for the AtomicContinuum cont.
-   !  -> cross-section is extrapolated beyond edge to be use with
+   !  -> cross-section is extrapolated beyond edge to be used with
    ! level's dissolution, if lambdamax > lambda0
    !
    ! Allocate cont%lambda.
@@ -95,7 +95,7 @@ module wavelengths_gas
    subroutine compute_line_bound(line,limage)
    use voigts, only : max_voigt_profile, dmax_voigt, dmax_lorentz
       ! ------------------------------------------------------------ !
-      ! Compute the line bounds : lamndamin and lambdamax
+      ! Compute the line bounds : lambdamin and lambdamax
       ! the total extent of line in the atom's frame (no velocity).
       ! if limage is .false. :
       !  vmax is computed from the maximum thermal width of the line.
@@ -550,7 +550,7 @@ module wavelengths_gas
          tmp_grid2(1) = tmp_grid(1)
          Nremoved = 0
 
-         !here we will remove points that are also below hv so as to preserve the grid resolutin.
+         !here we will remove points that are also below hv so as to preserve the grid resolution.
          !however we keep points with hv_loc above hv as it means we are comparing lambda of different
          !line groups.
          !TO DO: check that when hv_loc >> hv it is indeed  because we change group.
@@ -596,7 +596,7 @@ module wavelengths_gas
          !-> Add continuum points beyond last "bound-free" continuum
          !In case they are lines beyond the last continuum I add at least3 points per line for the continuum in this region
          !->cont end		this is heavy for nothing but should work !
-         !finalise continuum here by reckoning how much freq we need
+         !finalize continuum here by reckoning how much freq we need
          !make the new points go farther than line_waves for interpolation.
          Nmore_cont_freq = 0
          do n=1, N_groups
@@ -701,7 +701,7 @@ module wavelengths_gas
          tmp_grid2(1:Nlambda) = tmp_grid(:)
 
          Nwaves = Nlambda
-         !add continuum wavlengths only outside line groups
+         !add continuum wavelengths only outside line groups
          !First values below or beyond first and last groups
          la = 0
          do lac=Nlambda+1, Nlambda+Nlambda_cont
@@ -732,7 +732,7 @@ module wavelengths_gas
 
          !continuum frequencies are sorted and so are the line frequencies
          !but they are added at the end, so sorted is needed, but I can improve the previous
-         !loop to fill the tmp_frid in the ascending order of wavelengths
+         !loop to fill the tmp_grid in the ascending order of wavelengths
          allocate(lambda(Nwaves),stat=alloc_status)
          tmp_grid2 = tmp_grid2(index_bubble_sort(tmp_grid2))
          lambda(:) = -99.0 !check
@@ -787,7 +787,7 @@ module wavelengths_gas
            !in any problem of grid resolution etc or locate approximation.
            !We take Nred-1 to be sure than the tab_lambda_cont(Nred) <= lambda0.
            !Only if not dissolution.
-           !We just need to avoind having cont_lambda(Nred)>lambda0, since the cross section is in (lambda/lambda0)**3
+           !We just need to avoid having cont_lambda(Nred)>lambda0, since the cross section is in (lambda/lambda0)**3
             if (l0 /= atom%continua(kr)%lambda0) then
                if (.not.ldissolve) then
                   if (lambda(atom%continua(kr)%Nr) > atom%continua(kr)%lambda0) then
@@ -796,7 +796,7 @@ module wavelengths_gas
                      do while (lambda(atom%continua(kr)%Nr) > atom%continua(kr)%lambda0)
                         atom%continua(kr)%Nr = atom%continua(kr)%Nr-1
                         atom%continua(kr)%Nlambda = atom%continua(kr)%Nr - atom%continua(kr)%Nb + 1
-                        if (atom%continua(kr)%Nlambda == 1) call error('accomadting bound-free egdes')
+                        if (atom%continua(kr)%Nlambda == 1) call error('accommodating bound-free edges')
                      enddo
                      write(*,*) "new val at Nred:", lambda(atom%continua(kr)%Nr), ' Nr=', atom%continua(kr)%Nr
                   !    write(*,*) atom%continua(kr)%lambda0
@@ -860,7 +860,7 @@ module wavelengths_gas
                !       l1 = atoms(nb)%p%lines(krr)%lambda0
 
                !       dvmin = c_light * abs(l1-l0)/l0 - atom%lines(kr)%vmax
-               !       !-> no overlap du to motion of cells
+               !       !-> no overlap due to motion of cells
                !       if (dvmin >  abs(vmax_overlap)) cycle inner_line_loop
 
                !       if ( dvmin <= abs(vmax_overlap)) then
@@ -929,7 +929,7 @@ module wavelengths_gas
 
   subroutine make_wavelengths_raytracing(lambda)
    !Make a wavelength grid for images and flux that is different from
-   !the non-LTE wavelength grid (the egdes of the lines take the velocity shift).
+   !the non-LTE wavelength grid (the edges of the lines take the velocity shift).
    !The grid is linearly sampled (in velocity) from -vmax_rt to +vmax_rt with n_speed_rt
    ! 1) if limage:
    !    keep only ray-traced lines of each atom and, the transitions (continua, other lines) with which they overlap
@@ -937,9 +937,9 @@ module wavelengths_gas
    !
    ! 2) if .not. limage:
    !    a) if lsed, use the lambda table in the parameter file to compute a sed.
-   !    No image will be written. If line%Nlambda < 3 the line contirbution to the opacity is neglected for the flux.
-   !    b) it .not. lsed, all transitions are kept taking into account the maximum velocity shift.
-   !       This represent a high resolution spectrum on a grid similar to the non-LTE grid (except that it takes velocity shifts).
+   !    No image will be written. If line%Nlambda < 3 the line contribution to the opacity is neglected for the flux.
+   !    b) if .not. lsed, all transitions are kept taking into account the maximum velocity shift.
+   !       This represents a high resolution spectrum on a grid similar to the non-LTE grid (except that it takes velocity shifts).
       real(kind=dp), intent(out), allocatable :: lambda(:)
       integer :: Ntrans, Ncont, Nlines, Nlambda_cont, Nlambda
       integer :: n, kr, Nlam, Nremoved, Nwaves
@@ -1199,10 +1199,10 @@ module wavelengths_gas
             atom%lines(kr)%Nlambda = atom%lines(kr)%Nr - atom%lines(kr)%Nb + 1
 
 
-            !line is not a raytraced line ? lcontrib is .false. (since begining)
+            !line is not a raytraced line ? lcontrib is .false. (since beginning)
             if (.not.atom%lines(kr)%lcontrib) then
                !just check that this line is not overlapping, that is nblue and nred falls onto the grid.
-               !The grid has be generated to include only lines for the raytracing, so we test if the other lines partially fall
+               !The grid has been generated to include only lines for the raytracing, so we test if the other lines partially fall
                !in these regions.
 
 
@@ -1492,7 +1492,7 @@ module wavelengths_gas
             !-> Add continuum points beyond last "bound-free" continuum
             !In case they are lines beyond the last continuum I add at least3 points per line for the continuum in this region
             !->cont end		this is heavy for nothing but should work !
-            !finalise continuum here by reckoning how much freq we need
+            !finalize continuum here by reckoning how much freq we need
             !make the new points go farther than line_waves for interpolation.
             Nmore_cont_freq = 0
             do n=1, N_groups
@@ -1567,7 +1567,7 @@ module wavelengths_gas
             tmp_grid2(1:Nlambda) = tmp_grid(:)
 
             Nwaves = Nlambda
-            !add continuum wavlengths only outside line groups
+            !add continuum wavelengths only outside line groups
             !First values below or beyond first and last groups
             la = 0
             do lac=Nlambda+1, Nlambda+Nlambda_cont
@@ -1594,7 +1594,7 @@ module wavelengths_gas
 
             !continuum frequencies are sorted and so are the line frequencies
             !but they are added at the end, so sorted is needed, but I can improve the previous
-            !loop to fill the tmp_frid in the ascending order of wavelengths
+            !loop to fill the tmp_grid in the ascending order of wavelengths
             allocate(lambda(Nwaves),stat=alloc_status)
             tmp_grid2 = tmp_grid2(index_bubble_sort(tmp_grid2))
             lambda(:) = -99.0 !check
@@ -1624,7 +1624,7 @@ module wavelengths_gas
          tab_lambda_nm = lambda * km_to_m !micron to nm
          tab_lambda_cont = tab_lambda_nm
          !we just need to check the bounds of the transitions on this grid
-         !in particular bound-free egdes and lines.
+         !in particular bound-free edges and lines.
          do n=1,n_atoms
             do kr=1,atoms(n)%p%Nline
                call compute_line_bound(atoms(n)%p%lines(kr),.true.)
@@ -1677,7 +1677,7 @@ module wavelengths_gas
                            write(*,*) tab_lambda_nm(atom%continua(kr)%Nr), atom%continua(kr)%lambda0
                            atom%continua(kr)%Nr = atom%continua(kr)%Nr-1
                            atom%continua(kr)%Nlambda = atom%continua(kr)%Nr - atom%continua(kr)%Nb + 1
-                           if (atom%continua(kr)%Nlambda == 1) call error('accomadting bound-free egdes')
+                           if (atom%continua(kr)%Nlambda == 1) call error('accommodating bound-free edges')
                         enddo
                         atom%continua(kr)%Nbc = atom%continua(kr)%Nb
                         atom%continua(kr)%Nrc = atom%continua(kr)%Nr
@@ -1687,7 +1687,7 @@ module wavelengths_gas
                         do while (lambda(atom%continua(kr)%Nr) > atom%continua(kr)%lambda0)
                            atom%continua(kr)%Nr = atom%continua(kr)%Nr-1
                            atom%continua(kr)%Nlambda = atom%continua(kr)%Nr - atom%continua(kr)%Nb + 1
-                           if (atom%continua(kr)%Nlambda == 1) call error('accomadting bound-free egdes')
+                           if (atom%continua(kr)%Nlambda == 1) call error('accommodating bound-free edges')
                         enddo
                         atom%continua(kr)%Nbc = locate(tab_lambda_cont, atom%continua(kr)%lambdamin)
                         atom%continua(kr)%Nrc = locate(tab_lambda_cont, lambda(atom%continua(kr)%Nr))
@@ -1752,7 +1752,7 @@ module wavelengths_gas
  end module wavelengths_gas
 
    ! function line_u_grid_loc(k, line, N)
-   !    !return for line line and cell k, the paramer:
+   !    !return for line line and cell k, the parameter:
    !    ! u = (lambda - lambda0) / lambda0 * c_light / vth
    !    integer, parameter :: Nlambda = 2 * (Nlambda_line_w_log + Nlambda_line_c_lin - 1) - 1
    !    integer, intent(in) :: k
@@ -1828,7 +1828,7 @@ module wavelengths_gas
     ! subroutine make_sub_wavelength_grid_cont_lin(cont, lambdamin, lambdamax)
    ! ! ----------------------------------------------------------------- !
    ! ! Make an individual wavelength grid for the AtomicContinuum cont.
-   ! !  -> cross-section is extrapolated beyond edge to be use with
+   ! !  -> cross-section is extrapolated beyond edge to be used with
    ! ! level's dissolution, if lambdamax > lambda0
    ! !
    ! ! Allocate cont%lambda.
@@ -1878,7 +1878,7 @@ module wavelengths_gas
    ! subroutine make_sub_wavelength_grid_cont_linlog(cont, lambdamin, lambdamax)
    ! ! ----------------------------------------------------------------- !
    ! ! Make an individual wavelength grid for the AtomicContinuum cont.
-   ! !  -> cross-section is extrapolated beyond edge to be use with
+   ! !  -> cross-section is extrapolated beyond edge to be used with
    ! ! level's dissolution, if lambdamax > lambda0
    ! !
    ! ! Allocate cont%lambda.

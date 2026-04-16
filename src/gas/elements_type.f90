@@ -5,7 +5,7 @@ module elements_type
 
     use mcfost_env, only : dp, mcfost_utils
     use constants
-    use utils !do not forget to add the math module un int
+    use utils !do not forget to add the math module in init
 
     implicit none
 
@@ -42,7 +42,7 @@ module elements_type
     real(kind=dp), dimension(:), allocatable :: Tpf
     integer :: Nelem, Npf
     real(kind=dp), parameter :: phi_min_limit = 1d-100!tiny_dp!1d-100 !1d-50, tiny_dp
-    integer :: Max_ionisation_stage
+    integer :: Max_ionization_stage
 
     real(kind=dp), parameter :: CI = 0.5*(HP**2 / (2.*PI*mel*kb))**1.5
 
@@ -231,7 +231,7 @@ module elements_type
             end if
             call ftgkyj(unit, "NSTAGE", Nstage, some_comments, EOF) !replace j with d if read double instead of int
             call ftgkyj(unit, "Z", Z, some_comments, EOF)
-            !j'arrive pas a lire ce string, but it is not necessary
+            !I cannot read this string, but it is not necessary
             !but should asks christophe to know how to do
             !call ftgkyj(unit, "ELEM", AtomID, commentfits, EOF)
 
@@ -249,7 +249,7 @@ module elements_type
             !data are actually transposed from my fits to fortran
             elems(n)%Nstage = Nstage
             allocate(elems(n)%ionpot(elems(n)%Nstage))
-            !-> all T for a given ionisation stage are contiguous in memory!
+            !-> all T for a given ionization stage are contiguous in memory!
             allocate(elems(n)%pf(Npf,elems(n)%Nstage))
             !now read the value of pf for that atom
             ! remember: pf(:,1) =  ion potentials
@@ -298,7 +298,7 @@ module elements_type
            elems(n)%massf = elems(n)%weight*elems(n)%Abund/wght_per_H
         enddo
 
-        Max_ionisation_stage =  maxval(elems(:)%Nstage)
+        Max_ionization_stage =  maxval(elems(:)%Nstage)
 
         return
     end subroutine read_abundance
@@ -308,7 +308,7 @@ module elements_type
         ! Position in the periodic table of an atom according
         ! to this Z number.
         ! min row is 1, max row is 87 Francium
-        ! No special ceses yet for Lanthanides and Actinides
+        ! No special cases yet for Lanthanides and Actinides
         ! min col is 1, max col is 18
         ! beware He, is on the 18 column, because they are 16
         ! empty columns between H and He
@@ -354,7 +354,7 @@ module elements_type
 
     function get_pf(elem, j, temp) result (Uk)
         ! ----------------------------------------------------------------------!
-        ! Interpolate the partition function of Element elem in ionisation stage
+        ! Interpolate the partition function of Element elem in ionization stage
         ! j at temperature temp
         ! 24/02/2023: added linear extrapolation for points outside range.
         ! ----------------------------------------------------------------------!
@@ -396,7 +396,7 @@ module elements_type
     function phi_T(temp, gi, gj, dE)!Ui_on_Uj,
     !Similar to phi_jl with less tests.
     !Mainly here for on-fly calculations of ni*/nj* for continua which is
-    !also equal to ne * phi_T. This prevents divding by 0.
+    !also equal to ne * phi_T. This prevents dividing by 0.
         real(kind=dp) :: phi_T
         real(kind=dp), intent(in) :: temp, dE, gi, gj!, Ui_on_Uj
 
@@ -411,7 +411,7 @@ module elements_type
         ! "Theory of Stellar Atmospheres", p.  94, eq. 4.35
         !
         !
-        ! ionisation state j of element l ! (j1=j+1)
+        ! ionization state j of element l ! (j1=j+1)
         ! ionpot = ionpot of ion j of element l (ionpot0l(H) = 13.6 eV)
         ! ionpot in J
         !
@@ -463,11 +463,11 @@ module elements_type
 
         !phi should be between phi_min_limit and exp(600)
         !and ne between ne_limit and nemax, so never nan nor infinity
-        !further in General, a larg phi implies a ne close to 0, so the product remains small
+        !further in General, a large phi implies a ne close to 0, so the product remains small
 
         if (ne > 0.0) then
            NI1 = NI/(phi*ne)
-        else !all in ground state, phi->infinity if T->0 and phi->0 if T->infinty
+        else !all in ground state, phi->infinity if T->0 and phi->0 if T->infinity
            !AND IF	ne -> 0, T likely goes to 0, all in neutral states
            !meaning if ne->0 phi goes to infinity
            NI1 = 0.0

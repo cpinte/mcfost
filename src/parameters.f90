@@ -1,6 +1,6 @@
 module parameters
 !****************************
-! parameters generaux
+! general parameters
 !****************************
 
   use mcfost_env, only : dp
@@ -14,42 +14,42 @@ module parameters
   logical :: lpara, lstop_after_init
   integer :: step_index, etape_i, etape_f
 
-  ! Nombre de photons lances
+  ! Number of photons launched
   logical :: ldust_transfer
   integer :: n_photons_loop, n_photons_eq_th, n_photons_lambda, n_photons_image, n_photons_spectrum
-  real :: n_photons_lim = 1.e4 ! combien de fois plus on aurait recu sans disque
+  real :: n_photons_lim = 1.e4 ! how many times more we would have received without the Disk
   integer :: nnfot1
   real :: n_photons_total
   real(kind=dp) :: E_paquet
-  integer :: n_dif_max_eq_th = 100000 ! Nbre max de dif autorises dans calcul eq. th OUTDATED
-  real :: tau_dark_zone_eq_th = 1500 !1500.   15000 pour benchmark a tau=1e6
-  real :: tau_dark_zone_obs = 100 ! idem que 1000 si 1500. ci-dessus
+  integer :: n_dif_max_eq_th = 100000 ! Max number of scattering allowed in thermal eq. calculation OUTDATED
+  real :: tau_dark_zone_eq_th = 1500 !1500.   15000 pour benchmark at tau=1e6
+  real :: tau_dark_zone_obs = 100 ! same as 1000 if 1500. above
   integer :: n_Stokes
 
-  ! Nbre d'angles pour echantillonner la fct de phase
-  integer, parameter :: nang_scatt = 180  ! TODO : ca bug si c'est pas 180
+  ! Number of angles to sample the phase function
+  integer, parameter :: nang_scatt = 180  ! TODO : it bugs if it is not 180
 
-  ! lvariable_dust = true si les proprites de la poussiere sont variables dans chaque cell
+  ! lvariable_dust = true if the dust properties are variable in each cell
   logical :: lvariable_dust, lmigration, lhydrostatic, ldust_sublimation
   integer :: settling_type ! 1 = Parametric, 2 = Dubrulle or 3 = Fromang
 
   logical :: lRE_LTE, lRE_nLTE, lnRE, lonly_LTE, lonly_nLTE
   logical :: loutput_J, loutput_J_step1, loutput_UV_field, lxJ_abs, lxJ_abs_step1
 
-  ! Methode de calcul de la diffusion : a choisir pour optimiser taille memoire et temps cpu
+  ! Scattering calculation method: to choose to optimize memory size and CPU time
   ! 0 -> automatique
-  ! 1 -> choix taille du grain diffuseur + matrice Mueller par grain
-  ! 2 -> matrice de Mueller moyenne par cell (benchmark)
+  ! 1 -> draw scattering grain size + Mueller matrix per grain
+  ! 2 -> average Mueller matrix per cell (benchmark)
   integer :: scattering_method, scattering_method0
   logical :: lscattering_method1
 
-  ! Theorie de Mie ou HG
+  ! Mie or HG theory
   integer :: aniso_method ! 1 = full phase function, 2 = HG
   logical :: lmethod_aniso1
 
-  integer :: RT_sed_method ! cf routine dust_map pour def
+  integer :: RT_sed_method ! cf routine dust_map for definition
 
-  ! Etapes de l'émission thermique
+  ! Thermal emission steps
   logical :: ltemp, lsed, lsed_complete, l_em_disk_image, lchauff_int, lextra_heating, lno_internal_energy
   character(len=512), dimension(:), allocatable :: indices
   character(len=512) :: tab_wavelength
@@ -90,21 +90,21 @@ module parameters
   					   !					-> good trade-off between 0 and 2.
   					   !if limit_mem == 2: everything is computed locally on the full grid. Slow but cheap in memory.
 
-  ! Decomposition image
+  ! Image decomposition
   logical :: lsepar_contrib, lsepar_pola, lonly_capt_interet, lsepar_ori
   integer :: N_type_flux
-  ! les flux sont I, (Q,U,V), (star, scatt, disk th, disk th scatt.)
+  ! the fluxes are I, (Q,U,V), (star, scatt, disk th, disk th scatt.)
 
-  ! rotation du plan du disque en deg., sens trigo.
+  ! rotation of the Disk plane in deg., counter-clockwise.
   real(kind=dp) :: ang_disque
 
-  ! Production d'images symetriques
-  ! La symetrie est effectuee avant de choisir les pixels
-  ! le système est-il centrosymetrique
-  ! le systeme a-t-il une symetrie axiale (ne compte que si N_phi > 1)
+  ! Production of symmetric images
+  ! The symmetry is performed before choosing the pixels
+  ! Is the system centrosymmetric?
+  ! does the system have axial symmetry (only counts if N_phi > 1)
   logical :: l_sym_ima, l_sym_centrale, l_sym_axiale
 
-  ! parameters des cartes
+  ! maps parameters
   integer :: N_thet, N_incl, N_phi, capt_interet, delta_capt, capt_inf, capt_sup, capt_debut, capt_fin
   integer ::  npix_x, npix_y, npix_x_save, npix_y_save
   real :: angle_interet, zoom, tau_seuil, wl_seuil, image_offset_centre(3)
@@ -114,15 +114,15 @@ module parameters
   !must be initialized to 0
   integer(kind=8) :: mem_alloc_tot !total memory allocated dynamically or not in bytes
 
-  ! Résolution de la grid de densité
-  ! Nombre de cellules dans la direction r (echantillonage log)
+  ! Density grid resolution
+  ! Number of cells in the r direction (log sampling)
   integer :: grid_type ! 1 = cylindrical, 2 = spherical
-  integer :: n_rad, n_rad_in  ! subdivision de la premiere cell
-  ! Nombre de couches verticales ( = de stratifications)
+  integer :: n_rad, n_rad_in  ! subdivision of the first cell
+  ! Number of vertical layers (= stratifications)
   integer :: nz, p_n_rad, p_nz, p_n_az, p_n_lambda_pos, p_n_lambda_grain
-  ! Nombre de cellules azimuthales
+  ! Number of azimuthal cells
   integer :: n_az, j_start, pj_start
-  ! Nombre de cellules totale
+  ! Total number of cells
   integer :: n_cells, nrz, p_n_cells
   integer, target :: icell1 = 1
   logical :: lregular_theta
@@ -166,7 +166,7 @@ module parameters
   integer :: isink_centre
 
   ! Disk parameters
-  real :: distance ! Distance du disque en pc
+  real :: distance ! Distance of the Disk in pc
   real(kind=dp) :: map_size
 
   ! Polarisation
@@ -202,7 +202,7 @@ module parameters
   real :: exp_strat, a_strat
   real :: alpha
 
-  ! Description analytique du puffed-up inner rim
+  ! Analytical description of the puffed-up inner rim
   logical :: lpuffed_rim
   real :: puffed_rim_h, puffed_rim_r, puffed_rim_delta_r
 
@@ -216,7 +216,7 @@ module parameters
   logical :: lgap_Gaussian
   real :: f_gap_Gaussian, r_gap_Gaussian, sigma_gap_Gaussian
 
-  ! Correction locale de la densite (dans un anneau)
+  ! Local density correction (in a ring)
   real :: correct_density_factor, correct_density_Rin, correct_density_Rout
 
   ! Vertical scaling of the envelope
@@ -260,13 +260,13 @@ module parameters
   character(len=8) :: system_age
 
   logical :: lscatt_ray_tracing, lscatt_ray_tracing1, lscatt_ray_tracing2, loutput_mc
-  ! ray-tracing 1 : sauve le champ de radiation diffuse
-  ! ray-tracing 2 : sauve l'intensite specifique
+  ! ray-tracing 1: saves the diffuse radiation field
+  ! ray-tracing 2: saves the specific intensity
 
   integer :: n_pop
 
 
-  real :: T_max, T_min, Tmax_PAH ! Temp_sublimation et Temp nuage
+  real :: T_max, T_min, Tmax_PAH ! Sublimation Temp and cloud Temp
   integer  :: n_T
 
   real, dimension(:), allocatable :: s11_file

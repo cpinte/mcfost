@@ -880,7 +880,7 @@ contains
     n_SPH = j
 
     ! TODO : use mcfost quantities directly rather that these intermediate variables
-    ! Voronoi()%x  gas_density & densite_pous
+    ! Voronoi()%x  gas_density & density_pous
     alloc_status = 0
     allocate(rhodust(ndusttypes,n_SPH),massdust(ndusttypes,n_SPH),SPH_grainsizes(ndusttypes),particle_id(n_SPH),&
          x(n_SPH),y(n_SPH),z(n_SPH),h(n_SPH),massgas(n_SPH),rhogas(n_SPH),T_gas(n_SPH),stat=alloc_status)

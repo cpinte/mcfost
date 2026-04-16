@@ -36,10 +36,10 @@ subroutine mol_line_transfer()
 !   optical_length_tot => dust_and_mol_optical_length_tot
 
 
-  ! Liberation memoire
+  ! Free memory
   call deallocate_em_th_mol()
   lscatt_ray_tracing = .false. ! tmp : scatt ray-tracing has no sense yet for mol emssion
-  call init_directions_ray_tracing() ! TODO : on peut le faire apres
+  call init_directions_ray_tracing() ! TODO : can be done later
 
   do imol=1,n_molecules
      if (lbenchmark_vanzadelhoff1) then
@@ -50,7 +50,7 @@ subroutine mol_line_transfer()
         call readmolecule(imol)
      endif
 
-     call alloc_emission_mol(imol) ! ne prend pas bcp de memoire
+     call alloc_emission_mol(imol) ! does not use much memory
 
      ! Champ externe
      call init_tab_Cmb_mol()
@@ -71,9 +71,9 @@ subroutine mol_line_transfer()
         call init_benchmark_water2()
      else if (lbenchmark_water3) then
         call init_benchmark_water3()
-     else ! Cas par defaut
+     else ! Default case
         call init_molecular_disk(imol)
-        ! TODO : il manque le cas defaut pour geometrie spherique
+        ! TODO : missing default case for spherical geometry
      endif
 
      ! Freeze-out & photo-dissociation eventuels
@@ -83,20 +83,20 @@ subroutine mol_line_transfer()
 
      if (lProDiMo2mcfost) call read_ProDiMo2mcfost(imol)
 
-     ! Absorption et emissivite poussiere
+     ! Dust absorption and emissivity
      call init_dust_mol(imol)
 
-     ! recalcul des flux stellaires aux nouvelles longeurs d'onde
-     call repartition_energie_etoiles()
+     ! Recompute stellar fluxes at the new wavelengths
+     call star_energy_distribution()
 
-     call init_Doppler_profiles(imol)  ! ne depend pas de nTrans_tot
+     call init_Doppler_profiles(imol)  ! does not depend on nTrans_tot
 
-     ! Population des niveaux initiale
+     ! Initial level populations
      if (.not.lProDiMo2mcfost) then
-        ! population dans le cas limite optiquement mince
+        ! populations in the optically thin limit
         if (ldouble_RT) call equilibre_othin_mol_pop2()
 
-        ! Condition initiale : population a l'ETL
+        ! Initial condition: LTE populations
         call equilibre_LTE_mol(imol)
      endif
 
@@ -105,12 +105,12 @@ subroutine mol_line_transfer()
 
      if (lwrite_mol_column_density) call write_mol_column_density(imol)
 
-     ! Resolution population des niveaux nLTE
+     ! Solve for nLTE level populations
      if (.not.lmol_LTE) then
         call NLTE_mol_line_transfer(imol)
      endif
 
-     !--- Creation carte emission moleculaire : ray-tracing
+     ! Create molecular emission map via ray-tracing
      if (mol(imol)%lline) then
         do ibin=1,RT_n_incl
            do iaz=1,RT_n_az
@@ -139,21 +139,21 @@ subroutine NLTE_mol_line_transfer(imol)
   ! C. Pinte
   ! 30/06/07
 
-  ! TODO : finir l'ajout des paquets dans etape 2 + verifier utilite avec profiling
-  ! Il faut que le tps de calcul des photons soit negligeable
+  ! TODO : finish adding packets in step 2 + verify usefulness with profiling
+  ! The photon compute time must be negligible
 
-  ! TODO : pourquoi ca merde a haute profondeur optique dans le benchmark 1 de van Zadelhoff ??? :-(
-  ! TODO : je capte pas le benchmark water3 ?????
+  ! TODO : why does this fail at high optical depth in van Zadelhoff benchmark 1? :-(
+  ! TODO : benchmark water3 is not understood ?????
 
 
-  ! WARNING : cette routine n'est pas vraiment 3D
+  ! WARNING : this routine is not truly 3D
 
   implicit none
 
 #include "sprng_f.h"
 
   integer, intent(in) :: imol
-  integer, parameter :: n_rayons_start = 100 ! l'augmenter permet de reduire le tps de l'etape 2 qui est la plus longue
+  integer, parameter :: n_rayons_start = 100 ! increasing this reduces the time for step 2, which is the longest
   integer, parameter :: n_rayons_start2 = 100
   integer, parameter :: n_iter2_max = 10
   integer, parameter :: n_rayons_max = n_rayons_start2 * (2**(n_iter2_max-1))
@@ -186,7 +186,7 @@ subroutine NLTE_mol_line_transfer(imol)
 
   id = 1
 
-  n_speed = mol(imol)%n_speed_rt ! j'utilise le meme maintenant
+  n_speed = mol(imol)%n_speed_rt ! using the same value now
   n_level_comp = min(mol(imol)%iLevel_max,nLevels)
 
   do i=1, nTrans_tot
@@ -227,13 +227,13 @@ subroutine NLTE_mol_line_transfer(imol)
   Doppler_P_x_freq = 0.0_dp
 
 
-  ! 2 etapes : 1) direction des rayons fixee pour eliminer les fluctuations aletoires
-  ! et 2) direction aleatoire pour assurer un echantillonnage suffisant
-  do etape=etape_start, etape_end  ! S'arreter a la 1 est OK pour les profils de raies :-)
+  ! 2 steps: 1) fixed ray directions to eliminate random fluctuations
+  ! and 2) random directions to ensure sufficient sampling
+  do etape=etape_start, etape_end  ! Stopping at step 1 is OK for line profiles :-)
 
      if (etape==1) then
         lfixed_Rays = .true. ;  ispeed(1) = -n_speed ; ispeed(2) = n_speed
-        n_rayons = 2 ! TR 1D : 1 radius qui monte, 1 radius qui descend
+        n_rayons = 2 ! 1D RT: 1 ray going up, 1 going down
         iray_start=1
         fac_etape = 1.0
         lprevious_converged = .false.
@@ -249,7 +249,7 @@ subroutine NLTE_mol_line_transfer(imol)
         fac_etape = 1.0
         lprevious_converged = .false.
 
-        ! On passe en mode mono-frequence
+        ! Switch to single-frequency mode
         deallocate(tab_speed,I0,I0c,ds,Doppler_P_x_freq)
 
         allocate(tab_speed(ispeed(1):ispeed(2),nb_proc), stat=alloc_status)
@@ -285,20 +285,20 @@ subroutine NLTE_mol_line_transfer(imol)
         max_n_iter_loc = 0
 
         if (lfixed_Rays) then
-           ! On remet le generateur aleatoire a zero
+           ! Reset the random number generator
            stream = 0.0
            do i=1, nb_proc
               stream(i) = init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
            enddo
         endif
 
-        ! Boucle sur les cellules
+        ! Loop over cells
         call progress_bar(0)
         !$omp parallel &
         !$omp default(none) &
         !$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02) &
         !$omp private(argmt,n_iter_loc,lconverged_loc,diff,norm,iv,icell,factor,tab_nLevel_old) &
-        !$omp shared(imol,stream,n_rad,nz,n_az,n_rayons,iray_start,Doppler_P_x_freq,tab_nLevel,n_level_comp) &
+        !$omp shared(imol,stream,n_rad,nz,n_az,n_radiuss,iray_start,Doppler_P_x_freq,tab_nLevel,n_level_comp) &
         !$omp shared(deltaVmax,ispeed,r_grid,z_grid,phi_grid,lcompute_molRT,lkeplerian,n_cells) &
         !$omp shared(tab_speed,lfixed_Rays,lnotfixed_Rays,pop_old,pop,labs,n_speed,max_n_iter_loc,etape,pos_em_cell) &
         !$omp shared(nTrans_tot,tab_Trans,n_cells_done,ibar) &
@@ -312,7 +312,7 @@ subroutine NLTE_mol_line_transfer(imol)
            if (lcompute_molRT(icell)) then
               tab_nLevel_old(1:n_level_comp) = tab_nLevel(icell,1:n_level_comp)
 
-              ! Echantillonage uniforme du profil de raie
+              ! Uniform sampling of the line profile
               factor = deltaVmax(icell) / real(n_speed,kind=dp)
               if (lfixed_rays) then
                  do iv=-n_speed, n_speed
@@ -320,17 +320,17 @@ subroutine NLTE_mol_line_transfer(imol)
                  enddo ! iv
               endif
 
-              ! Propagation des rayons
+              ! Ray propagation
               do iray=iray_start, iray_start-1+n_rayons
 
                  if (etape==1) then
-                    ! Position = milieu de la cell
+                    ! Position = cell centre
                     x0 = r_grid(icell) * cos(phi_grid(icell))
                     y0 = r_grid(icell) * sin(phi_grid(icell))
                     z0 = z_grid(icell)
 
                     if (lkeplerian) then
-                       ! Direction verticale
+                       ! Vertical direction
                        if (iray==1) then
                           w0=1.0_dp
                        else
@@ -351,13 +351,13 @@ subroutine NLTE_mol_line_transfer(imol)
                        endif
                     endif
                  else
-                    ! Position aleatoire dans la cell
+                    ! Random position within the cell
                     rand  = sprng(stream(id))
                     rand2 = sprng(stream(id))
                     rand3 = sprng(stream(id))
                     call pos_em_cell(icell ,rand,rand2,rand3,x0,y0,z0)
 
-                    ! Direction de propagation aleatoire
+                    ! Random propagation direction
                     rand = sprng(stream(id))
                     W0 = 2.0_dp * rand - 1.0_dp
                     W02 =  1.0_dp - W0*W0
@@ -368,49 +368,49 @@ subroutine NLTE_mol_line_transfer(imol)
                     V0 = SRW02 * sin(ARGMT)
                  endif
 
-                 ! Echantillonnage aleatoire du champ de velocity
+                 ! Random sampling of the velocity field
                  if (lnotfixed_Rays) then
                     do iv=ispeed(1),ispeed(2)
                        rand = sprng(stream(id)) ; tab_speed(iv,id) =  2.0_dp * (rand - 0.5_dp) * deltaVmax(icell)
                     enddo
                  endif
 
-                 ! Integration le long du radius
+                 ! Integration along the ray
                  call integ_ray_mol(id,imol,icell,x0,y0,z0,u0,v0,w0,iray,labs, ispeed,tab_speed(:,id), &
                       nTrans_tot, tab_Trans)
               enddo ! iray
 
 
-              ! Resolution de l'equilibre statistique
+              ! Solve the statistical equilibrium
               n_iter_loc = 0
               pop(:,id) = tab_nLevel(icell,:)
               lconverged_loc = .false.
-              ! Boucle pour converger le champ local et les populations
-              ! avec champ externe fixe
+              ! Loop to converge the local radiation field and populations
+              ! with a fixed external field
               do while (.not.lconverged_loc)
                  n_iter_loc = n_iter_loc + 1
 
-                 ! Sauvegarde ancienne pop locale
+                 ! Save old local populations
                  pop_old(:,id) = pop(:,id)
 
-                 ! Calcul du champ de radiation
-                 call J_mol_loc(id,icell,n_rayons,ispeed)  ! inclus les boucles sur Transition
+                 ! Compute the radiation field
+                 call J_mol_loc(id,icell,n_rayons,ispeed)  ! includes loops over transitions
 
                  call equilibre_rad_mol_loc(id,icell)
                  pop(:,id) = tab_nLevel(icell,:)
 
-                 ! Critere de convergence locale
+                 ! Local convergence criterion
                  diff = maxval( abs(pop(1:n_level_comp,id) - pop_old(1:n_level_comp,id)) &
                       / (pop_old(1:n_level_comp,id) + 10*tiny_real) )
 
                  if (diff < precision_sub) then
                     lconverged_loc = .true.
                  else
-                    ! On est pas converge, on recalcule les opacites et fonctions source
+                    ! Not converged, recompute opacities and source functions
                     call opacite_mol_loc(icell,imol)
                  endif
 
-              enddo ! while : convergence champ local
+              enddo ! while: local field convergence
               if (n_iter_loc > max_n_iter_loc(id)) max_n_iter_loc(id) = n_iter_loc
 
               diff = maxval( abs( tab_nLevel(icell,1:n_level_comp) - tab_nLevel_old(1:n_level_comp) ) / &
@@ -433,7 +433,7 @@ subroutine NLTE_mol_line_transfer(imol)
         !$omp end parallel
         call progress_bar(50)
 
-        ! Critere de convergence totale
+        ! Global convergence criterion
         write(*,*) maxval(max_n_iter_loc), "sub-iterations"
         write(*,*) "Relative difference =", real(maxdiff)
 
@@ -449,15 +449,15 @@ subroutine NLTE_mol_line_transfer(imol)
            lprevious_converged = .false.
            if (.not.lfixed_rays) then
               n_rayons = n_rayons * 2
-             ! if (n_rayons > n_rayons_max) then
+             ! if (n_radiuss > n_radiuss_max) then
               if (n_iter >= n_iter2_max) then
               write(*,*) "Warning : not enough rays to converge !!"
                  lconverged = .true.
               endif
 
-              ! On continue en calculant 2 fois plus de rayons
-              ! On les ajoute a l'ensemble de ceux calcules precedemment
-!              iray_start = iray_start + n_rayons
+              ! Continue by computing twice as many rays
+              ! and add them to the previously computed set
+!              iray_start = iray_start + n_radiuss
 
            endif
         endif
@@ -465,7 +465,7 @@ subroutine NLTE_mol_line_transfer(imol)
         !write(*,*) "STAT", minval(tab_nLevel(:,1:n_level_comp)), maxval(tab_nLevel(:,1:n_level_comp))
         call integ_tau_mol(imol)
 
-     enddo ! while : convergence totale
+     enddo ! while: global convergence
 
      write(step, "(A5, I1)") "_step", etape
 
@@ -482,9 +482,9 @@ end subroutine NLTE_mol_line_transfer
 !***********************************************************
 
 subroutine emission_line_map(imol,ibin,iaz)
-  ! Creation de la carte d'emission moleculaire
-  ! (ou du spectrum s'il n'y a qu'un seul pixel)
-  ! par ray-tracing dans une direction donnee
+  ! Create the molecular emission map
+  ! (or the spectrum if there is only one pixel)
+  ! via ray-tracing in a given direction
   ! C. Pinte
   ! 12/04/07
 
@@ -499,7 +499,7 @@ subroutine emission_line_map(imol,ibin,iaz)
   real(kind=dp) :: taille_pix
   integer :: i,j, id, npix_x_max, n_iter_min, n_iter_max
 
-  integer, parameter :: n_rad_RT = 100, n_phi_RT = 36  ! OK, ca marche avec n_rad_RT = 1000
+  integer, parameter :: n_rad_RT = 100, n_phi_RT = 36  ! OK, also works with n_rad_RT = 1000
   integer, parameter :: n_ray_star = 1000
   real(kind=dp), dimension(n_rad_RT) :: tab_r
   real(kind=dp) :: rmin_RT, rmax_RT, fact_r, r, phi, fact_A, cst_phi
@@ -509,7 +509,7 @@ subroutine emission_line_map(imol,ibin,iaz)
   real :: vmin_center_rt, vmax_center_rt, extra_deltaV_rt
   logical :: lresolved, l_sym_ima_mol
 
- ! Direction de visee pour le ray-tracing
+ ! Line-of-sight direction for ray-tracing
   u = tab_u_RT(ibin,iaz) ;  v = tab_v_RT(ibin,iaz) ;  w = tab_w_RT(ibin) ;
   uvw = (/u,v,w/)
 
@@ -527,9 +527,9 @@ subroutine emission_line_map(imol,ibin,iaz)
      allocate(I0(n_speed_rt,nTrans_raytracing,1,nb_proc),I0c(nTrans_raytracing,1,nb_proc))
      allocate(tab_speed_rt(n_speed_rt))
 
-     ! centre de la raie
+     ! line centre
      tab_speed_rt(1:n_speed_center_rt) = span(vmin_center_rt,vmax_center_rt,n_speed_center_rt)
-     !! ailes de la raie
+     !! line wings
      !tab_speed_rt(n_speed_center_rt+1:n_speed_rt) = indgen(n_extraV_rt) * extra_deltaV_rt + vmax_center_rt
      !do i = -n_speed_rt, -n_speed_center_rt-1
      !   tab_speed_rt(i) = (i+n_speed_center_rt) * extra_deltaV_rt - vmax_center_rt
@@ -545,36 +545,36 @@ subroutine emission_line_map(imol,ibin,iaz)
   I0c = 0.0_dp
   if (lorigine) origine_mol = 0.0
 
-  ! Definition des vecteurs de base du plan image dans le repere universel
+  ! Definition of the image plane basis vectors in the universal frame
 
-  ! Vecteur x image sans PA : il est dans le plan (x,y) et orthogonal a uvw
+  ! Image x-vector without PA: lies in the (x,y) plane and is orthogonal to uvw
   x = (/cos(tab_RT_az(iaz) * deg_to_rad),sin(tab_RT_az(iaz) * deg_to_rad),0._dp/)
 
-  ! Vecteur x image avec PA
+  ! Image x-vector with PA
   if (abs(ang_disque) > tiny_real) then
-     ! Todo : on peut faire plus simple car axe rotation perpendiculaire a x
+     ! Todo: can simplify since the rotation axis is perpendicular to x
      x_plan_image = rotation_3d(uvw, ang_disque, x)
   else
      x_plan_image = x
   endif
 
-  ! Vecteur y image avec PA : orthogonal a x_plan_image et uvw
+  ! Image y-vector with PA: orthogonal to x_plan_image and uvw
   y_plan_image = -cross_product(x_plan_image, uvw)
 
-  ! position initiale hors modele (du cote de l'observateur)
-  ! = centre de l'image
+  ! initial position outside the model (on the observer side)
+  ! = image centre
   l = 10.*Rmax  ! on se met loin
 
   x0 = u * l  ;  y0 = v * l  ;  z0 = w * l
   center(1) = x0 ; center(2) = y0 ; center(3) = z0
 
-  ! Coin en bas gauche de l'image
+  ! Bottom-left corner of the image
   Icorner(:) = center(:) - 0.5 * map_size * (x_plan_image + y_plan_image)
 
   l_sym_ima_mol = mol(imol)%l_sym_ima
 
-  if (RT_line_method == 1) then ! method 1 : echantillonanage log
-     ! Pas de sous-pixel car les pixels ne sont pas carres
+  if (RT_line_method == 1) then ! method 1: log sampling
+     ! No sub-pixel since the pixels are not square
      n_iter_min = 1
      n_iter_max = 1
 
@@ -598,13 +598,13 @@ subroutine emission_line_map(imol,ibin,iaz)
 
      fact_A = sqrt(pi * (fact_r - 1.0_dp/fact_r)  / n_phi_RT )
 
-     ! Boucle sur les rayons d'echantillonnage
+     ! Loop over sampling rays
      !$omp parallel &
      !$omp default(none) &
      !$omp private(ri_RT,id,r,taille_pix,phi_RT,phi,pixelcorner) &
      !$omp shared(tab_r,fact_A,x_plan_image,y_plan_image,center,dx,dy,u,v,w,i,j) &
      !$omp shared(n_iter_min,n_iter_max,l_sym_ima_mol,cst_phi,imol,ibin,iaz)
-     id =1 ! pour code sequentiel
+     id =1 ! for sequential code
 
      if (l_sym_ima_mol) then
         cst_phi = pi  / real(n_phi_RT,kind=dp)
@@ -617,22 +617,22 @@ subroutine emission_line_map(imol,ibin,iaz)
         !$ id = omp_get_thread_num() + 1
 
         r = tab_r(ri_RT)
-        taille_pix =  fact_A * r ! racine carree de l'aire du pixel
+        taille_pix =  fact_A * r ! square root of the pixel area
 
-        do phi_RT=1,n_phi_RT ! de 0 a pi
+        do phi_RT=1,n_phi_RT ! from 0 to pi
            phi = cst_phi * (real(phi_RT,kind=dp) -0.5_dp)
 
-           pixelcorner(:,id) = center(:) + r * sin(phi) * x_plan_image + r * cos(phi) * y_plan_image ! C'est le centre en fait car dx = dy = 0.
+           pixelcorner(:,id) = center(:) + r * sin(phi) * x_plan_image + r * cos(phi) * y_plan_image ! This is actually the centre since dx = dy = 0.
            call intensite_pixel_mol(id,imol,ibin,iaz,n_iter_min,n_iter_max,i,j,pixelcorner(:,id),taille_pix,dx,dy,u,v,w)
         enddo !j
      enddo !i
      !$omp end do
      !$omp end parallel
 
-  else ! method 2 : echantillonnage lineaire avec sous-pixels
+  else ! method 2: linear sampling with sub-pixels
      lresolved = .true.
 
-     ! Vecteurs definissant les pixels (dx,dy) dans le repere universel
+     ! Vectors defining the pixels (dx,dy) in the universal frame
      taille_pix = (map_size/zoom) / real(max(npix_x,npix_y),kind=dp) ! en au
      dx(:) = x_plan_image * taille_pix
      dy(:) = y_plan_image * taille_pix
@@ -643,14 +643,14 @@ subroutine emission_line_map(imol,ibin,iaz)
         npix_x_max = npix_x
      endif
 
-     ! Boucle sur les pixels de l'image
+     ! Loop over image pixels
      !$omp parallel &
      !$omp default(none) &
      !$omp private(i,j,id) &
      !$omp shared(Icorner,pixelcorner,dx,dy,u,v,w,taille_pix,npix_x_max,npix_y) &
      !$omp shared(n_iter_min,n_iter_max,imol,ibin,iaz)
 
-     id =1 ! pour code sequentiel
+     id =1 ! for sequential code
      n_iter_min = 1 ! 3
      n_iter_max = 1 ! 6
 
@@ -659,7 +659,7 @@ subroutine emission_line_map(imol,ibin,iaz)
         !$ id = omp_get_thread_num() + 1
         do j = 1,npix_y
            !write(*,*) i,j
-           ! Coin en bas gauche du pixel
+           ! Bottom-left corner of the pixel
            pixelcorner(:,id) = Icorner(:) + (i-1) * dx(:) + (j-1) * dy(:)
            call intensite_pixel_mol(id,imol,ibin,iaz,n_iter_min,n_iter_max,i,j,pixelcorner(:,id),taille_pix,dx,dy,u,v,w)
         enddo !j
@@ -689,10 +689,10 @@ end subroutine emission_line_map
 !***********************************************************
 
 subroutine intensite_pixel_mol(id,imol,ibin,iaz,n_iter_min,n_iter_max,ipix,jpix,pixelcorner,pixelsize,dx,dy,u,v,w)
-  ! Calcule l'intensite d'un pixel carre de taille, position et orientation arbitaires
-  ! par une methode de Ray-tracing
+  ! Computes the intensity of a square pixel with arbitrary size, position and orientation
+  ! using a ray-tracing method
   ! (u,v,w) pointe vers l'observateur
-  ! Integration par methode de Romberg pour determiner le nbre de sous-pixel
+  ! Romberg integration to determine the number of sub-pixels
   ! necessaire
   ! Unite : W.m-2 : nu.F_nu
   ! C. Pinte
@@ -729,52 +729,52 @@ subroutine intensite_pixel_mol(id,imol,ibin,iaz,n_iter_min,n_iter_max,ipix,jpix,
 
   labs = .false.
 
-  ! Ray tracing : on se propage dans l'autre sens
+  ! Ray tracing: propagating in the opposite direction
   u0 = -u ; v0 = -v ; w0 = -w
 
   IP = 0.0_dp
   IPc = 0.0_dp
 
-  ! le nbre de subpixel en x est 2^(iter-1)
+  ! the number of subpixels in x is 2^(iter-1)
   subpixels = 1
   iter = 1
 
-  infinie : do ! Boucle infinie tant que le pixel n'est pas converge
+  infinie : do ! Infinite loop until the pixel has converged
      npix2 =  real(subpixels)**2
      IP_old = IP
      IP = 0.0_dp
      IPc = 0.0_dp
 
-     ! Vecteurs definissant les sous-pixels
+     ! Vectors defining the sub-pixels
      sdx(:) = dx(:) / real(subpixels,kind=dp)
      sdy(:) = dy(:) / real(subpixels,kind=dp)
 
      iray = 1
 
-     ! L'obs est en dehors de la grid
+     ! The observer is outside the grid
      ri = 2*n_rad ; zj=1 ; phik=1
 
-     ! Boucle sur les sous-pixels qui calcule l'intensite au centre
-     ! de chaque sous pixel
+     ! Loop over sub-pixels computing the intensity at the centre
+     ! of each sub-pixel
      do i = 1,subpixels
         do j = 1,subpixels
-           ! Centre du sous-pixel
+           ! Centre of the sub-pixel
            x0 = pixelcorner(1) + (i - 0.5_dp) * sdx(1) + (j-0.5_dp) * sdy(1)
            y0 = pixelcorner(2) + (i - 0.5_dp) * sdx(2) + (j-0.5_dp) * sdy(2)
            z0 = pixelcorner(3) + (i - 0.5_dp) * sdx(3) + (j-0.5_dp) * sdy(3)
 
-           ! On se met au bord de la grid : propagation a l'envers
+           ! Start at the grid boundary: backward propagation
            call move_to_grid(id, x0,y0,z0,u0,v0,w0, icell,lintersect)
 
-           if (lintersect) then ! On rencontre la grid, on a potentiellement du flux
+           if (lintersect) then ! Intersected the grid, meaning potential flux
               call integ_ray_mol(id,imol,icell,x0,y0,z0,u0,v0,w0,iray,labs,ispeed,tab_speed_rt, &
                    nTrans_raytracing, mol(imol)%index_trans_ray_tracing)
-              ! Flux recu dans le pixel
+              ! Flux received in the pixel
               IP(:,:) = IP(:,:) +  I0(:,:,iray,id)
               IPc(:) = IPc(:) +  I0c(:,iray,id)
            else
-              ! Il n'y a que le Cmb
-              ! TODO : je ne suis pas sur de vouloir le Cmb en dehors du disque, ...
+              ! Only the CMB remains
+              ! TODO : not sure if I want the CMB outside the Disk, ...
               ! IP(:,:) = IP(:,:) +  Cmb(ispeed,tab_speed)
            endif
         enddo !j
@@ -784,57 +784,57 @@ subroutine intensite_pixel_mol(id,imol,ibin,iaz,n_iter_min,n_iter_max,ipix,jpix,
      IPc = IPc / npix2
 
      if (iter < n_iter_min) then
-        ! On itere par defaut
+        ! Iterate by default
         subpixels = subpixels * 2
      else if (iter >= n_iter_max) then
-        ! On arrete pour pas tourner dans le vide
+        ! Stop to prevent infinite loops
         ! write(*,*) "Warning : converging pb in ray-tracing"
         ! write(*,*) " Pixel", ipix, jpix
         exit infinie
      else
-        ! On fait le test sur a difference
+        ! Test the difference
         diff = maxval( abs(IP - IP_old) / (IP + 1e-300_dp) )
         if (diff > precision ) then
-           ! On est pas converge
+           ! Not converged
            subpixels = subpixels * 2
         else
-           ! On est converge
+           ! Converged
            exit infinie
         endif
      endif ! iter
 
      iter = iter + 1
 
-     ! TODO : Integration Romberg
+     ! TODO : Romberg integration
 !!$     if(any(abs((I - oldintensite_pixel)) > precision * I)) then
 !!$        oldintensite_pixel = I
-!!$        ! Il n'y a pas un truc mieux pour utiliser les calculs a plus faible resol ??
+!!$        ! Isn't there a better way to use the lower resolution computations ??
 !!$
 !!$        subpixels = subpixels * 2
 !!$        !if(subpixels .gt. 15) write(*,*)"large",index
 !!$     else
 !!$        I = (real(2**(log(real(subpixels))/log(2.d0)))*I - Oldintensite_pixel) &
 !!$             /(real(2**(log(real(subpixels))/log(2.d0)))-1.d0) ! Richardson Extrapolation
-!!$        ! Ok mais n'utilise que les 2 derniers calculs : il doit y avoir mieux !!!
+!!$        ! Ok but only uses the last 2 calculations: there must be a better way !!!
 !!$
 !!$     endif
   enddo infinie
 
-  ! Prise en compte de la surface du pixel (en sr)
+  ! Take into account the pixel surface (in sr)
   IP = IP * (pixelsize / (distance*pc_to_AU) )**2
   IPc = IPc * (pixelsize / (distance*pc_to_AU) )**2
 
-  ! et multiplication par la frequence pour avoir du nu.F_nu
+  ! and multiply by the frequency to get nu.F_nu
   ! Warning IP, IPc are smaller array (dimension mol(imol)%nTrans_raytracing)
   do i=1,mol(imol)%nTrans_raytracing
      iTrans = mol(imol)%index_trans_ray_tracing(i)
      IP(:,i) = IP(:,i) * transfreq(iTrans)
      IPc(i) = IPc(i) * transfreq(iTrans)
   enddo
-  ! Unite teste OK pour le Cmb
-  ! profil de raie non convolue teste ok avec torus
+  ! Units tested OK for CMB
+  ! unconvolved line profile tested ok with torus
 
-  if (RT_line_method==1) then ! Sommation implicite sur les pixels
+  if (RT_line_method==1) then ! Implicit summation over pixels
      spectrum(1,1,:,:,ibin,iaz) = spectrum(1,1,:,:,ibin,iaz) + IP(:,:)
      continu(1,1,:,ibin,iaz) = continu(1,1,:,ibin,iaz) + IPc(:)
   else
@@ -849,13 +849,13 @@ end subroutine intensite_pixel_mol
 !***********************************************************
 
 subroutine init_dust_mol(imol)
-  ! calcul les opacites et emissivites des cellules
-  ! aux longueurs d'onde des raies moleculaires
-  ! pour prendre en compte l'interaction radiative entre
-  ! les 2 phases.
+  ! computes the opacities and emissivities of the cells
+  ! at the wavelengths of the molecular lines
+  ! to take into account the radiative interaction between
+  ! the 2 phases.
   ! C. Pinte
   ! 17/10/07
-  ! TODO : gerer le cas ou l'albedo (et donc scattering) non negligeable
+  ! TODO : handle the case where albedo (and thus scattering) is not negligible
 
   use mem, only : realloc_dust_mol, clean_mem_dust_mol
 
@@ -881,18 +881,18 @@ subroutine init_dust_mol(imol)
 
   cst_E=2.0*hp*c_light**2
 
-  ! Reallocation des tableaux de proprietes de poussiere
-  ! n_lambda =   mol(imol)%nTrans_raytracing ! opacites dust considerees cst sur le profil de raie
-  n_lambda = nTrans_tot ! opacites dust considerees cst sur le profil de raie
+  ! Reallocate the dust property arrays
+  ! n_lambda =   mol(imol)%nTrans_raytracing ! dust opacities considered constant over the line profile
+  n_lambda = nTrans_tot ! dust opacities considered constant over the line profile
 
-  ! On n'est interesse que par les prop d'abs : pas besoin des matrices de mueller
-  ! -> pas de polarisation, on utilise une HG
+  ! We are only interested in absorption properties: no need for Mueller matrices
+  ! -> no polarisation, we use an HG function
   scattering_method=1 ; lscattering_method1 = .true.
   aniso_method = 2 ; lmethod_aniso1 = .false.
 
   lsepar_pola = .false.
   ltemp = .false.
-  lmono = .true. ! equivalent au mode sed2
+  lmono = .true. ! equivalent to sed2 mode
 
   if (lvariable_dust) then
      p_icell => icell
@@ -905,29 +905,29 @@ subroutine init_dust_mol(imol)
   tab_lambda = 1e-30 ! to avoid error in stars.f90
 
   if (ldust_mol) then
-     ! Tableau de longeur d'onde
+     ! Wavelength array
      do iTrans=iTrans_min,iTrans_max
-        tab_lambda(iTrans) = c_light/Transfreq(iTrans) * 1.0e6 ! en microns
+        tab_lambda(iTrans) = c_light/Transfreq(iTrans) * 1.0e6 ! in microns
         tab_lambda_sup(iTrans)= tab_lambda(iTrans)*delta_lambda
         tab_lambda_inf(iTrans)= tab_lambda(iTrans)/delta_lambda
         tab_delta_lambda(iTrans) = tab_lambda_sup(iTrans) - tab_lambda_inf(iTrans)
      enddo
 
-     if (lbenchmark_water3) then ! opacity en loi de puissance
+     if (lbenchmark_water3) then ! power-law opacity
         write(*,*) "WARNING : hard-coded gas_dust =", gas_dust
 
         do iTrans=1,nTrans_tot
            wl = tab_lambda(iTrans)
 
-           ! Loi d'opacity (cm^2 par g de poussiere)
+           ! Opacity law (cm^2 per g of dust)
            if (wl > 250) then
               kap = 10. * (wl/250.)**(-2.0)
            else
               kap = 10. * (wl/250.)**(-1.3)
            endif
 
-           ! Multiplication par densite
-           ! AU_to_cm**2 car on veut kappa_abs_LTE en AU-1
+           ! Multiplication by density
+           ! AU_to_cm**2 because we want kappa_abs_LTE in AU-1
            write(*,*) "TODO : the water benchmark 3 needs to be updated for cell pointer in opacity table"
            do icell=1,n_cells
               kappa_abs_LTE(icell,iTrans) =  kap * (gas_density(icell) * cm_to_m**3) * mu_mH / &
@@ -936,13 +936,13 @@ subroutine init_dust_mol(imol)
 
         enddo ! iTrans
 
-        ! Pas de scattering
+        ! No scattering
         kappa(:,:) = kappa_abs_LTE(:,:)
 
-     else ! cas par defaut
+     else ! default case
         call init_optical_indices()
 
-        ! On recalcule les proprietes optiques
+        ! Recompute the optical properties
         write(*,*) "Computing dust properties for", nTrans_tot, "wavelength"
         do iTrans=iTrans_min,iTrans_max
            call prop_grains(iTrans)
@@ -951,24 +951,24 @@ subroutine init_dust_mol(imol)
      endif
 
 
-     ! Changement d'unite : kappa en m-1 pour le TR dans les raies !!!!!!!
-     ! Sera reconverti en AU-1 dans opacite_mol_loc
+     ! Unit change: kappa in m-1 for RT in the lines !!!!!!!
+     ! Will be converted back to AU-1 in opacite_mol_loc
      !kappa = kappa * m_to_AU
      !kappa_abs_eg = kappa_abs_eg * m_to_AU
 
-     ! calcul de l'emissivite de la poussiere
+     ! Computation of the dust emissivity
      do iTrans=iTrans_min,iTrans_max
         freq = Transfreq(iTrans)
 
-        ! TODO : accelerer cette boucle via routine Bnu_disk (ca prend du tps ???)
-        ! TODO : generaliser pour tous les types de grains (ca doit deja exister non ???)
-        ! TODO : ca peut aussi servir pour faire du ray-tracing ds le continu 8-)
+        ! TODO : speed up this loop via Bnu_disk routine (does this take time ???)
+        ! TODO : generalize for all grain types (should already exist no ???)
+        ! TODO : this could also be used to do ray-tracing in the continuum 8-)
         do icell=1, n_cells
-           !-- ! Interpolation champ de radiation en longeur d'onde
+           !-- ! Interpolate radiation field across wavelength
            !-- if (lProDiMo2mcfost) then
            !--    Jnu = interp(m2p%Jnu(ri,zj,:), m2p%wavelengths, real(tab_lambda(iTrans)))
            !-- else
-           !--    Jnu = 0.0 ! todo : pour prendre en compte scattering
+           !--    Jnu = 0.0 ! todo : to take scattering into account
            !-- endif
 
            T = Tdust(icell)
@@ -1055,7 +1055,7 @@ subroutine init_Tgas()
      call xgb_predict_Tgas()
      write(*,*) "Max gas temperature=", maxval(Tcin)
   else
-     ! Temperature gaz = poussiere
+     ! Temperature gaz = dust
      if (lcorrect_Tgas) then
         write(*,*) "Correcting Tgas by", correct_Tgas
         Tcin(:) = Tdust(:)  * correct_Tgas
@@ -1117,56 +1117,56 @@ subroutine emission_line_tau_surface_map(imol,tau,ibin,iaz)
   logical :: lintersect, flag_sortie, lpacket_alive
   integer, dimension(4) :: ispeed
 
-  ! Direction de visee pour le ray-tracing
+  ! Line-of-sight direction for ray-tracing
   u = tab_u_RT(ibin,iaz) ;  v = tab_v_RT(ibin,iaz) ;  w = tab_w_RT(ibin) ;
   uvw = (/u,v,w/)
 
-  ! Definition des vecteurs de base du plan image dans le repere universel
+  ! Definition of the image plane basis vectors in the universal frame
 
-  ! Vecteur x image sans PA : il est dans le plan (x,y) et orthogonal a uvw
+  ! Image x-vector without PA: lies in the (x,y) plane and is orthogonal to uvw
   x = (/cos(tab_RT_az(iaz) * deg_to_rad), sin(tab_RT_az(iaz) * deg_to_rad),0._dp/)
 
-  ! Vecteur x image avec PA
+  ! Image x-vector with PA
   if (abs(ang_disque) > tiny_real) then
-     ! Todo : on peut faire plus simple car axe rotation perpendiculaire a x
+     ! Todo: can simplify since the rotation axis is perpendicular to x
      x_plan_image = rotation_3d(uvw, ang_disque, x)
   else
      x_plan_image = x
   endif
 
-  ! Vecteur y image avec PA : orthogonal a x_plan_image et uvw
+  ! Image y-vector with PA: orthogonal to x_plan_image and uvw
   y_plan_image = -cross_product(x_plan_image, uvw)
 
-  ! position initiale hors modele (du cote de l'observateur)
-  ! = centre de l'image
+  ! initial position outside the model (on the observer side)
+  ! = image centre
   l = 10.*Rmax  ! on se met loin
 
   x0 = u * l  ;  y0 = v * l  ;  z0 = w * l
   center(1) = x0 ; center(2) = y0 ; center(3) = z0
 
-  ! Vecteurs definissant les pixels (dx,dy) dans le repere universel
+  ! Vectors defining the pixels (dx,dy) in the universal frame
   taille_pix = (map_size/zoom) / real(max(npix_x,npix_y),kind=dp) ! en AU
   dx(:) = x_plan_image * taille_pix
   dy(:) = y_plan_image * taille_pix
 
-  ! Coin en bas gauche de l'image
+  ! Bottom-left corner of the image
   Icorner(:) = center(:) - ( 0.5 * npix_x * dx(:) +  0.5 * npix_y * dy(:))
 
   ! We only consider the 1st transition for now
   iTrans = mol(imol)%index_trans_ray_tracing(1)
 
-  ! Tableau velocity
+  ! Array velocity
   !nTrans_raytracing = mol(imol)%nTrans_raytracing
   ispeed(1) = 1 ; ispeed(2) = mol(imol)%n_speed_rt
 
-  ! Boucle sur les pixels de l'image
+  ! Loop over image pixels
   !$omp parallel &
   !$omp default(none) &
   !$omp private(i,j,id,icell,lintersect,x0,y0,z0,u0,v0,w0) &
   !$omp private(flag_sortie,lpacket_alive,pixelcenter) &
   !$omp shared(tau,Icorner,imol,iTrans,dx,dy,u,v,w,ispeed,tab_speed_rt) &
   !$omp shared(taille_pix,npix_x,npix_y,ibin,iaz,tau_surface_map,move_to_grid)
-  id = 1 ! pour code sequentiel
+  id = 1 ! for sequential code
 
   tau_surface_map = 0.0_dp
 
@@ -1174,14 +1174,14 @@ subroutine emission_line_tau_surface_map(imol,tau,ibin,iaz)
   do i = 1, npix_x
      !$ id = omp_get_thread_num() + 1
      do j = 1,npix_y
-        ! Coin en bas gauche du pixel
+        ! Bottom-left corner of the pixel
         pixelcenter(:,id) = Icorner(:) + (i-0.5_dp) * dx(:) + (j-0.5_dp) * dy(:)
 
         x0 = pixelcenter(1,id)
         y0 = pixelcenter(2,id)
         z0 = pixelcenter(3,id)
 
-        ! Ray tracing : on se propage dans l'autre sens
+        ! Ray tracing: propagating in the opposite direction
         u0 = -u ; v0 = -v ; w0 = -w
 
         ! On se met au bord de la grid : propagation a l'envers
@@ -1226,39 +1226,39 @@ subroutine emission_line_energy_fraction_surface_map(imol,flux_fraction,ibin,iaz
   logical :: lintersect, flag_sortie, lpacket_alive
   integer, dimension(4) :: ispeed
 
-  ! Direction de visee pour le ray-tracing
+  ! Line-of-sight direction for ray-tracing
   u = tab_u_RT(ibin,iaz) ;  v = tab_v_RT(ibin,iaz) ;  w = tab_w_RT(ibin) ;
   uvw = (/u,v,w/)
 
-  ! Definition des vecteurs de base du plan image dans le repere universel
+  ! Definition of the image plane basis vectors in the universal frame
 
-  ! Vecteur x image sans PA : il est dans le plan (x,y) et orthogonal a uvw
+  ! Image x-vector without PA: lies in the (x,y) plane and is orthogonal to uvw
   x = (/cos(tab_RT_az(iaz) * deg_to_rad), sin(tab_RT_az(iaz) * deg_to_rad),0._dp/)
 
-  ! Vecteur x image avec PA
+  ! Image x-vector with PA
   if (abs(ang_disque) > tiny_real) then
-     ! Todo : on peut faire plus simple car axe rotation perpendiculaire a x
+     ! Todo: can simplify since the rotation axis is perpendicular to x
      x_plan_image = rotation_3d(uvw, ang_disque, x)
   else
      x_plan_image = x
   endif
 
-  ! Vecteur y image avec PA : orthogonal a x_plan_image et uvw
+  ! Image y-vector with PA: orthogonal to x_plan_image and uvw
   y_plan_image = -cross_product(x_plan_image, uvw)
 
-  ! position initiale hors modele (du cote de l'observateur)
-  ! = centre de l'image
+  ! initial position outside the model (on the observer side)
+  ! = image centre
   l = 10.*Rmax  ! on se met loin
 
   x0 = u * l  ;  y0 = v * l  ;  z0 = w * l
   center(1) = x0 ; center(2) = y0 ; center(3) = z0
 
-  ! Vecteurs definissant les pixels (dx,dy) dans le repere universel
+  ! Vectors defining the pixels (dx,dy) in the universal frame
   taille_pix = (map_size/zoom) / real(max(npix_x,npix_y),kind=dp) ! en au
   dx(:) = x_plan_image * taille_pix
   dy(:) = y_plan_image * taille_pix
 
-  ! Coin en bas gauche de l'image
+  ! Bottom-left corner of the image
   Icorner(:) = center(:) - ( 0.5 * npix_x * dx(:) +  0.5 * npix_y * dy(:))
 
   ! We only consider the 1st transition for now
@@ -1268,18 +1268,18 @@ subroutine emission_line_energy_fraction_surface_map(imol,flux_fraction,ibin,iaz
   ! Corrective factor : we want the flux before we take into account the pixel size
   factor = flux_fraction / (taille_pix / (distance*pc_to_AU))**2 /  transfreq(iiTrans)
 
-  ! Tableau velocity
+  ! Array velocity
   !nTrans_raytracing = mol(imol)%nTrans_raytracing
   ispeed(1) = 1 ; ispeed(2) = mol(imol)%n_speed_rt
 
-  ! Boucle sur les pixels de l'image
+  ! Loop over image pixels
   !$omp parallel &
   !$omp default(none) &
   !$omp private(i,j,id,icell,lintersect,x0,y0,z0,u0,v0,w0) &
   !$omp private(flag_sortie,lpacket_alive,pixelcenter,Flux) &
   !$omp shared(flux_fraction,Icorner,imol,iTrans,iiTrans,dx,dy,u,v,w,ispeed,tab_speed_rt) &
   !$omp shared(taille_pix,npix_x,npix_y,ibin,iaz,tau_surface_map,move_to_grid,spectrum,factor)
-  id = 1 ! pour code sequentiel
+  id = 1 ! for sequential code
 
   tau_surface_map = 0.0_dp
 
@@ -1287,14 +1287,14 @@ subroutine emission_line_energy_fraction_surface_map(imol,flux_fraction,ibin,iaz
   do i = 1, npix_x
      !$ id = omp_get_thread_num() + 1
      do j = 1,npix_y
-        ! Coin en bas gauche du pixel
+        ! Bottom-left corner of the pixel
         pixelcenter(:,id) = Icorner(:) + (i-0.5_dp) * dx(:) + (j-0.5_dp) * dy(:)
 
         x0 = pixelcenter(1,id)
         y0 = pixelcenter(2,id)
         z0 = pixelcenter(3,id)
 
-        ! Ray tracing : on se propage dans l'autre sens
+        ! Ray tracing: propagating in the opposite direction
         u0 = -u ; v0 = -v ; w0 = -w
 
         ! On se met au bord de la grid : propagation a l'envers

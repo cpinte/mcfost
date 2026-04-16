@@ -85,7 +85,7 @@ module collision_atom
 
    subroutine Johnson_CI(temp, Cik)
    ! --------------------------------------------------- !
-   ! Ionisation rate coefficient for Hydrogen atom
+   ! ionization rate coefficient for Hydrogen atom
    ! from lower level i to the continuum level k
    ! C(i,k) = C_{i->k}
    !
@@ -123,7 +123,7 @@ module collision_atom
          end if
 
          ! in Joules
-         En = E_RYDBERG /deltam / n / n !energie of level with different quantum number in 13.6eV: En = 13.6/n**2
+         En = E_RYDBERG /deltam / n / n !energy of level with different quantum number in 13.6eV: En = 13.6/n**2
          yn = En / KB / temp
          !     An = 32. / 3. / sqrt(3d0) / pi * n  * (g0(n)/3. + g1(n)/4. + g2(n)/5.)
          An = 32. / 3. / sqrt(3d0) / pi * n  * (g0(i)/3. + g1(i)/4. + g2(i)/5.)
@@ -186,7 +186,7 @@ module collision_atom
             rnnp = rn * x
             Annp = 2.0 * n*n*fnnp/x
             ! in Joules
-            En = E_RYDBERG /deltam / n / n !energie of level with different quantum number in 13.6eV = ionisation E of n
+            En = E_RYDBERG /deltam / n / n !energy of level with different quantum number in 13.6eV = ionization E of n
             y = x * En / KB / temp !x = ratio of E/En
             Bnnp = 4d0 * (n**4)/(np**3) / x / x * (1. + 4./(3.0 * x) + bn/x/x)
             z = rnnp + y
@@ -268,7 +268,7 @@ module collision_atom
 
   subroutine read_collisions(unit, atom)
    !To Do check here that the collision data are consistent with the transitions in the model
-   !instead of doing it in the colling routine
+   !instead of doing it in the colliding routine
     integer, intent(in) :: unit
     type (AtomType), intent(inout) :: atom
    !  character(len=Nmax_line_per_collision), dimension(Nmax_lines) :: lines_in_file !check len char matches the one in atom%
@@ -414,17 +414,17 @@ module collision_atom
 
   ! -----------------------------------------------
   ! REMEMBER -> stage is like in C, it goes from 0
-  ! for neutrals, to Nstage-1 for the most ionised
+  ! for neutrals, to Nstage-1 for the most ionized
   ! stage (instead of 1 to Nstage)
-  ! Furhter, in readatom.f90, i is i+1 and j is j+1
-  ! to be in aggreement with the index convention of
+  ! Further, in readatom.f90, i is i+1 and j is j+1
+  ! to be in agreement with the index convention of
   ! fortran 90. First level is i(j) = 1, not 0 !
   ! and last level is i(j) = Nlevel, not Nlevel-1.
   ! -----------------------------------------------
 
   function ar85cea(i,j,k, atom) result(cup)
     ! -----------------------------------------------
-    ! Computes collisional autoionisation rates
+    ! Computes collisional autoionization rates
     ! using the formalism from Arnaud and Rothenflug
     ! 1985, A&ASS, 60, 425 (a.k.a ar85)
     !
@@ -547,7 +547,7 @@ module collision_atom
     ! --- Density sensitive dielectronic recombination ----
     ! the term adi may be multiplied by a density-sensitive
     ! factor if needed, this is crucial for Li and B-like
-    ! ions collinding with impacting electrons.
+    ! ions colliding with impacting electrons.
     !
     ! This simple formulation was derived from a study of
     ! the dependence of the dielectronic "bump" in the figures
@@ -648,13 +648,13 @@ module collision_atom
 
     Nlines = size(atom%collision_lines)
 
-    ! -- Go throught the remaining lines in the file -- !
+    ! -- Go through the remaining lines in the file -- !
     ! read collisional data depending the cases of recipes.
 
     loop_lines_in_file : do k1=1, Nlines
        countline = countline + 1
        inputline = atom%collision_lines(k1)
-       Nread = len(inputline)!already trimed
+       Nread = len(inputline)!already trimmed
        ! do not go further, because after there is
        ! the number of grid points, which is in general
        ! one or two digits.
@@ -855,8 +855,8 @@ module collision_atom
 
        !Compute also the derivative if present.
        !note that in principle ni_bb / nj_cont is prop to ne and
-       !ne * phi(T) should be use because LTE populations are updated afterwards
-       !not during the electron + SEE iterations. See impact.f90 and see_ionisation_nonlte in statequil_atom.f90 for more details.
+       !ne * phi(T) should be used because LTE populations are updated afterwards
+       !not during the electron + SEE iterations. See impact.f90 and see_ionization_nonlte in statequil_atom.f90 for more details.
 
        if (key.eq."OMEGA") then
           ! -- Collisional excitation of ions
@@ -878,7 +878,7 @@ module collision_atom
           Cup = Cdown * nj_on_ni
 
        else if (key.eq."CI") then
-          ! -- Collisional ionisation
+          ! -- Collisional ionization
           deltaE = atom%E(j) - atom%E(i)
           Cup = CC * ne(icell) * exp(-deltaE/(KB*T(icell))) *sqrt(T(icell))
           !write(*,*) key, "k=",k, "Cup = ", Cup, C(k)
@@ -936,7 +936,7 @@ module collision_atom
           Cdown = cdn
        else if (key.eq."BADNELL") then
           ! -- Fit for dielectronic recombination form Badnell
-          ! First line coefficients are energies in K (from Chianti)
+          ! First line coefficients are energys in K (from Chianti)
           ! Second line coefficients are coefficients (from Chianti)
           ! See Badnell 2006 for more details
 
@@ -960,7 +960,7 @@ module collision_atom
 
           !deallocate(badi)
        else if (key.eq."AR85-CDI") then
-          ! -- Direct collisional ionisation
+          ! -- Direct collisional ionization
           cup = 0.
           tg = T(icell)
           do m=1,Nrow
@@ -979,7 +979,7 @@ module collision_atom
           cdn = cup * ni_on_nj
           Cdown = cdn
        else if (key.eq."AR85-CEA") then
-          ! -- Autoionisation
+          ! -- Autoionization
           fac = ar85cea(i,j,icell,atom)
           !write(*,*) "fac=", fac
           cup = coeff(1)*fac*ne(icell)
@@ -988,7 +988,7 @@ module collision_atom
           !  " C[ji,k]=",C(ji,k)
           Cdown = 0.0
        else if (key.eq."AR85-CHP") then
-          ! -- Charge transfer with ionised Hydrogen
+          ! -- Charge transfer with ionized Hydrogen
           ar85t1 = coeff(1)
           ar85t2 = coeff(2)
           ar85a = coeff(3)
@@ -1019,7 +1019,7 @@ module collision_atom
           Cdown = cdn
        else if (key.eq."BURGESS") then
           write(*,*) "BURGESS NOT CHECK"
-          ! -- Electron impact ionisation from Burgess Chidichimo
+          ! -- Electron impact ionization from Burgess Chidichimo
           ! 1983, MNRAS, 203, 1269-1280
           de = (atom%E(j)-atom%E(i))/electron_charge
           zz = atom%stage(i) !0 for neutrals
@@ -1049,10 +1049,10 @@ module collision_atom
          endif
       endif
 
-      !In case some collision data exists for absent radiative transitions (form some reasons),
+      !In case some collision data exists for absent radiative transitions (for some reasons),
       !write the collision data without the need of a radiative transition (kr > 0).
       if (key /= "TEMP") then ! otherwise i and j are 0
-         ! -1 (no radiative but collisional) is to distangle with -99 (no radiative and no collisional)
+         ! -1 (no radiative but collisional) is to disentangle with -99 (no radiative and no collisional)
          atom%col_mat(i,j,id) = atom%col_mat(i,j,id) + Cdown
          atom%col_mat(j,i,id) = atom%col_mat(j,i,id) + Cup
       endif

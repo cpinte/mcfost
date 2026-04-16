@@ -15,10 +15,10 @@ module radiation_field
 
   private
 
-  ! pour stockage des cellules par lequelles on passe
-  ! length de vol cumulee dans la cell
+  ! for storing the cells traversed by the photon
+  ! cumulative path length in the cell
   real(kind=dp), dimension(:,:), allocatable :: xKJ_abs ! n_cells, id
-  ! xJabs represente J_lambda dans le bin lambda -> bin en log : xJabs varie comme lambda.F_lambda
+  ! xJabs represents J_lambda in the lambda bin (log bin): xJabs varies as lambda.F_lambda
   real(kind=dp), dimension(:,:,:), allocatable :: xJ_abs ! n_cells, n_lambda, nb_proc
   real, dimension(:,:,:), allocatable :: xN_abs ! n_cells, n_lambda, nb_proc, for ProDiMo
 
@@ -56,7 +56,7 @@ subroutine save_radiation_field(id,lambda,p_lambda,icell, Stokes, l,  x0,y0,z0, 
   else
      if (lxJ_abs) then ! loutput_UV_field .or. loutput_J .or. lprodimo
         xJ_abs(icell,lambda,id) = xJ_abs(icell,lambda,id) + l * Stokes(1)
-        ! Pour statistique: nbre de paquet contribuant a intensite specifique
+        ! For statistics: number of packets contributing to specific intensity
         if (lProDiMo) xN_abs(icell,lambda,id) = xN_abs(icell,lambda,id) + 1.0
      endif ! lProDiMo
 
@@ -83,7 +83,7 @@ subroutine save_radiation_field(id,lambda,p_lambda,icell, Stokes, l,  x0,y0,z0, 
         if (lsepar_pola) then
            call calc_xI_scatt_pola(id,lambda,p_lambda,icell,phi_k,psup,l,Stokes(:),flag_star)
         else
-           ! ralentit d'un factor 5 le calcul de SED
+           ! slows down the SED calculation by a factor of 5
            ! factor limitant
            call calc_xI_scatt(id,lambda,p_lambda,icell,phi_k,psup,l,Stokes(1),flag_star)
         endif
@@ -97,7 +97,7 @@ subroutine save_radiation_field(id,lambda,p_lambda,icell, Stokes, l,  x0,y0,z0, 
            zm = 0.5_dp * (z0 + z1)
            phi_pos = atan2(xm,ym)
 
-           phi_vol = atan2(-u,-v) + two_pi ! two_pi pour assurer diff avec phi_pos > 0
+           phi_vol = atan2(-u,-v) + two_pi ! two_pi ensures phi_vol > phi_pos
 
            !  if (l_sym_ima) then
            !     delta_phi = modulo(phi_vol - phi_pos, two_pi)

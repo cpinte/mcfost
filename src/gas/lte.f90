@@ -77,7 +77,7 @@ module lte
 
 
    function nH_minus(icell)
-   !Saha Ionisation equation applied to H-
+   !Saha Ionization equation applied to H-
       integer :: icell
       real(kind=dp) :: nH_minus, nH, UH, UHm
 
@@ -151,7 +151,7 @@ module lte
       hydrogen%nstar(2:hydrogen%Nlevel,k) = hydrogen%nstar(2:hydrogen%Nlevel,k)*hydrogen%nstar(1,k)
 
       !test positivity. Must be > 0.
-      !sum is either 1 (all in ground state) or infinity (fully ionised). And ntotal here > 0.
+      !sum is either 1 (all in ground state) or infinity (fully ionized). And ntotal here > 0.
       if ((hydrogen%nstar(1,k) < 0)) then
          write(*,*) " ************************************* "
          write(*,*) "error negative gs pop", hydrogen%ID, hydrogen%nstar(i,k)
@@ -211,7 +211,7 @@ module lte
       integer :: dZ, i, m
 
       ! debye shielding activated:
-      ! It lowers the ionisation potential taking into account the charge of all levels
+      ! It lowers the Ionization potential taking into account the charge of all levels
 
       ! dE_ion = -Z*(qel**2 / 4PI*EPS0) / D in J
       ! D = sqrt(EPS0/2qel**2) * sqrt(kT/ne) in m
@@ -227,7 +227,7 @@ module lte
          c2 = sqrt(8.0*PI/KB) * (electron_charge**2/(4.0*PI*EPSILON_0))**1.5
          !write(*,*) "c2=",c2,  atom%Abund * nHtot(1),  atom%Abund * nHtot(2)
          ndebye(1:atom%Nlevel)=0
-         !reduce the ionisation potential of ion i+1 (wrt to the ground state) by nDebye(i) * (ne/T)**1/2.
+         !reduce the Ionization potential of ion i+1 (wrt to the ground state) by nDebye(i) * (ne/T)**1/2.
          do i=2, atom%Nlevel
             if (atom%stage(i) - atom%stage(1) > 0) nDebye(i) = atom%stage(i) + 1
          enddo
@@ -257,7 +257,7 @@ module lte
           ! ---------- Saha equation ------------------------------------------------ !
           ! n1j+1 = n1j * exp(-ionpotj->j+1)/(ne*phi(T)) !or phik here
           ! we can express all pops nij in specific ion stage j
-          ! wrt the groud state and ionisation stage of the ground state
+          ! wrt the ground state and Ionization stage of the ground state
           ! namely n1j=1. Remembering that E0j+1-E0j = chiIj->j+1 = ionpot
 
           ! for this level i in stage stage(i),
@@ -265,9 +265,9 @@ module lte
           ! level 1 in stage stage(1).
           ! the population of the ground state in stage (i)+dZ
           ! is given by nstar(i,k)/(phik)**dZ.
-          ! because expressing dE has Eij - E00 will involved succesive division by phik
+          ! because expressing dE has Eij - E00 will involve successive division by phik
           ! dZ + 1 times -> 0 times if same ion stage, +1 times if next ion, +2 times if
-          ! third ion ect ..
+          ! third ion etc ..
 
           ! is equivalent to nstar(i,k)*(phik)**(-dZ)
           ! if dZ = 0, same ion, no division, only Boltzmann eq.
@@ -410,13 +410,13 @@ module lte
       ! -------------------------------------------------------------- !
       ! computed wrt the ground state of H I
       ! ########Check occupation prob.#########
-      ! Beware cannot determine ground state of nH to be use in w
+      ! Beware cannot determine ground state of nH to be used in w
       ! if computed before lte pops without w are known.
       !
       ! Diss Should be okay here.
       ! In turbospectrum nHI and nHII are known by chemical equi.
       ! before computing n(i) with occupation proba, which should be
-      ! similar to mine since n(i) (so implicitely nHI) are computed
+      ! similar to mine since n(i) (so implicitly nHI) are computed
       ! with no dissolution and then dissolution is taken for bound
       ! levels.
       !
@@ -577,7 +577,7 @@ module lte
       real(kind=dp), dimension(atom%Nlevel) :: max_nstar, min_nstar !old_values
 
       ! debye shielding activated:
-      ! It lowers the ionisation potential taking into account the charge of all levels
+      ! It lowers the Ionization potential taking into account the charge of all levels
 
       ! dE_ion = -Z*(qel**2 / 4PI*EPS0) / D in J
       ! D = sqrt(EPS0/2qel**2) * sqrt(kT/ne) in m
@@ -596,14 +596,14 @@ module lte
 
       locupa_prob = .false. !Only for He
       !Not yet. For H, use the LTEpops_H()
-      !only for the bound levels of each ionisation stage ? The last level beeing the last continuum ?
+      !only for the bound levels of each Ionization stage ? The last level being the last continuum ?
       if (debye .and. locupa_prob) locupa_prob = .false.
 
       if (debye) then
          c2 = sqrt(8.0*PI/KB) * (electron_charge**2/(4.0*PI*EPSILON_0))**1.5
          !write(*,*) "c2=",c2,  atom%Abund * nHtot(1),  atom%Abund * nHtot(2)
          ndebye(1:atom%Nlevel)=0
-         !reduce the ionisation potential of ion i+1 (wrt to the ground state) by nDebye(i) * (ne/T)**1/2.
+         !reduce the Ionization potential of ion i+1 (wrt to the ground state) by nDebye(i) * (ne/T)**1/2.
          do i=2, atom%Nlevel
             if (atom%stage(i) - atom%stage(1) > 0) nDebye(i) = atom%stage(i) + 1
          enddo
@@ -642,7 +642,7 @@ module lte
           ! ---------- Saha equation ------------------------------------------------ !
           ! n1j+1 = n1j * exp(-ionpotj->j+1)/(ne*phi(T)) !or phik here
           ! we can express all pops nij in specific ion stage j
-          ! wrt the groud state and ionisation stage of the ground state
+          ! wrt the ground state and Ionization stage of the ground state
           ! namely n1j=1. Remembering that E0j+1-E0j = chiIj->j+1 = ionpot
 
           ! for this level i in stage stage(i),
@@ -650,9 +650,9 @@ module lte
           ! level 1 in stage stage(1).
           ! the population of the ground state in stage (i)+dZ
           ! is given by nstar(i,k)/(phik)**dZ.
-          ! because expressing dE has Eij - E00 will involved succesive division by phik
+          ! because expressing dE has Eij - E00 will involve successive division by phik
           ! dZ + 1 times -> 0 times if same ion stage, +1 times if next ion, +2 times if
-          ! third ion ect ..
+          ! third ion etc ..
 
           ! is equivalent to nstar(i,k)*(phik)**(-dZ)
           ! if dZ = 0, same ion, no division, only Boltzmann eq.

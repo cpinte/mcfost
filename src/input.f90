@@ -54,9 +54,9 @@ end subroutine read_molecules_names
 
 
 subroutine readmolecule(imol)
-  ! Lit les parameters de la molecule etudiee
-  ! remplit Aul, Bul, Blu + les f,   Level_energy, transfreq,
-  ! iTransUpper, iTransLower + les donnees de collisions
+  ! Reads the parameters of the molecule under study
+  ! fills Aul, Bul, Blu + f, Level_energy, transfreq,
+  ! iTransUpper, iTransLower + collision data
 
   use utils, only : split_line
 
@@ -518,8 +518,8 @@ end subroutine read_abundance
 !**********************************************************************
 
 subroutine lect_lambda()
-  ! Remplit la variable lambda_filename
-  ! et le tableau de lambda pour sed2
+  ! Fills the lambda_filename variable
+  ! and the lambda array for sed2
 
   integer :: alloc_status, lambda, status, n_comment, i, ios
   real :: fbuffer
@@ -552,7 +552,7 @@ subroutine lect_lambda()
      endif
   endif
 
-  ! On elimine les lignes avec des commentaires
+  ! Remove lines with comments
   status = 1
   n_comment = 0
   do while (status /= 0)
@@ -561,9 +561,9 @@ subroutine lect_lambda()
   enddo
   n_comment = n_comment - 1
 
-  ! On compte d'abord le nombre de lignes
+  ! First count the number of lines
   status=0
-  n_lambda2=1 ! On a deja lu une ligne en cherchant les commentaires
+  n_lambda2=1 ! One line has already been read while searching for comments
   do while(status==0)
      n_lambda2=n_lambda2+1
      read(1,*,iostat=status)
@@ -572,7 +572,7 @@ subroutine lect_lambda()
 
   rewind(1)
 
-  ! On passe les commentaires
+  ! Skip comment lines
   do i=1, n_comment
      read(1,*)
   enddo

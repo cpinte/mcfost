@@ -39,7 +39,7 @@ module dust_transfer
   contains
 
 subroutine dust_transfer_sub()
-! Ajout du cas ou les matrices de Mueller sont donnees en entrees
+! Added the case where Mueller matrices are given as inputs
 ! 20/04/2023
 
   use MRW, only : initialize_cumulative_zeta
@@ -48,10 +48,10 @@ subroutine dust_transfer_sub()
 
 #include "sprng_f.h"
 
-  ! Energie des paquets
+  ! Packet energy
   real(kind=dp), dimension(4) :: Stokes
 
-  ! parameters simu
+  ! Simulation parameters
   integer :: itime, lambda_threshold, n_photons2
   integer :: ind_etape, first_etape_obs
   integer :: etape_start, nnfot1_start, n_iter, ibin, iaz, ibar, n_photons1_cumul
@@ -87,7 +87,7 @@ subroutine dust_transfer_sub()
 
   lambda0 = -99 ; nnfot2=0.0_dp ; n_phot_sed2 = 0.0_dp
 
-  ! Energie des paquets mise a 1
+  ! Packet energy mise a 1
   E_paquet = 1.0_dp
 
   ! Compute equation (7) of Min et al (2009) for Modified Random Walk
@@ -149,7 +149,7 @@ subroutine dust_transfer_sub()
   endif
 
   call setup_scattering()
-  ! Allocation dynamique de tous les autres tableaux
+  ! Dynamic allocation of all other tables
   call alloc_dust_prop()
 
   call alloc_dynamique()
@@ -175,7 +175,7 @@ subroutine dust_transfer_sub()
      endif
   endif
 
-  if (lmono) then ! code monochromatique
+  if (lmono) then ! monochromatic code
      lambda=1
      etape_i=1
      etape_f=1
@@ -190,7 +190,7 @@ subroutine dust_transfer_sub()
         lmethod_aniso1=.false.
         if (laggregate) call error("you must use scattering method 1 when grains are aggregates")
      endif
-     call repartition_energie_etoiles()
+     call star_energy_distribution()
 
      if (llimb_darkening) call read_limb_darkening_file(1)
 
@@ -218,11 +218,11 @@ subroutine dust_transfer_sub()
      if (lsepar_pola.and.(scattering_method == 2)) write(*,*) "polarisability", maxval(-tab_s12_o_s11_pos(:,p_icell,1))
      if (lopacite_only) call exit(0)
 
-     if (l_em_disk_image) then ! le disque �met
+     if (l_em_disk_image) then ! the disk is emitting
         if (.not.(ldust_prop.and.lstop_after_init)) then ! we do not need the temperature if we only compute the dust prop
            call lect_Temperature()
         endif
-     else ! Seule l'�toile �met
+     else ! Only the star is emitting
         Tdust=0.0
      endif !l_em_disk_image
 
@@ -235,7 +235,7 @@ subroutine dust_transfer_sub()
      endif
 
      first_etape_obs=2
-     ! Nbre d'�tapes � d�terminer pour code thermique
+     ! Number of steps to determine for the thermal calculation
      if (lTemp) then
         etape_i=1
         letape_th=.true.
@@ -251,7 +251,7 @@ subroutine dust_transfer_sub()
            etape_f=1+n_lambda
            n_lambda2 = n_lambda
         else
-           etape_f=1+n_lambda2 ! modif nombre �tape
+           etape_f=1+n_lambda2 ! modified number of steps
         endif
      else
         etape_f=1
@@ -259,9 +259,9 @@ subroutine dust_transfer_sub()
 
 
      if (lTemp.or.lsed_complete) then
-        call repartition_energie_etoiles()
+        call star_energy_distribution()
         if (lISM_heating) then
-           call repartition_energie_ISM(ISR_model)
+           call ism_energy_distribution(ISR_model)
         else
            E_ISM = 0.0 ;
         endif
@@ -307,7 +307,7 @@ subroutine dust_transfer_sub()
            if (ldisk_struct) call write_disk_struct(.false.,lwrite_column_density,lwrite_velocity)
 
            do lambda=1,n_lambda
-              ! recalcul pour opacity 2 :peut etre eviter mais implique + meme : garder tab_s11 en mem
+              ! recalculation for opacity 2 :peut etre eviter mais implique + meme : garder tab_s11 en mem
               call prop_grains(lambda)
               call opacity(lambda, p_lambda)
            enddo
@@ -371,21 +371,21 @@ subroutine dust_transfer_sub()
 
   etape_start=etape_i
   nnfot1_start=1
-  lambda=1 ! pour eviter depassement tab a l'initialisation
+  lambda=1 ! to avoid array overflow at initialization
   ind_etape = etape_start
 
   !************************************************************
-  !  Boucle principale sur les �tapes du calcul
+  ! Main loop over calculation steps
   !************************************************************
-  n_iter = 0 ! Nbre iteration grains hors equilibre
+  n_iter = 0 ! Number of iterations for non-equilibrium grains
   do while (ind_etape <= etape_f)
      step_index=ind_etape
 
-     if (letape_th) then ! Calcul des temperatures
+     if (letape_th) then ! Temperature calculation
         n_photons2 = n_photons_eq_th
-        n_phot_lim = 1.0e30 ! on ne tue pas les paquets
-     else ! calcul des observables
-        ! on devient monochromatique
+        n_phot_lim = 1.0e30 ! packets are not killed
+     else ! observables calculation
+        ! becomes monochromatic
         lmono=.true.
         E_paquet = 1.0_dp
 
@@ -406,7 +406,7 @@ subroutine dust_transfer_sub()
         if (lmono0) then ! image
            laffichage=.true.
            n_photons2 = n_photons_image
-           n_phot_lim = 1.0e30 ! On ne limite pas le nbre de photons
+           n_phot_lim = 1.0e30 ! Number of photons is not limited
         else ! SED
            lambda=1
            laffichage=.false.
@@ -419,7 +419,7 @@ subroutine dust_transfer_sub()
            if (lTemp.and.lsed_complete) then
               write(*,'(a30, $)') "Computing dust properties ..."
               do lambda=1, n_lambda
-                 call prop_grains(lambda) ! recalcul pour opacity
+                 call prop_grains(lambda) ! recompute opacity
                  call opacity(lambda, p_lambda)
               enddo
               write(*,*) "Done"
@@ -430,7 +430,7 @@ subroutine dust_transfer_sub()
            if (.not.lMueller_pos_multi .and. lscatt_ray_tracing) call realloc_ray_tracing_scattering_matrix()
         endif
 
-        if ((ind_etape==first_etape_obs).and.(.not.lsed_complete).and.(.not.lmono0)) then ! Changement des lambda
+        if ((ind_etape==first_etape_obs).and.(.not.lsed_complete).and.(.not.lmono0)) then ! wavelength change
            ! if we reallocate, we are now in monochromatic
            ! except if we want to save the dust properties
            if (ldust_prop) then
@@ -441,13 +441,13 @@ subroutine dust_transfer_sub()
 
            call setup_scattering()
 
-           ! reorganisation memoire
+           ! memory reorganization
            call realloc_step2()
 
            call init_lambda2()
            call init_optical_indices()
 
-           call repartition_energie_etoiles()
+           call star_energy_distribution()
            E_ISM = 0.0 ! ISM done a second step in SED step2 calculation
 
            if (lscatt_ray_tracing) then
@@ -455,7 +455,7 @@ subroutine dust_transfer_sub()
               call init_directions_ray_tracing()
            endif
 
-           ! Recalcul des propri�t�s optiques
+           ! Recompute optical properties
            ! Try to restore dust calculation from previous run
            call read_saved_dust_prop(letape_th, lcompute_dust_prop)
            if (lcompute_dust_prop) then
@@ -549,14 +549,14 @@ subroutine dust_transfer_sub()
            p_nnfot2 => n_phot_sed2
 
            if (lProDiMo.or.lML)  then
-              p_nnfot2 => nnfot2  ! Nbre de paquet cst par lambda
-              ! Augmentation du nbre de paquets dans UV
+              p_nnfot2 => nnfot2  ! Constant number of packets per wavelength
+              ! Increase number of packets in the UV
               if (tab_lambda(lambda) < 0.5) n_photons2 = n_photons_lambda * 10
            endif
         endif
      endif
 
-     id = 1 ! Pour code sequentiel
+     id = 1 ! For sequential code
      !$ id = omp_get_thread_num() + 1
      ibar=1 ;  n_photons1_cumul = 0
 
@@ -569,24 +569,24 @@ subroutine dust_transfer_sub()
            n_phot_envoyes(lambda,id) = n_phot_envoyes(lambda,id) + 1.0_dp
            n_phot_envoyes_in_loop = n_phot_envoyes_in_loop + 1.0_dp
 
-           ! Choix length d'onde
+           ! Wavelength choice
            if (.not.lmono) then
               rand = sprng(stream(id))
               call select_wl_em(rand,lambda)
            endif
 
-           ! Emission du paquet
+           ! Packet emission
            call emit_packet(id,lambda, icell,x,y,z,u,v,w,stokes,flag_star,flag_ISM,lintersect)
            lpacket_alive = .true.
 
-           ! Propagation du packet
+           ! Packet propagation
            if (lintersect) call propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes, &
                 flag_star,flag_ISM,flag_scatt,lpacket_alive)
 
-           ! La paquet est maintenant sorti : on le met dans le bon capteur
+           ! The packet has now exited : on le met dans le bon capteur
            if (lpacket_alive.and.(.not.flag_ISM)) then
               call capteur(id,lambda,icell,x,y,z,u,v,w,Stokes,flag_star,flag_scatt,capt)
-              if (capt == capt_sup) n_phot_sed2 = n_phot_sed2 + 1.0_dp ! nbre de photons recus pour etape 2
+              if (capt == capt_sup) n_phot_sed2 = n_phot_sed2 + 1.0_dp ! number of photons received for step 2
            endif
         enddo photon !nnfot2
 
@@ -605,15 +605,15 @@ subroutine dust_transfer_sub()
      !$omp end parallel
      if (laffichage) call progress_bar(50)
 
-     ! Champ de radiation interstellaire
+     ! Interstellar radiation field
      if ((.not.letape_th).and.(lProDiMo.or.lML)) then
-        ! Pas de ray-tracing avec les packets ISM
+        ! No ray-tracing with ISM packets
         lscatt_ray_tracing1_save = lscatt_ray_tracing1
         lscatt_ray_tracing2_save = lscatt_ray_tracing2
         lscatt_ray_tracing1 = .false.
         lscatt_ray_tracing2 = .false.
 
-        ! Sauvegarde champ stellaire et th separement
+        ! Saving stellar and thermal fields separately
         if (lProDiMo) call save_J_ProDiMo(lambda)
         if (lML)      call save_J_ML(lambda,.false.)
 
@@ -631,16 +631,16 @@ subroutine dust_transfer_sub()
            photon_ISM : do while (nnfot2 < n_photons_lambda)
               n_phot_envoyes_ISM(lambda,id) = n_phot_envoyes_ISM(lambda,id) + 1.0_dp
 
-              ! Emission du paquet
+              ! Packet emission
               call emit_packet_ISM(id, icell,x,y,z,u,v,w,stokes,lintersect)
               flag_ISM = .true.
 
-              ! Le photon sert a quelquechose ou pas ??
+              ! Is the photon useful or not ??
               if (.not.lintersect) then
                  cycle photon_ISM
               else
                  nnfot2 = nnfot2 + 1.0_dp
-                 ! Propagation du packet
+                 ! Packet propagation
                  call propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_star,flag_ISM,flag_scatt,lpacket_alive)
               endif
            enddo photon_ISM ! nnfot2
@@ -655,10 +655,10 @@ subroutine dust_transfer_sub()
      endif ! champ ISM
 
      !----------------------------------------------------
-     if (lmono0) then ! Creation image
+     if (lmono0) then ! Image creation
         if (loutput_mc) call write_stokes_fits()
 
-        ! Carte ray-tracing
+        ! Ray-tracing map
         if (lscatt_ray_tracing) then
 
            call system_clock(time_end)
@@ -679,7 +679,7 @@ subroutine dust_transfer_sub()
                     time_source_fct = time_source_fct + (time_2 - time_1)
 
                     time_1 = time_2
-                    call dust_map(lambda,ibin,iaz) ! Ne prend pas de temps en SED
+                    call dust_map(lambda,ibin,iaz) ! Does not take time in SED
                     if (ltau_surface) call compute_tau_surface_map(lambda,tau_surface, ibin,iaz)
                     if (ltau_map) call compute_tau_map(lambda, ibin, iaz)
                     call system_clock(time_2)
@@ -693,7 +693,7 @@ subroutine dust_transfer_sub()
                  time_source_fct = time_source_fct + (time_2 - time_1)
 
                  time_1 = time_2
-                 call dust_map(lambda,ibin,iaz) ! Ne prend pas de temps en SED
+                 call dust_map(lambda,ibin,iaz) ! Does not take time in SED
                  if (ltau_surface) call compute_tau_surface_map(lambda,tau_surface, ibin,iaz)
                  if (ltau_map) call compute_tau_map(lambda, ibin, iaz)
                  call system_clock(time_2)
@@ -715,9 +715,9 @@ subroutine dust_transfer_sub()
            if (ltau_map) call write_tau_map(0)
         endif
 
-     elseif (letape_th) then ! Calcul de la structure en temperature
+     elseif (letape_th) then ! Calculation of la structure en temperature
 
-        letape_th=.false. ! A priori, on a calcule la temperature
+        letape_th=.false. ! A priori, on a Calculates la temperature
         if (lRE_LTE) then
            call Temp_finale()
            if (lreemission_stats) call reemission_stats()
@@ -734,7 +734,7 @@ subroutine dust_transfer_sub()
               write(*,*) "radiation field may not be converged"
            endif
 
-           if (.not.flag_em_nRE) then ! il faut iterer
+           if (.not.flag_em_nRE) then ! need to iterate
               call emission_nRE()
               letape_th=.true.
               first_etape_obs = first_etape_obs + 1
@@ -748,8 +748,8 @@ subroutine dust_transfer_sub()
            call sublimate_dust()
         endif
 
-        ! A-t-on fini le calcul des grains hors eq ?
-        if (.not.letape_th) then ! oui, on passe a la suite
+        ! Have we finished the calculation of non-eq grains ?
+        if (.not.letape_th) then ! yes, proceed to the next step
            call ecriture_temperature(1)
            call ecriture_sed(1)
 
@@ -761,7 +761,7 @@ subroutine dust_transfer_sub()
               call ecriture_temperature(2)
            endif
 
-           ! Remise a zero pour etape suivante
+           ! Reset for the next step
            sed=0.0; sed_q=0.0 ; sed_u=0.0 ; sed_v=0.0
            n_phot_sed=0.0;  n_phot_sed2=0.0; n_phot_envoyes=0.0
            sed_star=0.0 ; sed_star_scat=0.0 ; sed_disk=0.0 ; sed_disk_scat=0.0
@@ -795,7 +795,7 @@ subroutine dust_transfer_sub()
                     time_source_fct = time_source_fct + (time_2 - time_1)
 
                     time_1 = time_2
-                    call dust_map(lambda,ibin,iaz) ! Ne prend pas de temps en SED
+                    call dust_map(lambda,ibin,iaz) ! Does not take time in SED
                     call system_clock(time_2)
                     time_RT = time_RT + (time_2 - time_1)
                  enddo
@@ -807,13 +807,13 @@ subroutine dust_transfer_sub()
                  time_source_fct = time_source_fct + (time_2 - time_1)
 
                  time_1 = time_2
-                 call dust_map(lambda,ibin,iaz) ! Ne prend pas de temps en SED
+                 call dust_map(lambda,ibin,iaz) ! Does not take time in SED
                  call system_clock(time_2)
                  time_RT = time_RT + (time_2 - time_1)
               endif
            enddo
 
-           ! Pour longeur d'onde suivante
+           ! For next wavelength
            if (lscatt_ray_tracing1) then
               xI_scatt = 0.0_dp
            else
@@ -821,7 +821,7 @@ subroutine dust_transfer_sub()
            endif
         endif
 
-        if (ind_etape==etape_f) then ! Ecriture SED ou spectrum
+        if (ind_etape==etape_f) then ! SED or spectrum writing
            call ecriture_sed(2)
            if (lscatt_ray_tracing) call ecriture_sed_ray_tracing()
            if (lProDiMo) call mcfost2ProDiMo()
@@ -852,13 +852,13 @@ subroutine emit_packet(id,lambda, icell,x0,y0,z0,u0,v0,w0,stokes,flag_star,flag_
 
   integer, intent(in) :: id, lambda
 
-  ! Position et direction du packet
+  ! Packet position and direction
   integer, intent(out) :: icell
   real(kind=dp), intent(out) :: x0,y0,z0,u0,v0,w0
   real(kind=dp), dimension(4), intent(out) :: Stokes
   logical, intent(out) :: lintersect
 
-  ! Proprietes du packet
+  ! Packet properties
   logical, intent(out) :: flag_star, flag_ISM
   real :: rand, rand2, rand3, rand4
   integer :: i_star
@@ -879,52 +879,52 @@ subroutine emit_packet(id,lambda, icell,x0,y0,z0,u0,v0,w0,stokes,flag_star,flag_
 
      rand = sprng(stream(id))
      ! Choix de l'�toile
-     call select_etoile(lambda,rand,i_star)
+     call select_star(lambda,rand,i_star)
      ! Emission depuis l'�toile
      rand  = sprng(stream(id))
      rand2 = sprng(stream(id))
      rand3 = sprng(stream(id))
      rand4 = sprng(stream(id))
-     call em_sphere_uniforme(id, i_star,rand,rand2,rand3,rand4, icell,x0,y0,z0,u0,v0,w0,w02,lintersect)
-     ! Lumiere non polarisee emanant de l'star
+     call emit_packet_uniform_sphere(id, i_star,rand,rand2,rand3,rand4, icell,x0,y0,z0,u0,v0,w0,w02,lintersect)
+     ! Unpolarized light emanant de l'star
      Stokes(1) = E_paquet ; Stokes(2) = 0.0 ; Stokes(3) = 0.0 ; Stokes(4) = 0.0
 
      !********************************************************
-     ! parameters du point chaud
+     ! Hot spot parameters
      !********************************************************
 
      if (lspot) then
         !write(*,*) "*******************"
         !write(*,*) "*  Adding a spot  *"
         !write(*,*) "*******************"
-        ! Pas tres malin ca, ca fait les calculs a chaque paquet
+        ! Not very smart, it calculates for each packet
 
         ! Position
         z_spot = cos(theta_spot/180.*pi)
         x_spot = sin(theta_spot/180.*pi) * cos(phi_spot/180.*pi)
         y_spot = sin(theta_spot/180.*pi) * sin(phi_spot/180.*pi)
 
-        ! Angle sous-tendu par le spot
+        ! Angle subtended by the spot
         cos_thet_spot = sqrt(1.0 - surf_fraction_spot)
 
-        ! Si le photon est dans le spot, on corrige l'intensite
-        ! On multiplis par r_star car x0, y0, et z0 ont ete multiplies par r_star
+        ! If the photon is in the spot, the intensity is corrected
+        ! Multiply by r_star car x0, y0, et z0 ont ete multiplies par r_star
         !write(*,*) "test"
         if (x_spot*x0+y_spot*y0+z_spot*z0  > cos_thet_spot * star(1)%r) then
            !  Rapport des intensites point chaud / star
            hc_lk = hp * c_light / (tab_lambda(lambda)*1e-6 * kb)
            correct_spot = (exp(hc_lk/star(1)%T) - 1)/(exp(hc_lk/T_spot) - 1)
 
-           ! Correction energy packet
+           ! Packet energy correction
            Stokes(:) = Stokes(:) * correct_spot
         endif
      endif ! lspot
 
-  else  if (rand <= frac_E_disk(lambda)) then! Emission depuis le disque
+  else  if (rand <= frac_E_disk(lambda)) then! Emission from the Disk
      flag_star=.false.
      flag_ISM=.false.
 
-     ! Position initiale
+     ! Initial position
      rand = sprng(stream(id))
      call select_cellule(lambda,rand, icell)
 
@@ -933,10 +933,10 @@ subroutine emit_packet(id,lambda, icell,x0,y0,z0,u0,v0,w0,stokes,flag_star,flag_
      rand3 = sprng(stream(id))
      call  pos_em_cell(icell, rand,rand2,rand3,x0,y0,z0)
 
-     ! Direction de vol (uniforme)
+     ! Flight direction (uniform)
      call random_isotropic_direction(id, u0,v0,w0)
 
-     ! parameters de stokes : lumi�re non polaris�e
+     ! Stokes parameters : lumi�re non polaris�e
      Stokes(1) = E_paquet ; Stokes(2) = 0.0 ; Stokes(3) = 0.0 ; Stokes(4) = 0.0
 
      if (lweight_emission) then
@@ -957,12 +957,12 @@ end subroutine emit_packet
 subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_star,flag_ISM,flag_scatt,lpacket_alive)
   ! C. Pinte
   ! 27/05/09
-  ! Ajout du cas ou les matrices de Mueller sont donnees en entrees
+  ! Added the case where Mueller matrices are given as inputs
   ! 20/04/2023
 
-  ! - flag_star_direct et flag_scatt a initialiser : on a besoin des 2
-  ! - separer 1ere diffusion et reste
-  ! - lom supprime !
+  ! - flag_star_direct and flag_scatt to initialize : on a besoin des 2
+  ! - separate 1st scattering and the rest
+  ! - lom deleted !
 
   use MRW, only : make_MRW_step, gamma_MRW
 
@@ -1000,13 +1000,13 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
      p_icell => icell1
   endif
 
-  ! Boucle sur les interactions du paquets:
-  ! - on avance le paquet
-  ! - on le fait interagir avec la poussiere si besoin
+  ! Loop over packet interactions:
+  ! - advance the packet
+  ! - make it interact with dust if needed
   n_iteractions_in_cell = 0
   infinie : do
 
-     ! length de vol
+     ! Flight length
      rand = sprng(stream(id))
      if (rand == 1.0) then
         tau=1.0e30
@@ -1016,7 +1016,7 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
         tau = rand
      endif
 
-     ! Propagation du packet jusqu'a la prochaine interaction
+     ! Packet propagation until next interaction
      !if (.not.letape_th) then
      !   if (.not.flag_star) Stokes=0.
      !endif
@@ -1050,7 +1050,7 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
         n_iteractions_in_cell = 0
      endif
 
-     if (flag_sortie) return ! Vie du photon terminee
+     if (flag_sortie) return ! Photon life finished
 
 !     if ((icell>n_cells).and.(.not.flag_sortie)) then
 !        write(*,*) "*********************"
@@ -1059,26 +1059,26 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
 !        write(*,*) "*********************"
 !     endif
 
-     ! Sinon la vie du photon continue : il y a interaction
-     ! Diffusion ou absorption
+     ! Otherwise the photon life continues : il y a interaction
+     ! Scattering or absorption
      flag_direct_star = .false.
-     if (lmono) then   ! Diffusion forcee : on multiplie l'energie du packet par l'albedo
-        ! test zone noire
-        if (l_dark_zone(icell)) then ! on saute le photon
+     if (lmono) then   ! Forced scattering: multiply packet energy by albedo
+        ! dark zone test
+        if (l_dark_zone(icell)) then ! skip the photon
            lpacket_alive = .false.
            return
         endif
 
-        ! Multiplication par albedo
+        ! Multiply by albedo
         Stokes(:)=Stokes(:)*tab_albedo_pos(p_icell,lambda)
-        if (Stokes(1) < tiny_real_x1e6)then ! on saute le photon
+        if (Stokes(1) < tiny_real_x1e6)then ! skip the photon
            lpacket_alive = .false.
            return
         endif
 
         ! Diffusion forcee: rand < albedo
         rand = -1.0
-     else ! Choix absorption ou diffusion
+     else ! Choose absorption or scattering
         rand = sprng(stream(id))
      endif ! lmono
 
@@ -1087,80 +1087,80 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
         flag_scatt=.true.
         flag_direct_star = .false.
 
-        if (lscattering_method1) then ! methode 1 : choix du grain diffuseur
+        if (lscattering_method1) then ! method 1: choice of scattering grain
            rand = sprng(stream(id))
            igrain = select_scattering_grain(lambda,p_icell, rand) ! ok, not too bad, not much smaller
 
            rand = sprng(stream(id))
            rand2 = sprng(stream(id))
-           if (lmethod_aniso1) then ! fonction de phase de Mie
+           if (lmethod_aniso1) then ! Mie phase function
               call angle_diff_theta(lambda,igrain,rand,rand2,itheta,cospsi)
               rand = sprng(stream(id))
               !  call angle_diff_phi(l,Stokes(1),Stokes(2),Stokes(3),itheta,rand,phi)
               PHI = PI * ( 2.0 * rand - 1.0 )
-              ! direction de propagation apres diffusion
+              ! propagation direction after scattering
               call cdapres(cospsi, phi, u, v, w, u1, v1, w1)
               if (lsepar_pola) then
                  call get_Mueller_matrix_per_grain(lambda,itheta,rand2,igrain, M)
                  call update_Stokes(Stokes,u,v,w,u1,v1,w1,M)
               endif
-           else ! fonction de phase HG
+           else ! HG phase function
               call hg(tab_g(igrain,lambda),rand, itheta, COSPSI) !HG
-              if (lisotropic) then ! Diffusion isotrope
+              if (lisotropic) then ! Isotropic scattering
                  itheta=1
                  cospsi=2.0*rand-1.0
               endif
               rand = sprng(stream(id))
               !  call angle_diff_phi(l,Stokes(1),Stokes(2),Stokes(3),itheta,rand,phi)
               PHI = PI * ( 2.0 * rand - 1.0 )
-              ! direction de propagation apres diffusion
+              ! propagation direction after scattering
               call cdapres(cospsi, phi, u, v, w, u1, v1, w1)
            endif
 
-        else ! methode 2 : diffusion sur la population de grains
+        else ! method 2: scattering on the grain population
            rand = sprng(stream(id))
            rand2= sprng(stream(id))
-           if (lmethod_aniso1) then ! fonction de phase de Mie
+           if (lmethod_aniso1) then ! Mie phase function
               call angle_diff_theta_pos(p_lambda,p_icell, rand, rand2, itheta, cospsi)
-              if (lisotropic) then ! Diffusion isotrope
+              if (lisotropic) then ! Isotropic scattering
                  itheta=1
                  cospsi=2.0*rand-1.0
               endif
               rand = sprng(stream(id))
               ! call angle_diff_phi(l,Stokes(1),Stokes(2),Stokes(3),itheta,rand,phi)
               PHI = PI * ( 2.0 * rand - 1.0 )
-              ! direction de propagation apres diffusion
+              ! propagation direction after scattering
               call cdapres(cospsi, phi, u, v, w, u1, v1, w1)
               if (lsepar_pola) then
                  call get_Mueller_matrix_per_cell(lambda,itheta,rand2,p_icell, M)
                  call update_Stokes(Stokes,u,v,w,u1,v1,w1,M)
 	      endif
-           else ! fonction de phase HG
+           else ! HG phase function
               call hg(tab_g_pos(p_icell,lambda),rand, itheta, cospsi) !HG
-              if (lisotropic)  then ! Diffusion isotrope
+              if (lisotropic)  then ! Isotropic scattering
                  itheta=1
                  cospsi=2.0*rand-1.0
               endif
               rand = sprng(stream(id))
               ! call angle_diff_phi(l,STOKES(1),STOKES(2),STOKES(3),itheta,rand,phi)
               phi = pi * ( 2.0 * rand - 1.0 )
-              ! direction de propagation apres diffusion
+              ! propagation direction after scattering
               call cdapres(cospsi, phi, u, v, w, u1, v1, w1)
            endif
         endif
 
-        ! Mise a jour direction de vol
+        ! Flight direction update
         u = u1 ; v = v1 ; w = w1
 
      else ! Absorption + eventual re-emission
 
         if ((.not.lmono).and.lnRE) then
-           ! fraction d'energie absorbee par les grains hors equilibre
+           ! energy fraction absorbed by non-equilibrium grains
            E_abs_nRE = E_abs_nRE + Stokes(1) * (1.0_dp - proba_abs_RE(icell,lambda))
-           ! Multiplication par proba abs sur grain en eq. radiatif
+           ! Multiply by probability of absorption by grain in radiative equilibrium
            Stokes = Stokes * proba_abs_RE(icell,lambda)
 
-           if (Stokes(1) < tiny_real)  then ! on saute le photon
+           if (Stokes(1) < tiny_real)  then ! skip the photon
               lpacket_alive = .false.
               return
            endif
@@ -1171,7 +1171,7 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
         flag_direct_star = .false.
         flag_ISM=.false.
 
-        ! Choix length d'onde
+        ! Wavelength choice
         if (lonly_LTE) then
            rand = sprng(stream(id)) ; rand2 = sprng(stream(id))
            call im_reemission_LTE(id,icell,p_icell,rand,rand2,lambda)
@@ -1182,15 +1182,15 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
            ! We need to select which type of dust grain will re-emit
            rand = sprng(stream(id))
            if (rand <= Proba_abs_RE_LTE(icell,lambda)) then
-              ! Cas RE - LTE
+              ! Case RE - LTE
               rand = sprng(stream(id)) ; rand2 = sprng(stream(id))
               call im_reemission_LTE(id,icell,p_icell,rand,rand2,lambda)
            else if (rand <= Proba_abs_RE_LTE_p_nLTE(icell,lambda)) then
-              ! Cas RE - nLTE
+              ! Case RE - nLTE
               rand = sprng(stream(id)) ; rand2 = sprng(stream(id))
               call im_reemission_NLTE(id,icell,p_icell,rand,rand2,lambda)
            else
-              ! Cas nRE - qRE
+              ! Case nRE - qRE
               rand = sprng(stream(id)) ; rand2 = sprng(stream(id))
               call im_reemission_qRE(id,icell,p_icell,rand,rand2,lambda)
            endif
@@ -1213,8 +1213,8 @@ end subroutine propagate_packet
 !***********************************************************
 
 subroutine dust_map(lambda,ibin,iaz)
-  ! Creation de la carte d'emission de la poussiere
-  ! par ray-tracing dans une direction donnee
+  ! Creation of the dust emission map
+  ! by ray-tracing in a given direction
   ! C. Pinte
   ! 24/01/08
 
@@ -1232,29 +1232,29 @@ subroutine dust_map(lambda,ibin,iaz)
   integer :: i,j, id, npix_x_max, n_iter_max, n_iter_min, ri_RT, phi_RT, ech_method
 
 
-  integer, parameter :: n_rad_RT = 128, n_phi_RT = 30  ! OK, ca marche avec n_rad_RT = 1000
+  integer, parameter :: n_rad_RT = 128, n_phi_RT = 30  ! OK, it works with n_rad_RT = 1000
   real(kind=dp), dimension(n_rad_RT) :: tab_r
   real(kind=dp) :: rmin_RT, rmax_RT, fact_r, r, phi, fact_A, cst_phi
   logical :: lresolved
 
-  ! Direction de visee pour le ray-tracing
+  ! Viewing direction for ray-tracing
   u = tab_u_RT(ibin,iaz) ;  v = tab_v_RT(ibin,iaz) ;  w = tab_w_RT(ibin) ;
   uvw = (/u,v,w/)
 
-  ! Definition des vecteurs de base du plan image dans le repere universel
+  ! Definition of image plane basis vectors in the universal frame
 
-  ! Vecteur x image sans PA : il est dans le plan (x,y) et orthogonal a uvw
+  ! Image x-vector without PA : il est dans le plan (x,y) et orthogonal a uvw
   x = (/cos(tab_RT_az(iaz) * deg_to_rad), sin(tab_RT_az(iaz) * deg_to_rad),0._dp/)
 
-  ! Vecteur x image avec PA
+  ! Image x-vector with PA
   if (abs(ang_disque) > tiny_real) then
-     ! Todo : on peut faire plus simple car axe rotation perpendiculaire a x
+     ! Todo: can be simpler because rotation axis is perpendicular to x
      x_plan_image = rotation_3d(uvw, ang_disque, x)
   else
      x_plan_image = x
   endif
 
-  ! Vecteur y image avec PA : orthogonal a x_plan_image et uvw
+  ! Image y-vector with PA: orthogonal to x_plan_image and uvw
   y_plan_image = -cross_product(x_plan_image, uvw)
 
 
@@ -1266,15 +1266,15 @@ subroutine dust_map(lambda,ibin,iaz)
      write(*,*) "y-image =           ", real(y_plan_image(:))
   endif
 
-  ! position initiale hors modele (du cote de l'observateur)
-  ! = centre de l'image
-  l = 10.*Rmax  ! on se met loin
+  ! Initial position outside model (observer side)
+  ! = image center
+  l = 10.*Rmax  ! stay far away
 
   x0 = u * l  ;  y0 = v * l  ;  z0 = w * l
   center(1) = x0 ; center(2) = y0 ; center(3) = z0
 
-  ! Methode 1 = echantillonage log en r et uniforme en phi
-  ! Methode 2 = echantillonage lineaire des pixels (carres donc) avec iteration sur les sous-pixels
+  ! Method 1 = log sampling in r and uniform in phi
+  ! Method 2 = linear sampling of pixels (square) with iteration on sub-pixels
   if (lsed) then
      ech_method = RT_sed_method
   else ! image
@@ -1282,7 +1282,7 @@ subroutine dust_map(lambda,ibin,iaz)
   endif
 
   if (ech_method==1) then
-     ! Pas de sous-pixel car les pixels ne sont pas carres
+     ! No sub-pixels because pixels are not square
      n_iter_min = 1
      n_iter_max = 1
 
@@ -1313,25 +1313,25 @@ subroutine dust_map(lambda,ibin,iaz)
         cst_phi = two_pi  / real(n_phi_RT,kind=dp)
      endif
 
-     ! Boucle sur les rayons d'echantillonnage
+     ! Loop over sampling radii
      !$omp parallel &
      !$omp default(none) &
      !$omp private(ri_RT,id,r,taille_pix,phi_RT,phi,pixelcorner) &
      !$omp shared(tab_r,fact_A,x_plan_image,y_plan_image,center,dx,dy,u,v,w,i,j,ibin,iaz) &
      !$omp shared(n_iter_min,n_iter_max,lambda,l_sym_ima,cst_phi)
-     id = 1 ! pour code sequentiel
+     id = 1 ! For sequential code
 
      !$omp do schedule(dynamic,1)
      do ri_RT=1, n_rad_RT
         !$ id = omp_get_thread_num() + 1
 
         r = tab_r(ri_RT)
-        taille_pix =  fact_A * r ! racine carree de l'aire du pixel
+        taille_pix =  fact_A * r ! square root of pixel area
 
-        do phi_RT=1,n_phi_RT ! de 0 a pi
+        do phi_RT=1,n_phi_RT ! from 0 to pi
            phi = cst_phi * (real(phi_RT,kind=dp) -0.5_dp)
 
-           pixelcorner(:,id) = center(:) + r * sin(phi) * x_plan_image + r * cos(phi) * y_plan_image ! C'est le centre en fait car dx = dy = 0.
+           pixelcorner(:,id) = center(:) + r * sin(phi) * x_plan_image + r * cos(phi) * y_plan_image ! This is actually the center because dx = dy = 0.
            ! this is of course the expensive line:
            call intensite_pixel_dust(id,ibin,iaz,n_iter_min,n_iter_max,lambda,i,j,pixelcorner(:,id),taille_pix,dx,dy,u,v,w)
         enddo !j
@@ -1342,15 +1342,15 @@ subroutine dust_map(lambda,ibin,iaz)
      ! We need dx and dy /= 0 for star_map now
      dx(:) = x_plan_image * taille_pix
      dy(:) = y_plan_image * taille_pix
-  else ! method 2 : echantillonnage lineaire avec sous-pixels
+  else ! method 2: linear sampling with sub-pixels
      lresolved = .true.
 
-     ! Vecteurs definissant les pixels (dx,dy) dans le repere universel
+     ! Vectors defining pixels (dx,dy) in the universal frame
      taille_pix = (map_size/zoom) / real(max(npix_x,npix_y),kind=dp) ! en AU
      dx(:) = x_plan_image * taille_pix
      dy(:) = y_plan_image * taille_pix
 
-     ! Coin en bas gauche de l'image
+     ! Bottom-left corner of the image
      Icorner(:) = center(:) - ( 0.5 * npix_x * dx(:) +  0.5 * npix_y * dy(:))
 
      if (l_sym_ima) then
@@ -1359,12 +1359,12 @@ subroutine dust_map(lambda,ibin,iaz)
         npix_x_max = npix_x
      endif
 
-     ! Boucle sur les pixels de l'image
+     ! Loop over image pixels
      !$omp parallel &
      !$omp default(none) &
      !$omp private(i,j,id) &
      !$omp shared(Icorner,lambda,pixelcorner,dx,dy,u,v,w,taille_pix,npix_x_max,npix_y,n_iter_min,n_iter_max,ibin,iaz)
-     id =1 ! pour code sequentiel
+     id =1 ! For sequential code
      n_iter_min = 2
      n_iter_max = 6
 
@@ -1372,7 +1372,7 @@ subroutine dust_map(lambda,ibin,iaz)
      do i = 1, npix_x_max ! We only compute half the map if it is symmetric
         !$ id = omp_get_thread_num() + 1
         do j = 1,npix_y
-           ! Coin en bas gauche du pixel
+           ! Bottom-left corner of the pixel
            pixelcorner(:,id) = Icorner(:) + (i-1) * dx(:) + (j-1) * dy(:)
            call intensite_pixel_dust(id,ibin,iaz,n_iter_min,n_iter_max,lambda,i,j,pixelcorner(:,id),taille_pix,dx,dy,u,v,w)
         enddo !j
@@ -1455,11 +1455,11 @@ subroutine compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix, dx_map, dy_ma
   x_center = npix_x/2 + 1
   y_center = npix_y/2 + 1
 
-  ! Energie
+  ! Energy
   factor = E_stars(lambda) * tab_lambda(lambda) * 1.0e-6 &
        / (distance*pc_to_AU*AU_to_Rsun)**2 * 1.35e-12
 
-  ! Test si star est resolue
+  ! Test if star is resolved
   n_ray_star(:) = max(n_ray_star_SED / n_stars,1)
 
   if (lresolved) then
@@ -1531,16 +1531,16 @@ subroutine compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix, dx_map, dy_ma
      in_map = .true. ! for SED
      LimbDarkening = 1.0
 
-     id = 1 ! Pour code sequentiel
+     id = 1 ! For sequential code
      !$ id = omp_get_thread_num() + 1
 
      !$omp do schedule(static,n_ray_star(istar)/nb_proc)
      do iray=1,n_ray_star(istar)
-        ! Position aleatoire sur la disque stellaire
+        ! Random position on the stellar Disk
         rand  = sprng(stream(id))
         rand2 = sprng(stream(id))
 
-        ! Position de depart aleatoire sur une sphere de radius 1
+        ! Random starting position on a sphere of radius 1
         z = 2.0_dp * rand - 1.0_dp
         srw02 = sqrt(1.0-z*z)
         argmt = pi*(2.0_dp*rand2-1.0_dp)
@@ -1556,7 +1556,7 @@ subroutine compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix, dx_map, dy_ma
            endif
         endif
 
-        ! Position de depart aleatoire sur une sphere de radius r_etoile
+        ! Random starting position on a sphere of radius r_star
         vec = (/x,y,z/) * star(istar)%r ! offset vector from center of star
         x = star(istar)%x + vec(1)
         y = star(istar)%y + vec(2)
@@ -1699,12 +1699,12 @@ end subroutine find_pixel
 !***********************************************************
 
 subroutine intensite_pixel_dust(id,ibin,iaz,n_iter_min,n_iter_max,lambda,ipix,jpix,pixelcorner,pixelsize,dx,dy,u,v,w)
-  ! Calcule l'intensite d'un pixel carre de taille, position et orientation arbitaires
+  ! Calculates the intensity of a square pixel of arbitrary size, position, and orientation
   ! par une methode de Ray-tracing
-  ! (u,v,w) pointe vers l'observateur
-  ! TODO : Integration par methode de Romberg pour determiner le nbre de sous-pixel
-  ! necessaire
-  ! Unite : W.m-2 : nu.F_nu
+  ! (u,v,w) points towards the observer
+  ! TODO: Integration by Romberg method to determine the number of sub-pixels
+  ! necessary
+  ! Unit: W.m-2: nu.F_nu
   ! C. Pinte
   ! 12/04/07
 
@@ -1724,42 +1724,42 @@ subroutine intensite_pixel_dust(id,ibin,iaz,n_iter_min,n_iter_max,lambda,ipix,jp
 
   logical :: lintersect
 
-  ! TODO : il y a un truc bizarre dans cette routine !!!
+  ! TODO: there is something weird in this routine !!!
 
-  ! Ray tracing : on se propage dans l'autre sens
+  ! Ray tracing: propagating in the other direction
   u0 = -u ; v0 = -v ; w0 = -w
 
-  ! le nbre de subpixel en x est 2^(iter-1)
+  ! the number of sub-pixels in x is 2^(iter-1)
   subpixels = 1
   iter = 1
 
-  infinie : do ! boucle jusqu'a convergence
+  infinie : do ! loop until convergence
 
      npix2 =  real(subpixels)**2
      Stokes_old(:) = Stokes(:)
      Stokes(:) = 0.0_dp
 
-     ! Vecteurs definissant les sous-pixels
+     ! Vectors defining sub-pixels
      sdx(:) = dx(:) / real(subpixels,kind=dp)
      sdy(:) = dy(:) / real(subpixels,kind=dp)
 
-     ! L'obs est en dehors de la grid
+     ! The observer is outside the grid
      ri = 2*n_rad ; zj=1 ; phik=1
 
-     ! Boucle sur les sous-pixels qui calcule l'intensite au centre
-     ! de chaque sous pixel
+     ! Loop over sub-pixels that calculates the intensity at the center
+     ! of each sub-pixel
      do i = 1,subpixels
         do j = 1,subpixels
-           ! Centre du sous-pixel
+           ! Center of sub-pixel
            x0 = pixelcorner(1) + (i - 0.5_dp) * sdx(1) + (j-0.5_dp) * sdy(1)
            y0 = pixelcorner(2) + (i - 0.5_dp) * sdx(2) + (j-0.5_dp) * sdy(2)
            z0 = pixelcorner(3) + (i - 0.5_dp) * sdx(3) + (j-0.5_dp) * sdy(3)
 
-           ! On se met au bord de la grid : propagation a l'envers
+           ! Go to the grid edge: reverse propagation
            call move_to_grid(id, x0,y0,z0,u0,v0,w0, icell,lintersect)  !BUG
 
-           if (lintersect) then ! On rencontre la grid, on a potentiellement du flux
-              ! Flux recu dans le pixel
+           if (lintersect) then ! If hitting the grid, potentially have flux
+              ! Flux received in the pixel
               Stokes(:) = Stokes(:) + integ_ray_dust(lambda,icell,x0,y0,z0,u0,v0,w0)
            endif
         enddo !j
@@ -1767,20 +1767,20 @@ subroutine intensite_pixel_dust(id,ibin,iaz,n_iter_min,n_iter_max,lambda,ipix,jp
      Stokes(:) = Stokes(:) / npix2
 
      if (iter < n_iter_min) then
-        ! On itere par defaut
+        ! Iterate by default
         subpixels = subpixels * 2
      else if (iter >= n_iter_max) then
-        ! On arrete pour pas tourner dans le vide
+        ! Stop to avoid infinite loop
         ! write(*,*) "Warning : converging pb in ray-tracing"
         ! write(*,*) " Pixel", ipix, jpix
         exit infinie
      else
-        ! On fait le test sur a difference
+        ! Test on the difference
         if (abs(Stokes(1) - Stokes_old(1)) > precision * Stokes_old(1)) then
-           ! On est pas converge
+           ! Not converged
            subpixels = subpixels * 2
         else
-           ! On est converge
+           ! Converged
            exit infinie
         endif
      endif ! iter
@@ -1789,11 +1789,11 @@ subroutine intensite_pixel_dust(id,ibin,iaz,n_iter_min,n_iter_max,lambda,ipix,jp
 
   enddo infinie
 
-  ! Prise en compte de la surface du pixel (en sr)
+  ! Take pixel surface into account (in sr)
   Stokes = Stokes * (pixelsize / (distance*pc_to_AU) )**2
 
   if (lsed) then
-     ! Sommation sur les pixels implicite
+     ! Implicit summation over pixels
      Stokes_ray_tracing(lambda,ipix,jpix,ibin,iaz,:,id) = Stokes_ray_tracing(lambda,ipix,jpix,ibin,iaz,:,id) + Stokes(:)
   else
      Stokes_ray_tracing(lambda,ipix,jpix,ibin,iaz,:,id) = Stokes(:)
@@ -1825,69 +1825,69 @@ subroutine compute_tau_surface_map(lambda,tau,ibin,iaz)
   p_lambda=lambda
   Stokes(1) = 1 ; Stokes(2:4) = 0.
 
-  ! Direction de visee pour le ray-tracing
+  ! Viewing direction for ray-tracing
   u = tab_u_RT(ibin,iaz) ;  v = tab_v_RT(ibin,iaz) ;  w = tab_w_RT(ibin) ;
   uvw = (/u,v,w/)
 
-  ! Definition des vecteurs de base du plan image dans le repere universel
+  ! Definition of image plane basis vectors in the universal frame
 
-  ! Vecteur x image sans PA : il est dans le plan (x,y) et orthogonal a uvw
+  ! Image x-vector without PA : il est dans le plan (x,y) et orthogonal a uvw
   x = (/cos(tab_RT_az(iaz) * deg_to_rad), sin(tab_RT_az(iaz) * deg_to_rad),0._dp/)
 
-  ! Vecteur x image avec PA
+  ! Image x-vector with PA
   if (abs(ang_disque) > tiny_real) then
-     ! Todo : on peut faire plus simple car axe rotation perpendiculaire a x
+     ! Todo: can be simpler because rotation axis is perpendicular to x
      x_plan_image = rotation_3d(uvw, ang_disque, x)
   else
      x_plan_image = x
   endif
 
-  ! Vecteur y image avec PA : orthogonal a x_plan_image et uvw
+  ! Image y-vector with PA: orthogonal to x_plan_image and uvw
   y_plan_image = -cross_product(x_plan_image, uvw)
 
-  ! position initiale hors modele (du cote de l'observateur)
-  ! = centre de l'image
-  l = 10.*Rmax  ! on se met loin
+  ! Initial position outside model (observer side)
+  ! = image center
+  l = 10.*Rmax  ! stay far away
 
   x0 = u * l  ;  y0 = v * l  ;  z0 = w * l
   center(1) = x0 ; center(2) = y0 ; center(3) = z0
 
 
-  ! Vecteurs definissant les pixels (dx,dy) dans le repere universel
+  ! Vectors defining pixels (dx,dy) in the universal frame
   taille_pix = (map_size/zoom) / real(max(npix_x,npix_y),kind=dp) ! en AU
   dx(:) = x_plan_image * taille_pix
   dy(:) = y_plan_image * taille_pix
 
-  ! Coin en bas gauche de l'image
+  ! Bottom-left corner of the image
   Icorner(:) = center(:) - ( 0.5 * npix_x * dx(:) +  0.5 * npix_y * dy(:))
 
-  ! Boucle sur les pixels de l'image
+  ! Loop over image pixels
   !$omp parallel &
   !$omp default(none) &
   !$omp private(i,j,id,Stokes,icell,lintersect,x0,y0,z0,u0,v0,w0) &
   !$omp private(flag_star,flag_direct_star,ltot,flag_sortie,lpacket_alive) &
   !$omp shared(tau,Icorner,lambda,P_lambda,pixelcenter,dx,dy,u,v,w) &
   !$omp shared(taille_pix,npix_x,npix_y,ibin,iaz,tau_surface_map,move_to_grid)
-  id = 1 ! pour code sequentiel
+  id = 1 ! For sequential code
 
   !$omp do schedule(dynamic,1)
   do i = 1, npix_x
      !$ id = omp_get_thread_num() + 1
      do j = 1,npix_y
-        ! Coin en bas gauche du pixel
+        ! Bottom-left corner of the pixel
         pixelcenter(:,id) = Icorner(:) + (i-0.5_dp) * dx(:) + (j-0.5_dp) * dy(:)
 
         x0 = pixelcenter(1,id)
         y0 = pixelcenter(2,id)
         z0 = pixelcenter(3,id)
 
-        ! Ray tracing : on se propage dans l'autre sens
+        ! Ray tracing: propagating in the other direction
         u0 = -u ; v0 = -v ; w0 = -w
 
-        ! On se met au bord de la grid : propagation a l'envers
+        ! Go to the grid edge: reverse propagation
         call move_to_grid(id, x0,y0,z0,u0,v0,w0, icell,lintersect)
 
-        if (lintersect) then ! On rencontre la grid, on a potentiellement du flux
+        if (lintersect) then ! If hitting the grid, potentially have flux
            lpacket_alive = .true.
            call physical_length(id,lambda,p_lambda,Stokes,icell,x0,y0,z0,u0,v0,w0, &
                 flag_star,flag_direct_star,tau,ltot,flag_sortie,lpacket_alive)
@@ -1933,69 +1933,69 @@ subroutine compute_tau_map(lambda,ibin,iaz)
   p_lambda=lambda
   Stokes(1) = 1 ; Stokes(2:4) = 0.
 
-  ! Direction de visee pour le ray-tracing
+  ! Viewing direction for ray-tracing
   u = tab_u_RT(ibin,iaz) ;  v = tab_v_RT(ibin,iaz) ;  w = tab_w_RT(ibin) ;
   uvw = (/u,v,w/)
 
-  ! Definition des vecteurs de base du plan image dans le repere universel
+  ! Definition of image plane basis vectors in the universal frame
 
-  ! Vecteur x image sans PA : il est dans le plan (x,y) et orthogonal a uvw
+  ! Image x-vector without PA : il est dans le plan (x,y) et orthogonal a uvw
   x = (/cos(tab_RT_az(iaz) * deg_to_rad), sin(tab_RT_az(iaz) * deg_to_rad),0._dp/)
 
-  ! Vecteur x image avec PA
+  ! Image x-vector with PA
   if (abs(ang_disque) > tiny_real) then
-     ! Todo : on peut faire plus simple car axe rotation perpendiculaire a x
+     ! Todo: can be simpler because rotation axis is perpendicular to x
      x_plan_image = rotation_3d(uvw, ang_disque, x)
   else
      x_plan_image = x
   endif
 
-  ! Vecteur y image avec PA : orthogonal a x_plan_image et uvw
+  ! Image y-vector with PA: orthogonal to x_plan_image and uvw
   y_plan_image = -cross_product(x_plan_image, uvw)
 
-  ! position initiale hors modele (du cote de l'observateur)
-  ! = centre de l'image
-  l = 10.*Rmax  ! on se met loin
+  ! Initial position outside model (observer side)
+  ! = image center
+  l = 10.*Rmax  ! stay far away
 
   x0 = u * l  ;  y0 = v * l  ;  z0 = w * l
   center(1) = x0 ; center(2) = y0 ; center(3) = z0
 
 
-  ! Vecteurs definissant les pixels (dx,dy) dans le repere universel
+  ! Vectors defining pixels (dx,dy) in the universal frame
   taille_pix = (map_size/zoom) / real(max(npix_x,npix_y),kind=dp) ! en AU
   dx(:) = x_plan_image * taille_pix
   dy(:) = y_plan_image * taille_pix
 
-  ! Coin en bas gauche de l'image
+  ! Bottom-left corner of the image
   Icorner(:) = center(:) - ( 0.5 * npix_x * dx(:) +  0.5 * npix_y * dy(:))
 
-  ! Boucle sur les pixels de l'image
+  ! Loop over image pixels
   !$omp parallel &
   !$omp default(none) &
   !$omp private(i,j,id,Stokes,icell,lintersect,x0,y0,z0,u0,v0,w0) &
   !$omp private(flag_star,flag_direct_star,flag_sortie,lpacket_alive,tau,lmin,lmax) &
   !$omp shared(Icorner,lambda,P_lambda,pixelcenter,dx,dy,u,v,w) &
   !$omp shared(taille_pix,npix_x,npix_y,ibin,iaz,tau_map,move_to_grid)
-  id = 1 ! pour code sequentiel
+  id = 1 ! For sequential code
 
   !$omp do schedule(dynamic,1)
   do i = 1, npix_x
      !$ id = omp_get_thread_num() + 1
      do j = 1,npix_y
-        ! Coin en bas gauche du pixel
+        ! Bottom-left corner of the pixel
         pixelcenter(:,id) = Icorner(:) + (i-0.5_dp) * dx(:) + (j-0.5_dp) * dy(:)
 
         x0 = pixelcenter(1,id)
         y0 = pixelcenter(2,id)
         z0 = pixelcenter(3,id)
 
-        ! Ray tracing : on se propage dans l'autre sens
+        ! Ray tracing: propagating in the other direction
         u0 = -u ; v0 = -v ; w0 = -w
 
-        ! On se met au bord de la grid : propagation a l'envers
+        ! Go to the grid edge: reverse propagation
         call move_to_grid(id, x0,y0,z0,u0,v0,w0, icell,lintersect)
 
-        if (lintersect) then ! On rencontre la grid, on a potentiellement du flux
+        if (lintersect) then ! If hitting the grid, potentially have flux
            call optical_length_tot(id,lambda,Stokes,icell,x0,y0,z0,u0,v0,w0,tau,lmin,lmax)
            tau_map(i,j,ibin,iaz,id) = tau
         else ! We do not reach the disk

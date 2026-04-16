@@ -37,9 +37,9 @@ end subroutine init_Pascucci_benchmark
 !*************************************************************
 
 !-- subroutine read_Pascucci_cross_sections(lambda, Cext, Csca)
-!-- ! Lecture table section efficace
+!-- ! Read cross-section table
 !-- ! Benchmark Pascucci et al. 2004
-!-- ! bande V : ligne 15
+!-- ! V band: line 15
 !--
 !--   use utils, only : in_dir
 !--
@@ -139,7 +139,7 @@ subroutine readMolecule_benchmark1()
 
   collTemps = 1.0_dp
 
-  allocate(collRates(1:nCollPart, 1:nCollTrans(1), 1:nCollTemps(1))) ! TODO : passage par des pointeurs, c'est crade
+  allocate(collRates(1:nCollPart, 1:nCollTrans(1), 1:nCollTemps(1))) ! TODO: use pointers instead of this ugly approach
   allocate(iCollUpper(1:nCollPart, 1:nCollTrans(1)))
   allocate(iCollLower(1:nCollPart, 1:nCollTrans(1)))
   collRates(1,1,1) = Kul
@@ -157,9 +157,9 @@ end subroutine readMolecule_benchmark1
 !*************************************************************
 
 subroutine readMolecule_benchmark2()
-  ! Lecture du fichier moleculaire pour le benchmark 2
-  ! de van Zadelhoff 2002
-  ! adapte de Torus
+  ! Read the molecular file for benchmark 2
+  ! from van Zadelhoff 2002
+  ! adapted from Torus
   ! C. Pinte
   ! 26/06/07
 
@@ -318,8 +318,8 @@ end subroutine init_benchmark_vanZadelhoff1
 !***********************************************************
 
 subroutine init_benchmark_vanzadelhoff2()
-  ! Lecture de la structure du modele de van Zadelhoff 2a/b
-  ! et ajustement sur la grid de mcfost
+  ! Read the model structure for van Zadelhoff 2a/b
+  ! and interpolation onto the mcfost grid
   ! C. Pinte
   ! 13/07/07
 
@@ -334,7 +334,7 @@ subroutine init_benchmark_vanzadelhoff2()
 
   ldust_mol = .false.
 
-  ! Lecture du fichier modele
+  ! Read the model file
   open(unit=1,file="model_1.d",status="old")
   do i=1,7
      read(1,*)
@@ -345,10 +345,10 @@ subroutine init_benchmark_vanzadelhoff2()
   enddo
   close(unit=1)
 
-  ! Conversion en AU
+  ! Convert to AU
   tmp_r(:) = tmp_r(:) * cm_to_AU
 
-  ! Interpolation sur la grid de mcfost
+  ! Interpolation onto the mcfost grid
   ! Distance en log
   ! densite en log
   ! T, V et vturb en lineaire cf Fig 2 van Zadelhoff 2002
@@ -356,7 +356,7 @@ subroutine init_benchmark_vanzadelhoff2()
   log_tmp_nH2(:) = log(tmp_nH2(:))
 
   do ri=1, n_rad
-     ! Recherche radius dans def bench
+     ! Search for radius in benchmark definition
      icell = cell_map(ri,1,1)
      radius = sqrt(r_grid(icell)**2+z_grid(icell)**2)
      log_radius = log(radius)
@@ -384,11 +384,11 @@ subroutine init_benchmark_vanzadelhoff2()
      enddo
   enddo
 
-  ! Conversion vitesses en m.s-1
+  ! Convert velocities to m.s-1
   vfield = vfield * 1.0e3
   v_turb2 = v_turb2 * 1.0e6
 
-  ! Conversion part.m-3
+  ! Convert to particles.m-3
   gas_density(:) = gas_density(:) / (cm_to_m)**3
 
   linfall = .true.
@@ -403,7 +403,7 @@ end subroutine init_benchmark_vanzadelhoff2
 !***********************************************************
 
 subroutine init_benchmark_water1()
-  ! Initialisation de la structure du modele d'eau 1
+  ! Initialise the structure of water model 1
   ! C. Pinte
   ! 15/10/07
 
@@ -480,7 +480,7 @@ subroutine init_benchmark_water3()
 
   ldust_mol = .true.
 
-  ! Lecture du fichier modele
+  ! Read the model file
   open(unit=1,file="mc_100.d",status="old")
   read(1,*)
   !  radius [cm]  n(H2) [cm^-3] Tkin [K]    Tdust [K]   Vrad [km/s] FWHM [km/s]
@@ -490,10 +490,10 @@ subroutine init_benchmark_water3()
   enddo
   close(unit=1)
 
-  ! Conversion en AU
+  ! Convert to AU
   tmp_r(:) = tmp_r(:) * cm_to_AU
 
-  ! Interpolation sur la grid de mcfost
+  ! Interpolation onto the mcfost grid
   ! Distance en log
   ! densite en log
   ! Tkin, T, V et vturb
@@ -505,7 +505,7 @@ subroutine init_benchmark_water3()
 
 
   do ri=1, n_rad
-     ! Recherche radius dans def bench
+     ! Search for radius in benchmark definition
      icell = cell_map(ri,1,1)
      radius = sqrt(r_grid(icell)**2+z_grid(icell)**2)
      log_radius = log(radius)
@@ -554,11 +554,11 @@ subroutine init_benchmark_water3()
   ! Conversion FWHM ---> velocity
   v_turb2 = v_turb2 / (2.*sqrt(log(2.)))**2
 
-  ! Conversion vitesses en m.s-1
+  ! Convert velocities to m.s-1
   vfield = vfield * 1.0e3
   v_turb2 = v_turb2 * 1.0e6
 
-  ! Conversion part.m-3
+  ! Convert to particles.m-3
   gas_density(:) = gas_density(:) / (cm_to_m)**3
 
   linfall = .true.

@@ -29,7 +29,7 @@ contains
 
     real :: fn_photons_eq_th, fn_photons_lambda, fn_photons_image
 
-    ! Lecture du fichier de parameters
+    ! Reading the parameter file
     open(unit=1, file=para, status='old', iostat=ios)
     if (ios/=0) call error("cannot open "//trim(para))
 
@@ -38,12 +38,12 @@ contains
     ! Version 2.21 and 3.0 are the same
     if (abs(para_version - 2.21) < 1.e-4) para_version = 3.0
 
-    ! Petit test pour le ray-tracing
+    ! Small test for ray-tracing
     if (lscatt_ray_tracing .and. (abs(para_version) < 2.0901)) then
        call error("Parameter version >= 2.10 required for ray-tracing.")
     endif
 
-    ! Petit test pour cavite
+    ! Small test for cavity
     if (lcavity .and. (abs(para_version) < 3.0)) then
        call error("Parameter version >= 3.0 required for option -lcavity.", &
             msg2="Use cavity section is parameter file for earlier version.")
@@ -242,7 +242,7 @@ contains
     ! ---------------
     read(1,*) line_buffer
     read(1,*) n_zones
-    ! Allocation des variables pour disque a une zone
+    ! Variable allocation for 1-zone disk
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error disk parameters')
     disk_zone%exp_beta=0.0; disk_zone%surf=0.0; disk_zone%sclht=0.0; disk_zone%diskmass=0.0; disk_zone%rref=0.0
@@ -312,7 +312,7 @@ contains
              write(*,*) "Exiting"
              call exit(1)
           endif
-          ! renormalisation des fraction en volume
+          ! Renormalization of volume fractions
           do k=1, dust_pop_tmp(n_pop)%n_components
              dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) &
                   / V_somme
@@ -351,21 +351,21 @@ contains
           endif
        enddo
 
-       ! renormalisation des fraction en mass
+       ! Renormalization of mass fractions
        do i=1,n_especes(j)
           dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/total_sum
           dust_pop_tmp(n_pop-n_especes(j)+i)%mass =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
        enddo
     enddo !n_zones
 
-    ! variables triees
+    ! sorted variables
     allocate(dust_pop(n_pop), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error n_pop tmp')
     !dust_pop%is_PAH = .false.
     !dust_pop%is_opacity_file = .false.
     !dust_pop%is_Misselt_opacity_file = .false.
 
-    ! Classement des populations de grains : LTE puis nLTE puis nRE
+    ! Classification of grain populations: LTE then nLTE then nRE
     ind_pop = 0
     grain_RE_LTE_start = 1
     grain_RE_LTE_end = 0
@@ -450,7 +450,7 @@ contains
        lvturb_in_cs = .false.
        if (v_turb_unit(1:1) /= "m") then
           if (v_turb_unit(1:2) == "km") then
-             vitesse_turb = vitesse_turb * km_to_m ! Conversion en m.s-1
+             vitesse_turb = vitesse_turb * km_to_m ! Conversion to m.s-1
           else
              call error("Turbulence velocity unit not recognised")
           endif
@@ -465,8 +465,8 @@ contains
        read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
        read(1,*) mol(imol)%index_trans_ray_tracing(1:mol(imol)%nTrans_raytracing)
        read(1,*) mol(imol)%vmin_center_rt, mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-       mol(imol)%vmin_center_rt = (mol(imol)%vmin_center_rt - v_syst) * km_to_m ! Conversion en m.s-1
-       mol(imol)%vmax_center_rt = (mol(imol)%vmax_center_rt - v_syst) * km_to_m ! Conversion en m.s-1
+       mol(imol)%vmin_center_rt = (mol(imol)%vmin_center_rt - v_syst) * km_to_m ! Conversion to m.s-1
+       mol(imol)%vmax_center_rt = (mol(imol)%vmax_center_rt - v_syst) * km_to_m ! Conversion to m.s-1
        mol(imol)%l_sym_ima = .false.
        if (l_sym_ima) then ! we check for PA later as this can be changed by command line
           ! Molecular maps are only symmetrical if velocity range is symmetrical around vsyst
@@ -538,7 +538,7 @@ contains
        endif
        star(i)%lb_body = .false.
 
-       ! Passage radius en AU
+       ! Convert radius to AU
        star(i)%r = star(i)%r * Rsun_to_AU
        read(1,*) star(i)%fUV, star(i)%slope_UV
        star(i)%slope_UV = star(i)%slope_UV - 2.0  ! Fnu -> F_lambda
@@ -571,7 +571,7 @@ contains
 
     real :: fn_photons_eq_th, fn_photons_lambda, fn_photons_image
 
-    ! Lecture du fichier de parameters
+    ! Reading the parameter file
     open(unit=1, file=para, status='old', iostat=ios)
     if (ios/=0) call error("cannot open "//trim(para))
 
@@ -682,7 +682,7 @@ contains
     ! ---------------
     read(1,*) line_buffer
     read(1,*) n_zones
-    ! Allocation des variables pour disque a une zone
+    ! Variable allocation for 1-zone disk
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error disk parameters')
     disk_zone%exp_beta=0.0; disk_zone%surf=0.0; disk_zone%sclht=0.0; disk_zone%diskmass=0.0; disk_zone%rref=0.0
@@ -752,7 +752,7 @@ contains
              write(*,*) "Exiting"
              call exit(1)
           endif
-          ! renormalisation des fraction en volume
+          ! Renormalization of volume fractions
           do k=1, dust_pop_tmp(n_pop)%n_components
              dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) &
                   / V_somme
@@ -791,21 +791,21 @@ contains
           endif
        enddo
 
-       ! renormalisation des fraction en mass
+       ! Renormalization of mass fractions
        do i=1,n_especes(j)
           dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/total_sum
           dust_pop_tmp(n_pop-n_especes(j)+i)%mass =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
        enddo
     enddo !n_zones
 
-    ! variables triees
+    ! sorted variables
     allocate(dust_pop(n_pop), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error n_pop tmp')
     !dust_pop%is_PAH = .false.
     !dust_pop%is_opacity_file = .false.
     !dust_pop%is_Misselt_opacity_file = .false.
 
-    ! Classement des populations de grains : LTE puis nLTE puis nRE
+    ! Classification of grain populations: LTE then nLTE then nRE
     ind_pop = 0
     grain_RE_LTE_start = 1
     grain_RE_LTE_end = 0
@@ -883,13 +883,13 @@ contains
     read(1,*) line_buffer
     read(1,*) lpop, lprecise_pop, lmol_LTE, profile_width
     read(1,*) vitesse_turb
-    vitesse_turb = vitesse_turb * km_to_m ! Conversion en m.s-1
+    vitesse_turb = vitesse_turb * km_to_m ! Conversion to m.s-1
     read(1,*) n_molecules
     allocate(mol(n_molecules))
     do imol=1,n_molecules
        read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
        read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion en m.s-1
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion to m.s-1
        mol(imol)%vmin_center_rt = -mol(imol)%vmax_center_rt
        mol(imol)%l_sym_ima = l_sym_ima
        mol(imol)%n_speed_rt = 2*mol(imol)%n_speed_rt+1 ! change of format from v4.1
@@ -959,7 +959,7 @@ contains
        endif
        star(i)%lb_body = .false.
 
-       ! Passage radius en AU
+       ! Convert radius to AU
        star(i)%r = star(i)%r * Rsun_to_AU
        read(1,*) star(i)%fUV, star(i)%slope_UV
        star(i)%slope_UV = star(i)%slope_UV - 2.0  ! Fnu -> F_lambda
@@ -993,7 +993,7 @@ contains
 
    real :: fn_photons_eq_th, fn_photons_lambda, fn_photons_image
 
-   ! Lecture du fichier de parameters
+   ! Reading the parameter file
    open(unit=1, file=para, status='old', iostat=ios)
    if (ios/=0) call error("cannot open "//trim(para))
 
@@ -1110,7 +1110,7 @@ contains
    ! ---------------
    read(1,*) line_buffer
    read(1,*) n_zones
-   ! Allocation des variables pour disque a une zone
+   ! Variable allocation for 1-zone disk
    allocate(disk_zone(n_zones), stat=alloc_status)
    if (alloc_status > 0) call error('Allocation error disk parameters')
    disk_zone%exp_beta=0.0; disk_zone%surf=0.0; disk_zone%sclht=0.0; disk_zone%diskmass=0.0; disk_zone%rref=0.0
@@ -1180,7 +1180,7 @@ contains
             write(*,*) "Exiting"
             call exit(1)
          endif
-         ! renormalisation des fraction en volume
+         ! Renormalization of volume fractions
          do k=1, dust_pop_tmp(n_pop)%n_components
             dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) &
                  / V_somme
@@ -1219,21 +1219,21 @@ contains
          endif
       enddo
 
-      ! renormalisation des fraction en mass
+      ! Renormalization of mass fractions
       do i=1,n_especes(j)
          dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/total_sum
          dust_pop_tmp(n_pop-n_especes(j)+i)%mass =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
       enddo
    enddo !n_zones
 
-   ! variables triees
+   ! sorted variables
    allocate(dust_pop(n_pop), stat=alloc_status)
    if (alloc_status > 0) call error('Allocation error n_pop tmp')
    !dust_pop%is_PAH = .false.
    !dust_pop%is_opacity_file = .false.
    !dust_pop%is_Misselt_opacity_file = .false.
 
-   ! Classement des populations de grains : LTE puis nLTE puis nRE
+   ! Classification of grain populations: LTE then nLTE then nRE
    ind_pop = 0
    grain_RE_LTE_start = 1
    grain_RE_LTE_end = 0
@@ -1316,13 +1316,13 @@ contains
    read(1,*) line_buffer
    read(1,*) lpop, lprecise_pop, lmol_LTE, profile_width
    read(1,*) vitesse_turb
-   vitesse_turb = vitesse_turb * km_to_m ! Conversion en m.s-1
+   vitesse_turb = vitesse_turb * km_to_m ! Conversion to m.s-1
    read(1,*) n_molecules
    allocate(mol(n_molecules))
    do imol=1,n_molecules
       read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
       read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-      mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion en m.s-1
+      mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion to m.s-1
       mol(imol)%vmin_center_rt = -mol(imol)%vmax_center_rt
       mol(imol)%l_sym_ima = l_sym_ima
       mol(imol)%n_speed_rt = 2*mol(imol)%n_speed_rt+1 ! change of format from v4.1
@@ -1361,7 +1361,7 @@ contains
       endif
       star(i)%lb_body = .false.
 
-      ! Passage radius en AU
+      ! Convert radius to AU
       star(i)%r = star(i)%r * Rsun_to_AU
       read(1,*) star(i)%fUV, star(i)%slope_UV
       star(i)%slope_UV = star(i)%slope_UV - 2.0  ! Fnu -> F_lambda
@@ -1394,7 +1394,7 @@ contains
 
     real :: fn_photons_eq_th, fn_photons_lambda, fn_photons_image
 
-    ! Lecture du fichier de parameters
+    ! Reading the parameter file
     open(unit=1, file=para, status='old')
 
     read(1,*) para_version
@@ -1505,7 +1505,7 @@ contains
     ! ---------------
     read(1,*) line_buffer
     read(1,*) n_zones
-    ! Allocation des variables pour disque a une zone
+    ! Variable allocation for 1-zone disk
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error disk parameters')
     disk_zone%exp_beta=0.0; disk_zone%surf=0.0; disk_zone%sclht=0.0; disk_zone%diskmass=0.0; disk_zone%rref=0.0
@@ -1583,7 +1583,7 @@ contains
              write(*,*) "Exiting"
              call exit(1)
           endif
-          ! renormalisation des fraction en volume
+          ! Renormalization of volume fractions
           do k=1, dust_pop_tmp(n_pop)%n_components
              dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) &
                   / V_somme
@@ -1613,21 +1613,21 @@ contains
 
        enddo
 
-       ! renormalisation des fraction en mass
+       ! Renormalization of mass fractions
        do i=1,n_especes(j)
           dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/total_sum
           dust_pop_tmp(n_pop-n_especes(j)+i)%mass =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
        enddo
     enddo !n_zones
 
-    ! variables triees
+    ! sorted variables
     allocate(dust_pop(n_pop), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error n_pop tmp')
     !dust_pop%is_PAH = .false.
     !dust_pop%is_opacity_file = .false.
     !dust_pop%is_Misselt_opacity_file = .false.
 
-    ! Classement des populations de grains : LTE puis nLTE puis nRE
+    ! Classification of grain populations: LTE then nLTE then nRE
     ind_pop = 0
     grain_RE_LTE_start = 1
     grain_RE_LTE_end = 0
@@ -1705,13 +1705,13 @@ contains
     read(1,*) line_buffer
     read(1,*) lpop, lprecise_pop, lmol_LTE, profile_width
     read(1,*) vitesse_turb
-    vitesse_turb = vitesse_turb * km_to_m ! Conversion en m.s-1
+    vitesse_turb = vitesse_turb * km_to_m ! Conversion to m.s-1
     read(1,*) n_molecules
     allocate(mol(n_molecules))
     do imol=1,n_molecules
        read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
        read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion en m.s-1
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion to m.s-1
        mol(imol)%vmin_center_rt = -mol(imol)%vmax_center_rt
        mol(imol)%l_sym_ima = l_sym_ima
        mol(imol)%n_speed_rt = 2*mol(imol)%n_speed_rt+1 ! change of format from v4.1
@@ -1750,7 +1750,7 @@ contains
        endif
        star(i)%lb_body = .false.
 
-       ! Passage radius en AU
+       ! Convert radius to AU
        star(i)%r = star(i)%r * Rsun_to_AU
        read(1,*) star(i)%fUV, star(i)%slope_UV
        star(i)%slope_UV = star(i)%slope_UV - 2.0  ! Fnu -> F_lambda
@@ -1784,7 +1784,7 @@ contains
 
     real :: fn_photons_eq_th, fn_photons_lambda, fn_photons_image
 
-    ! Lecture du fichier de parameters
+    ! Reading the parameter file
     open(unit=1, file=para, status='old')
 
     read(1,*) para_version
@@ -1889,7 +1889,7 @@ contains
     ! ---------------
     read(1,*) line_buffer
     read(1,*) n_zones
-    ! Allocation des variables pour disque a une zone
+    ! Variable allocation for 1-zone disk
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error disk parameters')
     disk_zone%exp_beta=0.0; disk_zone%surf=0.0; disk_zone%sclht=0.0; disk_zone%diskmass=0.0; disk_zone%rref=0.0
@@ -1967,7 +1967,7 @@ contains
              write(*,*) "Exiting"
              call exit(1)
           endif
-          ! renormalisation des fraction en volume
+          ! Renormalization of volume fractions
           do k=1, dust_pop_tmp(n_pop)%n_components
              dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) &
                   / V_somme
@@ -1981,21 +1981,21 @@ contains
           dust_pop_tmp(n_pop)%zone = j
        enddo
 
-       ! renormalisation des fraction en mass
+       ! Renormalization of mass fractions
        do i=1,n_especes(j)
           dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/total_sum
           dust_pop_tmp(n_pop-n_especes(j)+i)%mass =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
        enddo
     enddo !n_zones
 
-    ! variables triees
+    ! sorted variables
     allocate(dust_pop(n_pop), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error n_pop tmp')
     dust_pop%is_PAH = .false.
     dust_pop%is_opacity_file = .false.
     dust_pop%is_Misselt_opacity_file = .false.
 
-    ! Classement des populations de grains : LTE puis nLTE puis nRE
+    ! Classification of grain populations: LTE then nLTE then nRE
     ind_pop = 0
     grain_RE_LTE_start = 1
     grain_RE_LTE_end = 0
@@ -2074,13 +2074,13 @@ contains
     read(1,*) line_buffer
     read(1,*) lpop, lprecise_pop, lmol_LTE, profile_width
     read(1,*) vitesse_turb
-    vitesse_turb = vitesse_turb * km_to_m ! Conversion en m.s-1
+    vitesse_turb = vitesse_turb * km_to_m ! Conversion to m.s-1
     read(1,*) n_molecules
     allocate(mol(n_molecules))
     do imol=1,n_molecules
        read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
        read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion en m.s-1
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion to m.s-1
        mol(imol)%vmin_center_rt = -mol(imol)%vmax_center_rt
        mol(imol)%l_sym_ima = l_sym_ima
        mol(imol)%n_speed_rt = 2*mol(imol)%n_speed_rt+1 ! change of format from v4.1
@@ -2117,7 +2117,7 @@ contains
        endif
        star(i)%lb_body = .false.
 
-       ! Passage radius en AU
+       ! Convert radius to AU
        star(i)%r = star(i)%r * Rsun_to_AU
 
        read(1,*) star(i)%fUV, star(i)%slope_UV
@@ -2152,7 +2152,7 @@ contains
 
     real :: fn_photons_eq_th, fn_photons_lambda, fn_photons_image
 
-    ! Lecture du fichier de parameters
+    ! Reading the parameter file
     open(unit=1, file=para, status='old')
 
     read(1,*) para_version
@@ -2256,7 +2256,7 @@ contains
     ! ---------------
     read(1,*) line_buffer
     read(1,*) n_zones
-    ! Allocation des variables pour disque a une zone
+    ! Variable allocation for 1-zone disk
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error disk parameters')
     disk_zone%exp_beta=0.0; disk_zone%surf=0.0; disk_zone%sclht=0.0; disk_zone%diskmass=0.0; disk_zone%rref=0.0
@@ -2329,7 +2329,7 @@ contains
              write(*,*) "Exiting"
              call exit(1)
           endif
-          ! renormalisation des fraction en volume
+          ! Renormalization of volume fractions
           do k=1, dust_pop_tmp(n_pop)%n_components
              dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) &
                   / V_somme
@@ -2343,7 +2343,7 @@ contains
           dust_pop_tmp(n_pop)%zone = j
        enddo
 
-       ! renormalisation des fraction en mass
+       ! Renormalization of mass fractions
        do i=1,n_especes(j)
           dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/total_sum
           dust_pop_tmp(n_pop-n_especes(j)+i)%mass =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
@@ -2352,13 +2352,13 @@ contains
 
     if (lRE_LTE.and.lRE_nLTE) call error("cannot mix grains in LTE and nLTE")
 
-    ! variables triees
+    ! sorted variables
     allocate(dust_pop(n_pop), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error n_pop tmp')
     dust_pop%is_PAH = .false.
     dust_pop%is_opacity_file = .false.
 
-    ! Classement des populations de grains : LTE puis nLTE puis nRE
+    ! Classification of grain populations: LTE then nLTE then nRE
     ind_pop = 0
     grain_RE_LTE_start = 1
     grain_RE_LTE_end = 0
@@ -2426,13 +2426,13 @@ contains
     read(1,*) line_buffer
     read(1,*) lpop, lprecise_pop, lmol_LTE, profile_width
     read(1,*) vitesse_turb
-    vitesse_turb = vitesse_turb * km_to_m ! Conversion en m.s-1
+    vitesse_turb = vitesse_turb * km_to_m ! Conversion to m.s-1
     read(1,*) n_molecules
     allocate(mol(n_molecules))
     do imol=1,n_molecules
        read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
        read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion en m.s-1
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion to m.s-1
        mol(imol)%vmin_center_rt = -mol(imol)%vmax_center_rt
        mol(imol)%l_sym_ima = l_sym_ima
        mol(imol)%n_speed_rt = 2*mol(imol)%n_speed_rt+1 ! change of format from v4.1
@@ -2471,7 +2471,7 @@ contains
        endif
        star(i)%lb_body = .false.
 
-       ! Passage radius en AU
+       ! Convert radius to AU
        star(i)%r = star(i)%r * Rsun_to_AU
 
        read(1,*) star(i)%fUV, star(i)%slope_UV
@@ -2506,7 +2506,7 @@ contains
 
     real :: fn_photons_eq_th, fn_photons_lambda, fn_photons_image
 
-    ! Lecture du fichier de parameters
+    ! Reading the parameter file
     open(unit=1, file=para, status='old')
 
     read(1,*) para_version
@@ -2607,7 +2607,7 @@ contains
     ! ---------------
     read(1,*) line_buffer
     read(1,*) n_zones
-    ! Allocation des variables pour disque a une zone
+    ! Variable allocation for 1-zone disk
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error disk parameters')
     disk_zone%exp_beta=0.0; disk_zone%surf=0.0; disk_zone%sclht=0.0; disk_zone%diskmass=0.0; disk_zone%rref=0.0
@@ -2681,7 +2681,7 @@ contains
              write(*,*) "Exiting"
              call exit(1)
           endif
-          ! renormalisation des fraction en volume
+          ! Renormalization of volume fractions
           do k=1, dust_pop_tmp(n_pop)%n_components
              dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) &
                   / V_somme
@@ -2695,7 +2695,7 @@ contains
           dust_pop_tmp(n_pop)%zone = j
        enddo
 
-       ! renormalisation des fraction en mass
+       ! Renormalization of mass fractions
        do i=1,n_especes(j)
           dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/total_sum
           dust_pop_tmp(n_pop-n_especes(j)+i)%mass =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
@@ -2704,13 +2704,13 @@ contains
 
     if (lRE_LTE.and.lRE_nLTE) call error("cannot mix grains in LTE and nLTE")
 
-    ! variables triees
+    ! sorted variables
     allocate(dust_pop(n_pop), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error n_pop tmp')
     dust_pop%is_PAH = .false.
     dust_pop%is_opacity_file = .false.
 
-    ! Classement des populations de grains : LTE puis nLTE puis nRE
+    ! Classification of grain populations: LTE then nLTE then nRE
     ind_pop = 0
     grain_RE_LTE_start = 1
     grain_RE_LTE_end = 0
@@ -2778,13 +2778,13 @@ contains
     read(1,*) line_buffer
     read(1,*) lpop, lprecise_pop, lmol_LTE, profile_width
     read(1,*) vitesse_turb
-    vitesse_turb = vitesse_turb * km_to_m ! Conversion en m.s-1
+    vitesse_turb = vitesse_turb * km_to_m ! Conversion to m.s-1
     read(1,*) n_molecules
     allocate(mol(n_molecules))
     do imol=1,n_molecules
        read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
        read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion en m.s-1
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion to m.s-1
        mol(imol)%vmin_center_rt = -mol(imol)%vmax_center_rt
        mol(imol)%l_sym_ima = l_sym_ima
        mol(imol)%n_speed_rt = 2*mol(imol)%n_speed_rt+1 ! change of format from v4.1
@@ -2823,7 +2823,7 @@ contains
        endif
        star(i)%lb_body = .false.
 
-       ! Passage radius en AU
+       ! Convert radius to AU
        star(i)%r = star(i)%r * Rsun_to_AU
 
        read(1,*) star(i)%fUV, star(i)%slope_UV
@@ -2858,7 +2858,7 @@ contains
 
     real :: fn_photons_eq_th, fn_photons_lambda, fn_photons_image
 
-    ! Lecture du fichier de parameters
+    ! Reading the parameter file
     open(unit=1, file=para, status='old')
 
     read(1,*) para_version
@@ -2961,7 +2961,7 @@ contains
     ! ---------------
     read(1,*) line_buffer
     read(1,*) n_zones
-    ! Allocation des variables pour disque a une zone
+    ! Variable allocation for 1-zone disk
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error disk parameters')
     disk_zone%exp_beta=0.0; disk_zone%surf=0.0; disk_zone%sclht=0.0; disk_zone%diskmass=0.0; disk_zone%rref=0.0
@@ -3036,7 +3036,7 @@ contains
              write(*,*) "Exiting"
              call exit(1)
           endif
-          ! renormalisation des fraction en volume
+          ! Renormalization of volume fractions
           do k=1, dust_pop_tmp(n_pop)%n_components
              dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) &
                   / V_somme
@@ -3050,7 +3050,7 @@ contains
           dust_pop_tmp(n_pop)%zone = j
        enddo
 
-       ! renormalisation des fraction en mass
+       ! Renormalization of mass fractions
        do i=1,n_especes(j)
           dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/total_sum
           dust_pop_tmp(n_pop-n_especes(j)+i)%mass =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
@@ -3059,14 +3059,14 @@ contains
 
     if (lRE_LTE.and.lRE_nLTE) call error("cannot mix grains in LTE and nLTE")
 
-    ! variables triees
+    ! sorted variables
     allocate(dust_pop(n_pop), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error n_pop tmp')
     dust_pop%is_PAH = .false.
     dust_pop%is_opacity_file = .false.
 
 
-    ! Classement des populations de grains : LTE puis nLTE puis nRE
+    ! Classification of grain populations: LTE then nLTE then nRE
     ind_pop = 0
     grain_RE_LTE_start = 1
     grain_RE_LTE_end = 0
@@ -3134,13 +3134,13 @@ contains
     read(1,*) line_buffer
     read(1,*) lpop, lprecise_pop, lmol_LTE, profile_width
     read(1,*) vitesse_turb
-    vitesse_turb = vitesse_turb * km_to_m ! Conversion en m.s-1
+    vitesse_turb = vitesse_turb * km_to_m ! Conversion to m.s-1
     read(1,*) n_molecules
     allocate(mol(n_molecules))
     do imol=1,n_molecules
        read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
        read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion en m.s-1
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion to m.s-1
        mol(imol)%vmin_center_rt = -mol(imol)%vmax_center_rt
        mol(imol)%l_sym_ima = l_sym_ima
        mol(imol)%n_speed_rt = 2*mol(imol)%n_speed_rt+1 ! change of format from v4.1
@@ -3179,7 +3179,7 @@ contains
        endif
        star(i)%lb_body = .false.
 
-       ! Passage radius en AU
+       ! Convert radius to AU
        star(i)%r = star(i)%r * Rsun_to_AU
 
        read(1,*) star(i)%fUV, star(i)%slope_UV
@@ -3214,7 +3214,7 @@ contains
 
     real :: fn_photons_eq_th, fn_photons_lambda, fn_photons_image
 
-    ! Lecture du fichier de parameters
+    ! Reading the parameter file
     open(unit=1, file=para, status='old')
 
     read(1,*) para_version
@@ -3313,7 +3313,7 @@ contains
     ! ---------------
     read(1,*) line_buffer
     read(1,*) n_zones
-    ! Allocation des variables pour disque a une zone
+    ! Variable allocation for 1-zone disk
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error disk parameters')
     disk_zone%exp_beta=0.0; disk_zone%surf=0.0; disk_zone%sclht=0.0; disk_zone%diskmass=0.0; disk_zone%rref=0.0
@@ -3384,7 +3384,7 @@ contains
              write(*,*) "Exiting"
              call exit(1)
           endif
-          ! renormalisation des fraction en volume
+          ! Renormalization of volume fractions
           do k=1, dust_pop_tmp(n_pop)%n_components
              dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) / V_somme
           enddo
@@ -3397,7 +3397,7 @@ contains
           dust_pop_tmp(n_pop)%zone = j
        enddo
 
-       ! renormalisation des fraction en mass
+       ! Renormalization of mass fractions
        do i=1,n_especes(j)
           dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/total_sum
           dust_pop_tmp(n_pop-n_especes(j)+i)%mass =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
@@ -3406,13 +3406,13 @@ contains
 
     if (lRE_LTE.and.lRE_nLTE) call error("cannot mix grains in LTE and nLTE")
 
-    ! variables triees
+    ! sorted variables
     allocate(dust_pop(n_pop), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error n_pop tmp')
     dust_pop%is_PAH = .false.
     dust_pop%is_opacity_file = .false.
 
-    ! Classement des populations de grains : LTE puis nLTE puis nRE
+    ! Classification of grain populations: LTE then nLTE then nRE
     ind_pop = 0
     grain_RE_LTE_start = 1
     grain_RE_LTE_end = 0
@@ -3480,13 +3480,13 @@ contains
     read(1,*) line_buffer
     read(1,*) lpop, lprecise_pop, lmol_LTE, profile_width
     read(1,*) vitesse_turb
-    vitesse_turb = vitesse_turb * km_to_m ! Conversion en m.s-1
+    vitesse_turb = vitesse_turb * km_to_m ! Conversion to m.s-1
     read(1,*) n_molecules
     allocate(mol(n_molecules))
     do imol=1,n_molecules
        read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
        read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion en m.s-1
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion to m.s-1
        mol(imol)%vmin_center_rt = -mol(imol)%vmax_center_rt
        mol(imol)%l_sym_ima = l_sym_ima
        mol(imol)%n_speed_rt = 2*mol(imol)%n_speed_rt+1 ! change of format from v4.1
@@ -3525,7 +3525,7 @@ contains
        endif
        star(i)%lb_body = .false.
 
-       ! Passage radius en AU
+       ! Convert radius to AU
        star(i)%r = star(i)%r * Rsun_to_AU
 
        read(1,*) star(i)%fUV, star(i)%slope_UV
@@ -3560,7 +3560,7 @@ end subroutine read_para215
     integer, dimension(100) :: n_especes
     character(len=100) :: line_buffer
 
-    ! Lecture du fichier de parameters
+    ! Reading the parameter file
     open(unit=1, file=para, status='old')
 
     read(1,*) para_version
@@ -3650,7 +3650,7 @@ end subroutine read_para215
     ! ---------------
     read(1,*) line_buffer
     read(1,*) n_zones
-    ! Allocation des variables pour disque a une zone
+    ! Variable allocation for 1-zone disk
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error disk parameters')
     disk_zone%exp_beta=0.0; disk_zone%surf=0.0; disk_zone%sclht=0.0; disk_zone%diskmass=0.0; disk_zone%rref=0.0
@@ -3728,7 +3728,7 @@ end subroutine read_para215
              write(*,*) "Exiting"
              call exit(1)
           endif
-          ! renormalisation des fraction en volume
+          ! Renormalization of volume fractions
           do k=1, dust_pop_tmp(n_pop)%n_components
              dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) / V_somme
           enddo
@@ -3741,7 +3741,7 @@ end subroutine read_para215
           dust_pop_tmp(n_pop)%zone = j
        enddo
 
-       ! renormalisation des fraction en mass
+       ! Renormalization of mass fractions
        do i=1,n_especes(j)
           dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/total_sum
           dust_pop_tmp(n_pop-n_especes(j)+i)%mass =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
@@ -3750,13 +3750,13 @@ end subroutine read_para215
 
     if (lRE_LTE.and.lRE_nLTE) call error("cannot mix grains in LTE and nLTE")
 
-    ! variables triees
+    ! sorted variables
     allocate(dust_pop(n_pop), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error n_pop tmp')
     dust_pop%is_PAH = .false.
     dust_pop%is_opacity_file = .false.
 
-    ! Classement des populations de grains : LTE puis nLTE puis nRE
+    ! Classification of grain populations: LTE then nLTE then nRE
     ind_pop = 0
     grain_RE_LTE_start = 1
     grain_RE_LTE_end = 0
@@ -3824,13 +3824,13 @@ end subroutine read_para215
     read(1,*) line_buffer
     read(1,*) lpop, lprecise_pop, lmol_LTE, profile_width
     read(1,*) vitesse_turb
-    vitesse_turb = vitesse_turb * km_to_m ! Conversion en m.s-1
+    vitesse_turb = vitesse_turb * km_to_m ! Conversion to m.s-1
     read(1,*) n_molecules
     allocate(mol(n_molecules))
     do imol=1,n_molecules
        read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
        read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion en m.s-1
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion to m.s-1
        mol(imol)%vmin_center_rt = -mol(imol)%vmax_center_rt
        mol(imol)%l_sym_ima = l_sym_ima
        mol(imol)%n_speed_rt = 2*mol(imol)%n_speed_rt+1 ! change of format from v4.1
@@ -3869,7 +3869,7 @@ end subroutine read_para215
        endif
        star(i)%lb_body = .false.
 
-       ! Passage radius en AU
+       ! Convert radius to AU
        star(i)%r = star(i)%r * Rsun_to_AU
 
        read(1,*) star(i)%fUV, star(i)%slope_UV
@@ -3905,7 +3905,7 @@ end subroutine read_para215
     integer, dimension(100) :: n_especes
     character(len=100) :: line_buffer
 
-    ! Lecture du fichier de parameters
+    ! Reading the parameter file
     open(unit=1, file=para, status='old')
 
     read(1,*) para_version
@@ -3993,7 +3993,7 @@ end subroutine read_para215
     ! ---------------
     read(1,*) line_buffer
     read(1,*) n_zones
-    ! Allocation des variables pour disque a une zone
+    ! Variable allocation for 1-zone disk
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error disk parameters')
     disk_zone%exp_beta=0.0; disk_zone%surf=0.0; disk_zone%sclht=0.0; disk_zone%diskmass=0.0; disk_zone%rref=0.0
@@ -4070,7 +4070,7 @@ end subroutine read_para215
              write(*,*) "Exiting"
              call exit(1)
           endif
-          ! renormalisation des fraction en volume
+          ! Renormalization of volume fractions
           do k=1, dust_pop_tmp(n_pop)%n_components
              dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) / V_somme
           enddo
@@ -4083,7 +4083,7 @@ end subroutine read_para215
           dust_pop_tmp(n_pop)%zone = j
        enddo
 
-       ! renormalisation des fraction en mass
+       ! Renormalization of mass fractions
        do i=1,n_especes(j)
           dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/total_sum
           dust_pop_tmp(n_pop-n_especes(j)+i)%mass =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
@@ -4092,13 +4092,13 @@ end subroutine read_para215
 
     if (lRE_LTE.and.lRE_nLTE) call error("cannot mix grains in LTE and nLTE")
 
-    ! variables triees
+    ! sorted variables
     allocate(dust_pop(n_pop), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error n_pop tmp')
     dust_pop%is_PAH = .false.
     dust_pop%is_opacity_file = .false.
 
-    ! Classement des populations de grains : LTE puis nLTE puis nRE
+    ! Classification of grain populations: LTE then nLTE then nRE
     ind_pop = 0
     grain_RE_LTE_start = 1
     grain_RE_LTE_end = 0
@@ -4166,13 +4166,13 @@ end subroutine read_para215
     read(1,*) line_buffer
     read(1,*) lpop, lprecise_pop, lmol_LTE, profile_width
     read(1,*) vitesse_turb
-    vitesse_turb = vitesse_turb * km_to_m ! Conversion en m.s-1
+    vitesse_turb = vitesse_turb * km_to_m ! Conversion to m.s-1
     read(1,*) n_molecules
     allocate(mol(n_molecules))
     do imol=1,n_molecules
        read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
        read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion en m.s-1
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion to m.s-1
        mol(imol)%vmin_center_rt = -mol(imol)%vmax_center_rt
        mol(imol)%l_sym_ima = l_sym_ima
        mol(imol)%n_speed_rt = 2*mol(imol)%n_speed_rt+1 ! change of format from v4.1
@@ -4211,7 +4211,7 @@ end subroutine read_para215
        endif
        star(i)%lb_body = .false.
 
-       ! Passage radius en AU
+       ! Convert radius to AU
        star(i)%r = star(i)%r * Rsun_to_AU
 
        read(1,*) star(i)%fUV, star(i)%slope_UV
@@ -4245,7 +4245,7 @@ end subroutine read_para215
     integer, dimension(100) :: n_especes
     character(len=100) :: line_buffer
 
-    ! Lecture du fichier de parameters
+    ! Reading the parameter file
     open(unit=1, file=para, status='old')
 
     read(1,*) para_version
@@ -4333,7 +4333,7 @@ end subroutine read_para215
     ! ---------------
     read(1,*) line_buffer
     read(1,*) n_zones
-    ! Allocation des variables pour disque a une zone
+    ! Variable allocation for 1-zone disk
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error disk parameters')
     disk_zone%exp_beta=0.0; disk_zone%surf=0.0; disk_zone%sclht=0.0; disk_zone%diskmass=0.0; disk_zone%rref=0.0
@@ -4403,7 +4403,7 @@ end subroutine read_para215
           dust_pop_tmp(n_pop)%zone = j
        enddo
 
-       ! renormalisation des fraction en mass
+       ! Renormalization of mass fractions
        do i=1,n_especes(j)
           dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/total_sum
           dust_pop_tmp(n_pop-n_especes(j)+i)%mass =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
@@ -4413,13 +4413,13 @@ end subroutine read_para215
 
     if (lRE_LTE.and.lRE_nLTE) call error("cannot mix grains in LTE and nLTE")
 
-    ! variables triees
+    ! sorted variables
     allocate(dust_pop(n_pop), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error n_pop tmp')
     dust_pop%is_PAH = .false.
     dust_pop%is_opacity_file = .false.
 
-    ! Classement des populations de grains : LTE puis nLTE puis nRE
+    ! Classification of grain populations: LTE then nLTE then nRE
     ind_pop = 0
     grain_RE_LTE_start = 1
     grain_RE_LTE_end = 0
@@ -4487,13 +4487,13 @@ end subroutine read_para215
     read(1,*) line_buffer
     read(1,*) lpop, lprecise_pop, lmol_LTE, profile_width
     read(1,*) vitesse_turb
-    vitesse_turb = vitesse_turb * km_to_m ! Conversion en m.s-1
+    vitesse_turb = vitesse_turb * km_to_m ! Conversion to m.s-1
     read(1,*) n_molecules
     allocate(mol(n_molecules))
     do imol=1,n_molecules
        read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
        read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion en m.s-1
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion to m.s-1
        mol(imol)%vmin_center_rt = -mol(imol)%vmax_center_rt
        mol(imol)%l_sym_ima = l_sym_ima
        mol(imol)%n_speed_rt = 2*mol(imol)%n_speed_rt+1 ! change of format from v4.1
@@ -4532,7 +4532,7 @@ end subroutine read_para215
        endif
        star(i)%lb_body = .false.
 
-       ! Passage radius en AU
+       ! Convert radius to AU
        star(i)%r = star(i)%r * Rsun_to_AU
 
        read(1,*) star(i)%fUV, star(i)%slope_UV
@@ -4568,7 +4568,7 @@ end subroutine read_para215
 
     character(len=100) :: line_buffer
 
-    ! Lecture du fichier de parameters
+    ! Reading the parameter file
     open(unit=1, file=para, status='old')
 
     read(1,*) para_version
@@ -4663,7 +4663,7 @@ end subroutine read_para215
     ! ---------------
     read(1,*) line_buffer
     read(1,*) n_zones
-    ! Allocation des variables pour disque a une zone
+    ! Variable allocation for 1-zone disk
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error disk parameters')
     disk_zone%exp_beta=0.0; disk_zone%surf=0.0; disk_zone%sclht=0.0; disk_zone%diskmass=0.0; disk_zone%rref=0.0
@@ -4738,7 +4738,7 @@ end subroutine read_para215
           dust_pop_tmp(n_pop)%is_DustEM_opacity_file = .false.
        enddo
 
-       ! renormalisation des fraction en mass
+       ! Renormalization of mass fractions
        do i=1,n_especes(j)
           dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/total_sum
           dust_pop_tmp(n_pop-n_especes(j)+i)%mass =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
@@ -4748,12 +4748,12 @@ end subroutine read_para215
 
     if (lRE_LTE.and.lRE_nLTE) call error("cannot mix grains in LTE and nLTE")
 
-    ! variables triees
+    ! sorted variables
     allocate(dust_pop(n_pop), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error n_pop tmp')
     dust_pop%is_PAH = .false.
 
-    ! Classement des populations de grains : LTE puis nLTE puis nRE
+    ! Classification of grain populations: LTE then nLTE then nRE
     ind_pop = 0
     grain_RE_LTE_start = 1
     grain_RE_LTE_end = 0
@@ -4821,13 +4821,13 @@ end subroutine read_para215
     read(1,*) line_buffer
     read(1,*) lpop, lprecise_pop, lmol_LTE, profile_width
     read(1,*) vitesse_turb
-    vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
+    vitesse_turb = vitesse_turb * 1.e3 ! Conversion to m.s-1
     read(1,*) n_molecules
     allocate(mol(n_molecules))
     do imol=1,n_molecules
        read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
        read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * 1.e3 ! Conversion en m.s-1
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * 1.e3 ! Conversion to m.s-1
        mol(imol)%vmin_center_rt = -mol(imol)%vmax_center_rt
        mol(imol)%l_sym_ima = l_sym_ima
        mol(imol)%n_speed_rt = 2*mol(imol)%n_speed_rt+1 ! change of format from v4.1
@@ -4867,7 +4867,7 @@ end subroutine read_para215
        endif
        star(i)%lb_body = .false.
 
-       ! Passage radius en AU
+       ! Convert radius to AU
        star(i)%r = star(i)%r * Rsun_to_AU
     enddo
     star(:)%vx = 0.0 ; star(:)%vy = 0.0 ; star(:)%vz = 0.0

@@ -19,7 +19,7 @@ contains
 
 
 subroutine compute_othin_sublimation_radius()
-  ! Dans le cas optiquement mince, ne depend que de la temperature (et spectrum) de l'star
+  ! In the optically thin case, depends only on the temperature (and spectrum) of the star
 
   implicit none
 
@@ -34,7 +34,7 @@ subroutine compute_othin_sublimation_radius()
   icell = icell1
 
   do lambda=1, n_lambda
-     ! length d'onde en metre
+     ! wavelength in metres
      wl = tab_lambda(lambda)*1.e-6
      delta_wl=tab_delta_lambda(lambda)*1.e-6
      cst_wl=cst/wl
@@ -122,7 +122,7 @@ end subroutine read_sublimation_radius
 !**********************************************************************
 
 subroutine sublimate_dust()
-  ! Supprime les grains dont la temperature depasse la temperature de sublimation
+  ! Remove grains whose temperature exceeds the sublimation temperature
   ! C. Pinte
   ! 07/08/12
 
@@ -175,9 +175,9 @@ end subroutine sublimate_dust
 !**********************************************************
 
 subroutine equilibre_hydrostatique()
-  ! Calcul l'equilibre hydrostatique pour chaque radius
-  ! Equation 2.4.3 de la these (page 38, 52 du pdf)
-  ! Valable pour disque de gaz parfait, non-autogravitant, geometriquement mince
+  ! Compute hydrostatic equilibrium for each radius
+  ! Equation 2.4.3 of the thesis (page 38, 52 of the PDF)
+  ! Valid for a geometrically thin, non-self-gravitating perfect gas disk
   !
   ! C. Pinte
   ! 25/09/07

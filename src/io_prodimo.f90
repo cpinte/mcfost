@@ -27,17 +27,17 @@ module ProDiMo
   ! directory with *.in files and output dir
   character(len=512) :: ProDiMo_input_dir, data_ProDiMo
 
-  ! Pour champ UV
+  ! For UV field
   !real, parameter ::  slope_UV_ProDiMo = 2.2 - 2 ! Fnu -> F_lambda
   real :: fUV_ProDiMo, slope_UV_ProDiMo
 
-  ! Variables a passer dans le Parameter.in
+  ! Variables to pass in Parameter.in
   real, dimension(:), allocatable :: ProDiMo_fPAH, ProDiMo_dust_gas, ProDiMo_Mdisk  ! n_regions
   integer :: ProDiMo_PAH_NC, ProDiMo_PAH_NH
   logical :: lPAH, ProDiMo_other_PAH
   character(len=10) :: sProDiMo_fPAH
 
-  ! grid de longeurs d'onde
+  ! wavelength grid
   character(len=32) :: ProDiMo_tab_wavelength = "ProDiMo_UV3_9.lambda"
   character(len=32), parameter :: DENT_tab_wavelength = "DENT.lambda"
 
@@ -47,7 +47,7 @@ module ProDiMo
   ! ProDiMo2mcfost
   integer,parameter :: MC_NSP=5      ! number of species
   integer,parameter :: MC_LEVMAX=10  ! maximum number of levels
-  integer, parameter :: NXX=1, NZZ=1 ! c'est pas dans le fichier de Peter
+  integer, parameter :: NXX=1, NZZ=1 ! this is not in Peter's file
 
   type lpop_prodimo
      character(len=10) :: name(MC_NSP)       ! species name
@@ -60,7 +60,7 @@ module ProDiMo
 
   type(lpop_prodimo) :: lpops
 
-  ! Lecture du fichier for MCFOST.fits.gz
+  ! Read the MCFOST.fits.gz file
   integer, parameter :: nLevel_CII = 2
   integer, parameter :: nLevel_OI = 3
   integer, parameter :: nLevel_CO = 33  !52
@@ -137,7 +137,7 @@ contains
 
   subroutine setup_ProDiMo()
     ! - distance 100pc
-    ! - 1 pop de grains loi de puissance
+    ! - 1 grain population with power-law size distribution
     !
     ! Must be run after routines igrain & define_physical_zones()
 
@@ -147,7 +147,7 @@ contains
     integer :: i, pop, k, NC, NH, alloc_status, ir, iz, NC_0
     real, dimension(:), allocatable :: fPAH
 
-    ! Maximum 4 zones dans ProDiMo
+    ! Maximum 4 zones in ProDiMo
     if (n_regions > 4) call error("ProDiMo cannot deal with more than 4 zones.")
 
     ! Directories
@@ -159,7 +159,7 @@ contains
 
     if (lforce_ProDiMo_PAH) data_ProDiMo = trim(data_ProDiMO)//"_fPAH="//sProDiMo_fPAH
 
-    ! Limite 10x plus haut pour avoir temperature plus propre pour ProDiMo
+    ! Upper limit 10x higher for a cleaner temperature profile for ProDiMo
     !tau_dark_zone_eq_th = 15000.
 
     fUV_ProDiMo = star(1)%fUV
@@ -180,7 +180,7 @@ contains
     if (alloc_status > 0) call error('Allocation error n_phot_envoyes_ISM')
     n_phot_envoyes_ISM = 0.0
 
-    ! Calcul des fPAH pour ProDiMo
+    ! Compute fPAH values for ProDiMo
     lPAH = .false.
     test_PAH : do i=1, n_pop
        if (dust_pop(i)%is_PAH) then
@@ -202,7 +202,7 @@ contains
                    a = r_grain(k)
                    NC = nint((a*1.e3)**3*468.)   ! number of Carbon atoms (Draine & Li 2001 Eq 8+)
                    NH = get_NH(NC)               ! number of Hydrogen atoms
-                   mPAH = 12 * NC + NH    ! mass du PAH
+                   mPAH = 12 * NC + NH    ! PAH mass
 
                    if (NC_0 > 0) then
                       if (NC /= NC_0) call error("there can be only 1 type of PAH for ProDiMo")
@@ -213,15 +213,15 @@ contains
                    pah_mass = pah_mass + mPAH * n_grains(k)
                    norm = norm + n_grains(k)
                 enddo ! k
-                pah_mass = pah_mass / norm  ! mass moyenne des PAHs en mH
-                eps_PAH = dust_pop(pop)%frac_mass /disk_zone(i)%gas_to_dust  ! fraction en dust_mass(de gaz) des PAHS
+                pah_mass = pah_mass / norm  ! average PAH mass in units of mH
+                eps_PAH = dust_pop(pop)%frac_mass /disk_zone(i)%gas_to_dust  ! fraction in dust_mass (of gas) of PAHs
 
-                ! 1.209274 = (mH2*nH2 + mHe * mHe) / (nH2 + nHe) avec nHe/nH2 = 10^-1.125
-                ! abondance en nombre par rapport à H-nuclei + correction pour NC
+                ! 1.209274 = (mH2*nH2 + mHe*nHe) / (nH2 + nHe) with nHe/nH2 = 10^-1.125
+                ! number abundance relative to H-nuclei + correction for NC
                 fPAH(i) = fPAH(i) + (1.209274/pah_mass) * eps_PAH/3e-7 * (NC/50.)
                 !write(*,*) i, fPAH(i), real(dust_pop(pop)%frac_mass * disk_zone(i)%diskmass), real(dust_pop(pop)%frac_mass),  real(disk_zone(i)%diskmass)
              endif  ! PAH
-          endif ! pop dans la zone
+          endif ! population in the zone
        enddo ! pop
 
        fPAH(i) = max(fPAH(i),1e-9)
@@ -276,8 +276,8 @@ contains
   subroutine save_J_prodimo(lambda)
     ! C. Pinte
     ! 19/06/09
-    ! sauvegarde le champ de radiation pour ProDiMo
-    ! avant de calculer le champ ISM
+    ! save the radiation field for ProDiMo
+    ! before computing the ISM field
 
     integer, intent(in) :: lambda
     integer :: ri, zj, phik, icell
@@ -309,9 +309,9 @@ contains
   !********************************************************************
 
   subroutine allocate_m2p(n_rad,nz,n_lambda)
-    ! Routine similaire a celle de ProDiMo dans readMCFOST
-    ! pour le moment, ne sert que pour recuperer le champ de radiation
-    ! calcule par le run initial de mcfost
+    ! Similar routine to the ProDiMo one in readMCFOST
+    ! for now, only used to retrieve the radiation field
+    ! Computed by the initial mcfost run
     ! C. Pinte
     ! 29/08/2012
 
@@ -353,10 +353,10 @@ contains
     ! - cell position
     ! - dust temp
     ! - mean intensity Jnu
-    !  ---> nbre de bins entiers entre 91.2 et 205nm
-    ! - Qabs_nu et Qext_nu pour chaque cell
-    ! - gas density pour un rapport gas sur poussiere fixe ---> pour
-    ! verification seleument
+    !  ---> number of full bins between 91.2 and 205nm
+    ! - Qabs_nu and Qext_nu for each cell
+    ! - gas density for a fixed gas-to-dust ratio ---> for
+    ! verification only
     ! - zero, first et second moment of the grain size distribution
     !  N = int f(a) da   <a^i> = 1/N * int int f(a) a^i da
     ! - separation of constribution
@@ -771,7 +771,7 @@ contains
 
 
     !------------------------------------------------------------------------------
-    ! HDU 10 : Densite de gaz [g.cm^-3]
+    ! HDU 10 : density de gaz [g.cm^-3]
     !------------------------------------------------------------------------------
     bitpix=-32
     naxis=2
@@ -1365,7 +1365,7 @@ contains
        mol(imol)%lline = .true.
        read(1,*) mol(imol)%nTrans_raytracing
        read(1,*) mol(imol)%index_trans_ray_tracing(1:mol(imol)%nTrans_raytracing)
-       !mol(imol)%n_speed = 1 ! inutilise si on ne calcule pas le NLTE
+       !mol(imol)%n_speed = 1 ! inutilise si on ne Calculates pas le NLTE
 
 
        mol(imol)%abundance = 1e-6
@@ -1867,7 +1867,7 @@ contains
        call ftclos(unit, fits_status)
        if (fits_status > 0) write(*,*) "Status2=", fits_status ! renvoie non 0 sauf si on l'imprime (????)
        call ftfiou(unit, fits_status)
-       !call ftfiou(-1, fits_status) ! deallocate toutes les unites fitsio, semble resoudre le probleme
+       !call ftfiou(-1, fits_status) ! deallocate toutes les units fitsio, semble resoudre le probleme
        if (fits_status > 0) write(*,*) "Status3=", fits_status ! renvoie non 0 sauf si on l'imprime (????)
 
        !  Check for any error, and if so print out error messages

@@ -8,7 +8,7 @@ module wavelengths
 
   logical :: lmono0, lmono
 
-  ! Gamme de longueurs d'onde utilisees
+  ! Wavelength range in use
   real :: lambda_min, lambda_max
   integer :: n_lambda, n_lambda2
   real(kind=dp) :: delta_lambda
@@ -22,7 +22,7 @@ contains
 
 
 subroutine init_lambda()
-  ! Initialisation table de longueurs d'onde
+  ! Initialise the wavelength table
 
   integer :: i, alloc_status
 
@@ -73,7 +73,7 @@ end subroutine init_lambda
 !**********************************************************************
 
 subroutine init_lambda2()
-  ! Initialisation table en lambda sed
+  ! Initialise the SED wavelength table
 
   implicit none
 

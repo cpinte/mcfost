@@ -15,7 +15,7 @@ module scattering
 
 subroutine setup_scattering()
 
-  ! parametrage methode de diffusion en fonction de la taille de la grid
+  ! parameterization of scattering method according to grid size
   ! 1 : per dust grain
   ! 2 : per cell
   call select_scattering_method(p_n_cells)
@@ -75,11 +75,11 @@ subroutine bhmie(x,refrel,nang,s1,s2,qext,qsca,qback,gsca)
 ! Note: important that MXNANG be consistent with dimension of S1 and S2
 !       in calling routine!
 
-  ! Inutile depuis le passage en allocation dynamique
+  ! Useless since the switch to dynamic allocation
   !  integer, parameter :: NMXX=20000000
   ! defaut : NMXX=20000
-  ! On peut passer a  NMXX=2000000 : ca marche jusque a=10cm en bande B
-  ! mais faut pas etre presse
+  ! Can use NMXX=2000000: works up to a=10cm in band B
+  ! but you shouldn.t be in a hurry
   integer, parameter :: dp = selected_real_kind(p=13,r=200)
 
 ! Arguments:
@@ -141,16 +141,16 @@ subroutine bhmie(x,refrel,nang,s1,s2,qext,qsca,qback,gsca)
 !                 portable.  In event that portable version is
 !                 needed, use src/bhmie_f77.f
 ! 93/06/01 (BTD): Changed AMAX1 to generic function MAX
-! 04/03/04 (CP): passage en fortran 90
-! 13/10/04 (CP): passage a des angles demi-entier (milieu du bin) pour pouvoir faire l'integration de s11(theta)
-! l'angle 0° est calcule a part car on en a besoin pour Qext
-! de meme, on aurait besoin de 180° pour Qback mais ca ne sert pas donc je ne calcule pas
+! 04/03/04 (CP): switched to fortran 90
+! 13/10/04 (CP): switched to half-integer angles (middle of the bin) to perform s11(theta) integration
+! Angle 0 is computed separately as it is needed for Qext
+! Similarly, 180 would be needed for Qback but is not used, so it is not computed
 ! 16/12/04 (CP): Remplacement imag par aimag (Pas forcement ok avec tous les
 ! compilateurs) mais standard f95 et 2003
-! 24/03/05 (CP): allocation dynamique de D. Permet de placer le tableau dans la zone data
-! et de l'allouer avec juste le bon nombre de terme.
-! 07/02/08 (CP): repassage en angles entiers avec 0 et 180 explicitement calcules
-! necessaire pour integration du ray_tracing : passage a 2*nang + 1 angles
+! 24/03/05 (CP): dynamic allocation of D. Allows placing the array in the data zone
+! and allocating it with exactly the correct number of terms.
+! 07/02/08 (CP): switch back to integer angles with 0 and 180 explicitly calculated
+! necessary for ray-tracing integration: switched to 2*nang + 1 angles
 !***********************************************************************
 
 
@@ -160,7 +160,7 @@ subroutine bhmie(x,refrel,nang,s1,s2,qext,qsca,qback,gsca)
 !     stop
 !  endif
 !  if(NANG < 2) then
-!     write(*,*)'***Error: NANG doit etre >= 2'
+!     write(*,*)'***Error: NANG must be >= 2'
 !     stop
 !  endif
 !*** Obtain pi:
@@ -313,7 +313,7 @@ end subroutine BHMIE
 
 subroutine mueller_Mie(lambda,igrain,x,amu1,amu2, qext,qsca,gsca)
   !***************************************************************
-  ! Calcule les elements de la matrice de diffusion a partir de
+  ! calculate les elements de la matrice de diffusion a partir de
   ! la sous-routine bhmie (grains spheriques)
   !
   ! C. Pinte Fevrier 2004
@@ -337,7 +337,7 @@ subroutine mueller_Mie(lambda,igrain,x,amu1,amu2, qext,qsca,gsca)
 
   if (modulo(nang_scatt,2) == 1) call error("nang_scatt must be an EVEN number")
 
-  ! Si fonction de HG, on ne calcule pas la fonction de phase
+  ! If HG function, the phase function is not calculated
   if (aniso_method==2) then
      nang=1
   else
@@ -349,14 +349,14 @@ subroutine mueller_Mie(lambda,igrain,x,amu1,amu2, qext,qsca,gsca)
   if (lforce_HG) gsca = forced_g
   if (lisotropic) gsca = 0.0
 
-  ! The normalisation of bhmie for s11 is 0.5*x**2*Qsca
-  ! --> We correct by 0.5*x**2 to have a normalisation to Qsca Qsa
+  ! The Normalization of bhmie for s11 is 0.5*x**2*Qsca
+  ! --> We correct by 0.5*x**2 to have a Normalization to Qsca Qsa
   factor = 1 / (0.5 * x**2)
 
-  ! Passage des valeurs dans les tableaux de mcfost
+  ! Transfer of values to mcfost arrays
   if (aniso_method==1) then
-     ! Calcul des elements de la matrice de diffusion
-     ! indices decales de 1 par rapport a bhmie
+     ! Calculation of scattering matrix elements
+     ! indices offset by 1 compared to bhmie
      do j=0,nang_scatt
         jj=j+1
         vi1 = cabs(S2(jj))*cabs(S2(jj))
@@ -371,7 +371,7 @@ subroutine mueller_Mie(lambda,igrain,x,amu1,amu2, qext,qsca,gsca)
      s22(:) = s11(:)
      s44(:) = s33(:)
 
-     call normalise_Mueller_matrix(lambda,igrain, s11,s12,s22,s33,s34,s44, normalisation=qsca)
+     call normalise_Mueller_matrix(lambda,igrain, s11,s12,s22,s33,s34,s44, normalization=qsca)
   endif
 
   return
@@ -498,49 +498,49 @@ end subroutine Mueller_input
 
 !***************************************************
 
-subroutine normalise_Mueller_matrix(lambda,igrain, s11,s12,s22,s33,s34,s44, normalisation)
+subroutine normalise_Mueller_matrix(lambda,igrain, s11,s12,s22,s33,s34,s44, normalization)
   ! read in the matrix elements, calculate the cumulative s11, niormnaklise and fill up tab_s11, etc
 
   integer, intent(in) :: lambda,igrain
   real, dimension(0:nang_scatt), intent(in) ::  s11,s12,s22,s33,s34,s44
-  real, intent(in), optional :: normalisation
-  ! "normalisation" is the integral of S11(theta) sin(theta) dtheta if known
+  real, intent(in), optional :: normalization
+  ! "normalization" is the integral of S11(theta) sin(theta) dtheta if known
   ! The missing "flux" from the numerical integration is placed between 0 and 1 degree (or first scattering angle)
   ! as we assume it is mostly diffraction that has been missed by the sampling
 
   integer :: j
   real(kind=dp) :: norm, theta, dtheta
 
-  ! Integration S11 pour tirer angle
+  ! S11 integration for angle selection
   if (scattering_method==1) then
      prob_s11(lambda,igrain,0)=0.0
      dtheta = pi/real(nang_scatt)
 
-     do j=2,nang_scatt ! probabilite de diffusion jusqu'a l'angle j, on saute j=0 car sin(theta) = 0
+     do j=2,nang_scatt ! scattering probability up to angle j, j=0 is skipped because sin(theta) = 0
         theta = real(j)*dtheta
         prob_s11(lambda,igrain,j)=prob_s11(lambda,igrain,j-1)+s11(j)*sin(theta)*dtheta
      enddo
 
-     ! il y a un soucis numerique quand x >> 1 car la resolution en angle n'est pas suffisante
-     ! On rate le pic de diffraction (en particulier entre 0 et 1)
-     if (present(normalisation)) then
-        if (normalisation > prob_s11(lambda,igrain,nang_scatt)) then
+     ! there is a numerical issue when x >> 1 because the angular resolution is not sufficient
+     ! The diffraction peak is missed (particularly between 0 and 1)
+     if (present(normalization)) then
+        if (normalization > prob_s11(lambda,igrain,nang_scatt)) then
            prob_s11(lambda,igrain,1:nang_scatt) = prob_s11(lambda,igrain,1:nang_scatt) + &
-                normalisation - prob_s11(lambda,igrain,nang_scatt)
+                normalization - prob_s11(lambda,igrain,nang_scatt)
         else
-           call error("normalise_Mueller_matrix: exact normalisation is smaller than numerical integration")
+           call error("normalise_Mueller_matrix: exact normalization is smaller than numerical integration")
         endif
      endif
 
-     ! Normalisation de la proba cumulee a 1
+     ! Normalization of the cumulative probability to 1
      prob_s11(lambda,igrain,:)=prob_s11(lambda,igrain,:)/prob_s11(lambda,igrain,nang_scatt)
   endif ! scattering_method==1
 
   do j=0,nang_scatt
-     if (scattering_method==1) then ! Matrice de Mueller par grain
-        ! Normalisation pour diffusion selon fonction de phase (tab_s11=1.0 sert dans stokes)
+     if (scattering_method==1) then ! Mueller matrix per grain
+        ! Normalization for scattering according to phase function (tab_s11=1.0 used in Stokes)
         norm = 1./s11(j)
-     else ! Sinon normalisation a Qsca
+     else ! Otherwise normalization to Qsca
         norm = 1.
      endif
 
@@ -579,11 +579,11 @@ end subroutine overwrite_s12
 
 subroutine mueller_GMM(lambda,igrain, qext,qsca,gsca)
 !***************************************************************
-! calcule les elements de la matrice de diffusion a partir du
-! code gmm01TrA (clusters de sphères)
-!     Aggrégats
+! calculate les elements de la matrice de diffusion a partir du
+! code gmm01TrA (clusters de sphres)
+!     Aggrgats
 !
-!        CALCULE AUSSI "G" = LE PARAMETRE D'ASYMETRIE
+!        ALSO calculate "G" = THE ASYMMETRY PARAMETER
 !
 ! C. Pinte
 ! 04/07/2005
@@ -613,15 +613,15 @@ subroutine mueller_GMM(lambda,igrain, qext,qsca,gsca)
   character(len=128) :: string
 
 
-  ! Il faut coriger pour la nouvelle definition de nang_scatt
-  ! Il faut aussi corriger la normalisation de s11 (faire comme mueller_Mie)
-  ! int S11 sin(theta) dtheta = Qsca, utilise la normalisation exacte, pas numerique
+  ! Correct for the new definition of nang_scatt
+  ! Also correct the normalization of s11 (do like mueller_Mie)
+  ! int S11 sin(theta) dtheta = Qsca, use exact normalization, not numerical
   call error("mueller_gmm needs to be updated")
 
   if(n_grains_tot > 1) call error("You must choose n_grains_tot=1")
   if (scattering_method /= 1) call error("You must choose scattering_method 1")
 
-  ! Lecture du fichier de résultats de gmm01TrA : 'gmm01TrA.out'
+  ! Lecture du fichier de rsultats de gmm01TrA : 'gmm01TrA.out'
   open(unit=12,file=mueller_aggregate_file,status='old')
   read(12,*)
   read(12,*)
@@ -658,18 +658,18 @@ subroutine mueller_GMM(lambda,igrain, qext,qsca,gsca)
      enddo
   endif
   close(12)
-  ! Fin lecture
+  ! End of reading
   close(unit=1)
 
 
 !  QABS=QEXT-QSCA
-! Calcul des elements de la matrice de diffusion
-! Calcul angle central du bin par interpolation linéaire
+! Calculation of scattering matrix elements
+! Calcul angle central du bin par interpolation linaire
   do J=1,2*NANG_scatt
      mueller(:,:,j) = 0.5*(mue(:,:,j)+mue(:,:,j+1))
   enddo !j
 
-  ! Integration S11 pour tirer angle
+  ! S11 integration for angle selection
   prob_s11(lambda,igrain,0)=0.0
   somme_sin= 0.0
   somme2 = 0.0
@@ -682,7 +682,7 @@ subroutine mueller_GMM(lambda,igrain, qext,qsca,gsca)
 ! Somme2 sert juste pour faire des plots
   enddo
 
-  ! Normalisation
+  ! normalization
   somme_prob=prob_s11(lambda,igrain,2*nang_scatt) ! = (0.5*x**2*qsca)
   ! Soit int_0^\pi (i1(t)+i2(t)) sin(t) = x**2*qsca
   do j=1,2*nang_scatt
@@ -691,17 +691,17 @@ subroutine mueller_GMM(lambda,igrain, qext,qsca,gsca)
 
 
   do J=1,2*NANG_scatt
-!     ! Normalisation pour diffusion isotrope et E_sca(theta)
+!     ! Normalization pour diffusion isotrope et E_sca(theta)
 !     if (j == 1)  then
 !        norm = somme_prob/somme_sin
 !     endif
 
-! NORMALISATION ENLEVEE POUR LES CALCULS DES TAB_POS (MATRICES DE MUELLER
+! Normalization REMOVED FOR TAB_POS CALCULATIONS (MATRICES DE MUELLER
 ! PAR cell)
-! A REMETTRE POUR MATRICES DE MUELLER PAR GRAINS
+! TO BE REINSTATED FOR MUELLER MATRICES PER GRAIN
 
      if (scattering_method==1) then
-        ! Normalisation pour diffusion selon fonction de phase (tab_s11=1.0 sert dans stokes)
+        ! Normalization for scattering according to phase function (tab_s11=1.0 used in Stokes)
         norm=mueller(1,1,j) !* qext/q sca
         mueller(:,:,j) = mueller(:,:,j) / norm
      endif
@@ -727,12 +727,12 @@ end subroutine mueller_GMM
 subroutine Fresnel_input(lambda,igrain, qext,qsca,gsca)
 
 !***************************************************************
-! Routine dérivé de Mueller_GMM.
-! Calcule les elements de la matrice de diffusion a partir d'un
+! Routine driv de Mueller_GMM.
+! calculate les elements de la matrice de diffusion a partir d'un
 ! fichier ascii contenant divers informations :
-! La matrice de Mueller à chaque angle de diffraction de 0 à 180°,
-! Qsca, Qext et le factor d'assymétrie
-! Voici un exemple de fichier :
+! La matrice de Mueller  chaque angle de diffraction de 0  180,
+! Qsca, Qext et le factor d'assymtrie
+! Here is an example file:
 !        Qext        Qsca        <cos(theta)>
 !     0.34402E+01  0.82702E+00     0.73069E+00
 !
@@ -771,7 +771,7 @@ subroutine Fresnel_input(lambda,igrain, qext,qsca,gsca)
 
   if (aniso_method == 2) call error ("You shoudn't use a hg function option when putting Mueller matrix in input")
 
-  ! Lecture du fichier d'entrée :
+  ! Lecture du fichier d'entre :
   open(unit=12,file=mueller_file,status='old')
   read(12,*) string
   read(12,*) ext,sca,assym
@@ -785,12 +785,12 @@ subroutine Fresnel_input(lambda,igrain, qext,qsca,gsca)
      read(12,*)         mueller(4,1,i),mueller(4,2,i),mueller(4,3,i),mueller(4,4,i)
   enddo
   close(12)
-  ! Fin lecture
+  ! End of reading
   close(unit=1)
 
   if (scattering_method == 1) then
      ! Integration de S11 pour tirer angle
-     ! Condition initiale : sin(0)=0
+     ! Initial condition: sin(0)=0
      prob_s11(lambda,igrain,0)=0.0
      dtheta = pi/real(nang_scatt)
 
@@ -800,28 +800,28 @@ subroutine Fresnel_input(lambda,igrain, qext,qsca,gsca)
              mueller(1,1,j)*sin(theta)*dtheta
      enddo
 
-     ! Normalisation
+     ! normalization
      somme_prob = prob_s11(lambda, igrain,nang_scatt)
      prob_s11(lambda, igrain,:)=prob_s11(lambda, igrain,:)/somme_prob
-  else  !on va avoir besoin des valeurs non normalisés
+  else  ! non-normalized values will be needed
      do i=1, 4
         do j=1, 4
            if (i*j>1) mueller(i,j,:) = mueller(i,j,:)*mueller(1,1,:)
         enddo
      enddo
-     !on calcul maintenant l'intégrale de s11
+     ! now the integral of s11 is calculated
      somme_prob=0.0
      dtheta = pi/real(nang_scatt)
      do j=1,nang_scatt
         theta = real(j)*dtheta
         somme_prob = somme_prob + mueller(1,1,j)*sin(theta)*dtheta
      enddo
-  endif !scatt_meth
+  endif ! scatt_meth
 
   do J=0,NANG_scatt
-     if (scattering_method==1) then ! Matrice de Mueller par grain
-        ! Normalisation pour diffusion selon fonction de phase (tab_s11=1.0 sert dans stokes)
-        ! on ne normalise que S11 car les données sont déjà normalisées
+     if (scattering_method==1) then ! Mueller matrix per grain
+        ! Normalization for scattering according to phase function (tab_s11=1.0 used in Stokes)
+        ! only S11 is normalized because the data are already normalized
         norm=mueller(1,1,j)
         if (norm > tiny_real) then
            mueller(1,1,j) = mueller(1,1,j) / norm
@@ -829,7 +829,7 @@ subroutine Fresnel_input(lambda,igrain, qext,qsca,gsca)
            write (*,*) "at angle", real(j)*pi/real(nang_scatt)
            call error ("s11=0.0")
         endif
-     else ! Sinon normalisation a Qsca. On utilise somme_prob.
+     else ! Otherwise normalization to Qsca. somme_prob is used.
         norm = somme_prob/sca
         if (norm > tiny_real) then
            mueller(:,:,j) = mueller(:,:,j)/norm
@@ -860,12 +860,12 @@ end subroutine Fresnel_input
  subroutine Fresnel_input_size(lambda,igrain, qext,qsca,gsca)
 
 !***************************************************************
-! Routine dérivé de Mueller_GMM.
-! Calcule les elements de la matrice de diffusion a partir d'un
-! fichier ascii par taille de grain contenant divers informations :
-! La matrice de Mueller à chaque angle de diffraction de 0 à 180°
-! Qsca, Qext, le factor d'assymétrie
-! Voici un exemple de fichier :
+! Routine derived from Mueller_GMM.
+! calculate the scattering matrix elements from an
+! ascii file per grain size containing various information:
+! The Mueller matrix at each diffraction angle from 0 to 180
+! Qsca, Qext, the asymmetry factor
+! Here is an example file:
 !        Qext        Qsca        <cos(theta)>
 !     0.34402E+01  0.82702E+00     0.73069E+00
 !
@@ -879,8 +879,8 @@ end subroutine Fresnel_input
 !          0.1585395E+03   0.6996034E+04   0.7065835E-13 -0.1650172E-12
 !.......
 !
-! L'adresse de ces fichiers est contenu dans un fichier texte
-! trié dans l'ordre croissant suivant la taille de grain.
+! The address of these files (sorted in increasing order according to grain size)
+! is contained in a text file.
 !
 ! F. Malaval
 ! 20/04/2023
@@ -904,11 +904,11 @@ end subroutine Fresnel_input
 
   if (modulo(nang_scatt,2) == 1) call error("nang_scatt must be an EVEN number")
 
-  if (aniso_method == 2) call error ("You shoudn't use a hg function option when putting Mueller matrix in input")
+  if (aniso_method == 2) call error ("You shouldn't use a hg function option when putting Mueller matrix in input")
 
   open(unit=13, file = mueller_file, status = 'old')
-  !Dans ce cas, mueller_file contient les chemins vers les fichiers de chaque matrice,
-  !triés dans l'ordre croissant suivant la taille de grain.
+  ! In this case, mueller_file contains the paths to the files for each matrix,
+  ! sorted in increasing order according to grain size.
   do j=1, igrain
      read(13, *) size, path
   enddo
@@ -918,12 +918,12 @@ end subroutine Fresnel_input
      call error("Grain sizes do not match")
   endif
 
-  ! Lecture du fichier d'entrée :
+  ! Reading the input file:
   open(unit=12,file=path,status='old')
   read(12,*) string
   read(12,*) ext,sca,assym
   read(12,*)
-  read(12,*)  !'Matrice de mueller (4X4 coefficients pour chaque angle):'
+  read(12,*)  !'Mueller matrix (4X4 coefficients for each angle):'
   read(12,*) string
   do i=0,nang_scatt
      read(12,*) dang(i),mueller(1,1,i),mueller(1,2,i),mueller(1,3,i),mueller(1,4,i)
@@ -932,13 +932,13 @@ end subroutine Fresnel_input
      read(12,*)   mueller(4,1,i),mueller(4,2,i),mueller(4,3,i),mueller(4,4,i)
   enddo
   close(12)
-  ! Fin lecture
+  ! End of reading
 
   close(unit=1)
 
   if (scattering_method == 1) then
-     ! Integration S11 pour tirer angle
-     ! Condition initiale : sin(0)=0
+     ! S11 integration for angle selection
+     ! Initial condition: sin(0)=0
      prob_s11(lambda,igrain,0)=0.0
      dtheta = pi/real(nang_scatt)
 
@@ -948,29 +948,29 @@ end subroutine Fresnel_input
              mueller(1,1,j)*sin(theta)*dtheta
      enddo
 
-     ! Normalisation
+     ! Normalization
      somme_prob= prob_s11(lambda, igrain,nang_scatt)
      prob_s11(lambda, igrain,:)=prob_s11(lambda, igrain,:)/somme_prob
-  else  !on va avoir besoin des valeurs non normalisés
+  else  ! non-normalized values will be needed
      do i=1, 4
         do j=1, 4
            if (i*j>1) mueller(i,j,:) = mueller(i,j,:)*mueller(1,1,:)
         enddo
      enddo
-     !on calcul maintenant l'intégrale de s11
+     ! now the integral of s11 is calculated
      somme_prob=0.0
      dtheta = pi/real(nang_scatt)
      do j=1,nang_scatt
         theta = real(j)*dtheta
         somme_prob = somme_prob + mueller(1,1,j)*sin(theta)*dtheta
      enddo
-  endif !scatt_meth
+  endif ! scatt_meth
 
 
   do J=0,NANG_scatt
-     if (scattering_method==1) then ! Matrice de Mueller par grain
-        ! Normalisation pour diffusion selon fonction de phase (tab_s11=1.0 sert dans stokes)
-        ! on ne normalise que S11 car les données sont déjà normalisées
+     if (scattering_method==1) then ! Mueller matrix per grain
+        ! Normalization for scattering according to phase function (tab_s11=1.0 used in Stokes)
+        ! only S11 is normalized because the data are already normalized
         norm=mueller(1,1,j)
         if (norm > tiny_real) then
            mueller(1,1,j) = mueller(1,1,j) / norm
@@ -978,7 +978,7 @@ end subroutine Fresnel_input
            write (*,*) "at angle", real(j)*pi/real(nang_scatt)
            call error ("s11=0.0")
         endif
-     else ! Sinon normalisation a Qsca. On utilise somme_prob.
+     else ! Otherwise normalization to Qsca. somme_prob is used.
         norm = somme_prob/sca
         if (norm > tiny_real) then
            mueller(:,:,j) = mueller(:,:,j)/norm
@@ -1007,10 +1007,10 @@ end subroutine Fresnel_input_size
 !***************************************************
 
 subroutine mueller_opacity_file(lambda,igrain, qext,qsca,gsca)
-  ! interpolation bi-lineaire (en log-log) des sections efficaces
-  ! pour grains apres lecture du fichier d'opacity
-  ! En particulier pour les PAHs de Draine
-  ! Suppose une HG pour la fonction de phase et une polarisabilite nulle !!
+  ! bi-linear interpolation (in log-log) of cross sections
+  ! for grains after reading the opacity file
+  ! Particularly for Draine's PAHs
+  ! Assumes a HG for the phase function and zero polarizability !!
   ! C. Pinte
   ! 31/01/07
 
@@ -1032,7 +1032,7 @@ subroutine mueller_opacity_file(lambda,igrain, qext,qsca,gsca)
 
   if ((igrain == dust_pop(pop)%ind_debut).and.(lambda==1)) call read_opacity_file(pop)
 
-  ! Ordre croissant pour les tailles de grains
+  ! Increasing order for grain sizes
   if (r_grain(igrain) < exp(op_file_log_r_grain(1,pop))) then
      if (lambda==1) then
         write(*,*) "WARNING: index=",igrain, "grain size=",r_grain(igrain)
@@ -1050,8 +1050,8 @@ subroutine mueller_opacity_file(lambda,igrain, qext,qsca,gsca)
      j = op_file_na(pop)
      frac_a = 1.0 ; frac_a_m1 = 0.
   else
-     ! Recherche en taille de grain
-     ! tableau croissant
+     ! Search in grain size
+     ! Increasing array
      do j=2,op_file_na(pop)
         if (op_file_log_r_grain(j,pop) > log_a) exit
      enddo
@@ -1059,7 +1059,7 @@ subroutine mueller_opacity_file(lambda,igrain, qext,qsca,gsca)
      frac_a_m1 = 1 - frac_a
   endif
 
-  ! Moyennage en length d'onde
+  ! Wavelength averaging
   wl_min = tab_lambda_inf(lambda)
   wl_max = tab_lambda_sup(lambda)
 
@@ -1075,13 +1075,13 @@ subroutine mueller_opacity_file(lambda,igrain, qext,qsca,gsca)
   enddo !i
   !write(*,*) lambda, N, norm
 
-  if (norm > 0) then ! on fait la moyenne sur les points selectionnes
+  if (norm > 0) then ! averaging over selected points
      qext = qext / norm
      qsca = qsca / norm
      gsca = gsca / norm
-  else ! on peut pas moyenner, on fait une interpolation en log
-     ! Recherche en length d'onde
-     if (op_file_lambda(2,pop) > op_file_lambda(1,pop)) then  ! Ordre croisant
+  else ! cannot average, doing log interpolation
+     ! Wavelength search
+     if (op_file_lambda(2,pop) > op_file_lambda(1,pop)) then  ! Increasing order
         do i=2,op_file_n_lambda(pop)
            if (log(op_file_lambda(i,pop)) > log_wavel) exit
         enddo
@@ -1093,7 +1093,7 @@ subroutine mueller_opacity_file(lambda,igrain, qext,qsca,gsca)
         fact3 = frac_a * (1.-frac_lambda)
         fact4 = frac_a * frac_lambda
 
-     else ! Ordre decroisant
+     else ! Decreasing order
         do i=2,op_file_n_lambda(pop)-1
            if (log(op_file_lambda(i,pop)) < log_wavel) exit
         enddo
@@ -1125,42 +1125,42 @@ subroutine mueller_opacity_file(lambda,igrain, qext,qsca,gsca)
 
   !if ((igrain == dust_pop(pop)%ind_fin).and.(lambda==n_lambda)) call free_mem_opacity_file()
 
-  !! Matrices de mueller
+  !! Mueller matrices
   if (aniso_method==1) then ! we have to compute a phase function from g
 
-     ! HG avec le g interpole dans la table
+     ! HG with the g interpolated in the table
      do j=0,nang_scatt
         s11(j)=((1-gsca**2)/(2.0))*(1+gsca**2-2*gsca*cos((real(j))/real(nang_scatt)*pi))**(-1.5)
      enddo
 
-     ! Polarisabilite nulle
+     ! Zero polarizability
      s12=0.0 ; s22 = 0.0 ; s33 = 0.0 ; s34 = 0.0 ; s44 = 0.0
 
      if (scattering_method==1) then
         prob_s11(lambda,igrain,0)=0.0
         dtheta = pi/real(nang_scatt)
-        do j=2,nang_scatt ! probabilite de diffusion jusqu'a l'angle j, on saute j=0 car sin(theta) = 0
+        do j=2,nang_scatt ! scattering probability up to angle j, j=0 is skipped because sin(theta) = 0
            theta = real(j)*dtheta
            prob_s11(lambda,igrain,j)=prob_s11(lambda,igrain,j-1)+s11(j)*sin(theta)*dtheta
         enddo
 
-        ! s11 est calculee telle que la normalisation soit: 1.0 (def de la HG)
-        ! il y a un soucis numerique quand x >> 1 car la resolution en angle n'est pas suffisante
-        ! On rate le pic de diffraction (en particulier entre 0 et 1)
+        ! s11 is calculated such that the normalization is: 1.0 (HG definition)
+        ! there is a numerical issue when x >> 1 because the angular resolution is not sufficient
+        ! The diffraction peak is missed (particularly between 0 and 1)
         somme_prob = 1.0
         prob_s11(lambda,igrain,1:nang_scatt) = prob_s11(lambda,igrain,1:nang_scatt) + &
              somme_prob - prob_s11(lambda,igrain,nang_scatt)
 
-        ! Normalisation de la proba cumulee a 1
+        ! Normalization of the cumulative probability to 1
         prob_s11(lambda,igrain,:)=prob_s11(lambda,igrain,:)/somme_prob
      endif ! scattering_method==1
 
      do j=0,nang_scatt
-        if (scattering_method==1) then ! Matrice de Mueller par grain
-           ! Normalisation pour diffusion selon fonction de phase (tab_s11=1.0 sert dans stokes)
+        if (scattering_method==1) then ! Mueller matrix per grain
+           ! Normalization for scattering according to phase function (tab_s11=1.0 used in Stokes)
            norm=s11(j)
-        else ! Sinon normalisation a Qsca
-           ! La normalisation par default est 1 pour la HG
+        else ! Otherwise normalization to Qsca
+           ! Default normalization is 1 for HG
            if (qsca > 1e-35) then
               norm = 1./qsca
            else ! we don't care there won't be any scattering
@@ -1185,29 +1185,29 @@ end subroutine mueller_opacity_file
 !**********************************************************************
 
 subroutine update_Stokes(S,u0,v0,w0,u1,v1,w1, M)
-  ! Convention astronomique utilisee: angle de position
-  ! calcule antihoraire a partir du nord celeste
+  ! Astronomical convention used: position angle
+  ! Calculated counter-clockwise from celestial north
   !
-  ! Francois Menard, Montreal, 15 Fevrier 1989
+  ! Francois Menard, Montreal, 15 February 1989
   !
   ! C. Pinte
-  !  - Modif 22/12/03 (C. Pinte) : indice l de taille du grain diffuseur
-  !  - Normalisation de l'energie : le photon repart avec l'energie avec laquelle il est entré
+  !  - Modification 22/12/03 (C. Pinte): index l for scattering grain size
+  !  - Energy normalization: the photon leaves with the energy it entered with
   !
-  ! Coordonnees des diffuseurs
-  !  - x est vers l'observateur
-  !  - y et z forme une base droite(dans le bon sens)
-  !   - y vers la droite et z vers le haut
+  ! Scatterer coordinates
+  !  - x is towards the observer
+  !  - y and z form a right-handed basis (in the correct direction)
+  !   - y to the right and z upwards
   !
-  ! Calcul de l'angle omega entre le plan de diffusion
-  ! et le nord celeste projete(coord. equatoriale)
+  ! Calculation of the omega angle between the scattering plane
+  ! and the projected celestial north (equatorial coordinates)
   !
-  ! Dans le systeme de coord de la nebuleuse
-  !    vecteur 1 (du point "0" au point "1") = (u0,v0,w0)
-  !    vecteur 2 (du point "1" au point "2") = (u1,v1,w1)
+  ! In the nebula's coordinate system
+  !    vector 1 (from point "0" to point "1") = (u0,v0,w0)
+  !    vector 2 (from point "1" to point "2") = (u1,v1,w1)
   !
-  !  On transforme pour que v2prime = (1,0,0)
-  !  L'observateur est alors a +x dans le nouveau systeme
+  !  Transform so that v2prime = (1,0,0)
+  !  The observer is then at +x in the new system
 
   implicit none
 
@@ -1221,11 +1221,11 @@ subroutine update_Stokes(S,u0,v0,w0,u1,v1,w1, M)
   real(kind=dp), dimension(4) :: C, D
 
 
-  ! Transformation pour v1prime
+  ! Transformation for v1prime
   call rotation(u0,v0,w0,u1,v1,w1,v1pi,v1pj,v1pk)
 
-  !  Calcul des angles pour la rotation
-  !  La normale yprime est le produit vectoriel de v1prime x v2prime
+  ! Calculation of angles for the rotation
+  ! The normal yprime is the cross product of v1prime x v2prime
   !
   !  yprimei = 0.0
   !  yprimej = v1pk
@@ -1238,25 +1238,25 @@ subroutine update_Stokes(S,u0,v0,w0,u1,v1,w1, M)
      costhet = -1.0*v1pj / xnyp
   endif
 
-  ! calcul de l'angle entre la normale et l'axe z (theta)
+  ! Calculation of the angle between the normal and the z axis (theta)
   theta = acos(costhet)
   if (theta >= pi) theta = 0.0
 
-  ! le plan de diffusion est a +ou- 90deg de la normale
+  ! the scattering plane is at +/- 90deg from the normal
   theta = theta + half_pi
 
-  ! Dans les matrices de rotation l'angle est omega = 2 * theta
+  ! In the rotation matrices the angle is omega = 2 * theta
   omega = 2.0 * theta
 
-  !  prochain if car l'arccos va de 0 a pi seulement
-  !   Le +/- pour faire la difference dans le sens de rotation
+  ! next if because arccos only goes from 0 a pi only
+  ! The +/- to distinguish the rotation sense
   if (v1pk < 0.0) omega = -1.0 * omega
 
-  ! Calcul des elements des matrices de rotation
+  ! Calculation of rotation matrix elements
   !
-  ! RPO = rotation du point vers le systeme original
-  ! ROP = rotation du systeme original vers le point
-  ! (amene l'axe z dans le plan de diffusion)
+  ! RPO = rotation from the point to the original system
+  ! ROP = rotation from the original system to the point
+  ! (brings the z-axis into the scattering plane)
   cosw = cos(omega)
   sinw = sin(omega)
 
@@ -1288,147 +1288,30 @@ subroutine update_Stokes(S,u0,v0,w0,u1,v1,w1, M)
   D=matmul(M,C)
   S=matmul(RPO,D)
 
-  ! Normalisation de l'energie : le photon repart avec l'energie avec laquelle il est entré
-  ! I sortant = I entrant si diff selon s11  (tab_s11=1.0 normalisé dans mueller2)
-  ! I sortant = I entrant * s11 si diff uniforme
+  ! Energy normalization: the photon leaves with the energy it entered with
+  ! I outgoing = I incoming if scattered according to s11 (tab_s11=1.0 normalized in mueller2)
+  ! I outgoing = I incoming * s11 if uniform scattering
   if (S(1) > tiny_real) S(:) = S(:) * M(1,1)*S1_0/S(1)
 
   return
 
 end subroutine update_Stokes
-
 !**********************************************************************
-
-subroutine get_Mueller_matrix_per_grain(lambda,itheta,frac,igrain, M)
-
-  integer, intent(in) :: lambda,itheta,igrain
-  real, intent(in) :: frac
-  real(kind=dp), dimension(4,4), intent(out) :: M
-
-  real :: frac_m1
-
-  frac_m1 = 1.0 - frac
-
-  M(:,:) = 0.0_dp
-  M(1,1) = tab_s11(itheta,igrain,lambda) * frac + tab_s11(itheta-1,igrain,lambda) * frac_m1
-  M(2,2) = tab_s22(itheta,igrain,lambda) * frac + tab_s22(itheta-1,igrain,lambda) * frac_m1
-  M(1,2) = tab_s12(itheta,igrain,lambda) * frac + tab_s12(itheta-1,igrain,lambda) * frac_m1
-  M(2,1) = M(1,2)
-  M(3,3) = tab_s33(itheta,igrain,lambda) * frac + tab_s33(itheta-1,igrain,lambda) * frac_m1
-  M(4,4) = tab_s44(itheta,igrain,lambda) * frac + tab_s44(itheta-1,igrain,lambda) * frac_m1
-  M(3,4) = -tab_s34(itheta,igrain,lambda)* frac - tab_s34(itheta-1,igrain,lambda) * frac_m1
-  M(4,3) = -M(3,4)
-
-  return
-
-end subroutine get_Mueller_matrix_per_grain
-
-!**********************************************************************
-
-subroutine get_Mueller_matrix_per_cell(lambda,itheta,frac,icell, M)
-
-  integer, intent(in) :: lambda,itheta,icell
-  real, intent(in) :: frac
-  real(kind=dp), dimension(4,4), intent(out) :: M
-
-  real :: frac_m1
-
-  frac_m1 = 1.0 - frac
-
-  M(:,:) = 0.0_dp
-  M(1,1) = 1.0 ! Mueller matrix is normalized to 1.0 as we select the scattering angle
-  M(2,2) = tab_s22_o_s11_pos(itheta,icell,lambda) * frac +  tab_s22_o_s11_pos(itheta-1,icell,lambda) * frac_m1
-  M(1,2) = tab_s12_o_s11_pos(itheta,icell,lambda) * frac +  tab_s12_o_s11_pos(itheta-1,icell,lambda) * frac_m1
-  M(2,1) = M(1,2)
-  M(3,3) = tab_s33_o_s11_pos(itheta,icell,lambda) * frac +  tab_s33_o_s11_pos(itheta-1,icell,lambda) * frac_m1
-  M(4,4) = tab_s44_o_s11_pos(itheta,icell,lambda) * frac +  tab_s44_o_s11_pos(itheta-1,icell,lambda) * frac_m1
-  M(3,4) = -tab_s34_o_s11_pos(itheta,icell,lambda)* frac -  tab_s34_o_s11_pos(itheta-1,icell,lambda) * frac_m1
-  M(4,3) = -M(3,4)
-
-  return
-
-end subroutine get_Mueller_matrix_per_cell
-
-!**********************************************************************
-
-integer function seuil_n_dif(lambda)
-
-  implicit none
-
-  integer, intent(in) :: lambda
-  integer :: n
-  real :: albedo
-  real, parameter :: threshold = 1.0e-4
-  integer, parameter :: seuil_n = 15
-
-
-  albedo = maxval(tab_albedo_pos(:,lambda))
-
-  n = floor(log(threshold)/log(albedo))+1
-
-  if (n < seuil_n) then
-     if (albedo**seuil_n > tiny_real) then
-        n=seuil_n
-     else
-        n = floor(log(tiny_real)/log(albedo))
-     endif
-  endif
-
-  seuil_n_dif=n
-
-  return
-
-end function seuil_n_dif
-
-!***********************************************************
-
-subroutine isotrope(rand1,rand2,u,v,w)
-! Choix direction de vol isotrope
-! C. Pinte
-! 24/05/05
-
-  implicit none
-
-  real, intent(in) :: rand1, rand2
-  real(kind=dp), intent(out) :: u,v,w
-
-  real(kind=dp) :: SRW02, ARGMT, w02
-
-  w = 2.0_dp*rand1-1.0_dp
-  W02 =  1.0_dp - w*w
-  SRW02 = sqrt(W02)
-  ARGMT = PI * ( 2.0_dp * rand2 - 1.0_dp )
-  u = SRW02 * cos(ARGMT)
-  v = SRW02 * sin(ARGMT)
-
-  return
-
-end subroutine isotrope
-
-!********************************************************************
 
 subroutine hg(g, rand, itheta, cospsi)
-!********************************************************
-!* CALCUL DU COSINUS DE L'ANGLE DE DIFFUSION, COS(PSI)
-!*
-!*     1-PARAMETER HENYEY-GREENSTEIN PHASE FUNCTION
-!*
-!* FRANCOIS MENARD, 23 NOV 1988, UDEM
-! Modif 22/12/03 (C. Pinte) : indice l de taille du grain diffuseur
-! - gestion du cas isotrope proprement
-! - passage en double necessaire
-!********************************************************
+  ! Drawing of the scattering angle via the Henyey-Greenstein function
+  ! itheta is the index i of the angle from 1 to 180 corresponding to i-0.5 degrees
+  ! rand is a random number between 0 and 1
+  !
+  ! C. Pinte    23/10/2004
 
   implicit none
 
-  ! Le calcul de cospsi se fait en double precision mais on
-  ! renvoie cospsi en simple precision
-  ! Passage cospsi en dp lors passage physical_length en dp
-  real, intent(in) :: g
-  real, intent(in) :: rand
-  real(kind=dp), intent(out) :: cospsi
+  real, intent(in) :: g, rand
   integer, intent(out) :: itheta
-  real (kind=dp) :: rand_dp, g1, g2
+  real(kind=dp), intent(out) :: cospsi
+
+  real(kind=dp) :: g1, g2, rand_dp
 
   rand_dp = min(real(rand,kind=dp), 1.0_dp-1e-6_dp)
 
@@ -1436,7 +1319,7 @@ subroutine hg(g, rand, itheta, cospsi)
      g1 = g ! dp
      g2 = g1*g1
      cospsi = (1.0_dp + g2 - ((1.0_dp - g2) / (1.0_dp - g1 + 2.0_dp*g1*rand_dp))**2) / (2.0_dp * g1)
-  else ! g=0 --> diffusion isotrope
+  else ! g=0 --> isotropic scattering
      cospsi=2.0_dp*rand_dp-1.0_dp
   endif
 
@@ -1449,13 +1332,13 @@ end subroutine hg
 !***********************************************************
 
 subroutine angle_diff_theta(lambda, igrain, rand, rand2, itheta, cospsi)
-! Calcul du cosinus de l'angle de diffusion
-! a partir de l'integrale des s11 pretabulées
-! itheta est l'indice i de l'angle de 1 a 180 correspondant a i-0.5°
-! cospsi est tire uniformément dans le bin de 1° autour de l'angle i-0.5°
-! itheta est utilisé pour les valeurs prétabulées
-! cospsi est utilisé pour la direction de vol
-! C. Pinte 23/10/04
+  ! Calculation of the cosine of the scattering angle
+  ! from the integral of the pretabulated s11
+  ! itheta is the index i of the angle from 1 to 180 corresponding to i-0.5 degree
+  ! cospsi is drawn uniformly in the 1 degree bin around angle i-0.5 degrees
+  ! itheta is used for pretabulated values
+  ! cospsi is used for the flight direction
+  ! C. Pinte 23/10/04
 
   implicit none
 
@@ -1483,8 +1366,8 @@ subroutine angle_diff_theta(lambda, igrain, rand, rand2, itheta, cospsi)
    itheta=k
    !cospsi=cos((real(k)-0.5)*pi/180.)
 
-   ! Tirage aleatoire de l'angle de diffusion autour entre l'angle k et l'angle k-1
-   ! diffusion uniforme (lineaire en cos)
+   ! Random draw of the scattering angle between angle k and angle k-1
+   ! uniform scattering (linear in cos)
    cospsi=cos((real(k)-1.0)*pi/real(nang_scatt)) + &
         rand2*(cos((real(k))*pi/real(nang_scatt))-cos((real(k)-1.0)*pi/real(nang_scatt)))
 
@@ -1495,13 +1378,13 @@ end subroutine angle_diff_theta
 !**********************************************************************
 
 subroutine angle_diff_theta_pos(lambda, icell, rand, rand2, itheta, cospsi)
-! Calcul du cosinus de l'angle de diffusion
-! a partir de l'integrale des s11 pretabulee par cell
-! itheta est l'indice i de l'angle de 1 a 180 correspondant Ã  i-0.5Â°
-! cospsi est tire uniformÃ©ment dans le bin de 1Â° autour de l'angle i-0.5Â°
-! itheta est utilise pour les valeurs pretabulee
-! cospsi est utilise pour la direction de vol
-! C. Pinte 9/01/05
+  ! Calculation of the cosine of the scattering angle
+  ! from the integral of s11 pretabulated per cell
+  ! itheta is the index i of the angle from 1 to 180 corresponding to i-0.5 degrees
+  ! cospsi is drawn uniformly in the 1 degree bin around angle i-0.5 degrees
+  ! itheta is used for pretabulated values
+  ! cospsi is used for the flight direction
+  ! C. Pinte 9/01/05
 
   implicit none
 
@@ -1529,8 +1412,8 @@ subroutine angle_diff_theta_pos(lambda, icell, rand, rand2, itheta, cospsi)
    itheta=k
    !cospsi=cos((real(k)-0.5)*pi/180.)
 
-   ! Tirage aleatoire de l'angle de diffusion entre l'angle k et l'angle k-1
-   ! diffusion uniforme (lineaire en cos)
+   ! Random draw of the scattering angle between angle k and angle k-1
+   ! uniform scattering (linear in cos)
    cospsi=cos((real(k,kind=dp)-1.0_dp)*pi/real(nang_scatt,kind=dp)) + &
         rand2*(cos((real(k,kind=dp))*pi/real(nang_scatt,kind=dp))-cos((real(k,kind=dp)-1.0_dp)*pi/real(nang_scatt,kind=dp)))
 
@@ -1541,17 +1424,16 @@ end subroutine angle_diff_theta_pos
 !**********************************************************************
 
 subroutine funcd(x,fval,fderiv,ppp,A)
-! Calcule la fonction de repartition de l'angle de diffusion phi
-! ainsi que sa dérivée pour déterminer le zero par la méthode des
-! tangentes (Newton)
-! C. Pinte    23/10/2004
+  ! calculate the scattering angle distribution function phi
+  ! and its derivative to determine the zero by the Newton method
+  ! C. Pinte    23/10/2004
 
   implicit none
 
   real, intent(in) :: x,ppp,A
   real, intent(out) :: fval,fderiv
 
-  ! T'es sur que c'est le bon signe la ?????????
+  ! Are you sure about the sign here?
   fval=2*x-ppp*sin(2*x)-A
   fderiv=2-ppp*2*cos(2*x)
 
@@ -1562,12 +1444,12 @@ end subroutine funcd
 !**********************************************************************
 
 subroutine angle_diff_phi(lambda,igrain, I, Q, U, itheta, frac, rand, phi)
-! Tirage de l'angle de diffusion phi du photon
-! Uniforme pour une onde non polarisee
-! Suivant fct de phase de Mie pour un photon polarise
-! C. Pinte    23/10/2004
-! Ajout du cas ou les matrices de Mueller sont donnees en entrees
-! 20/04/2023
+  ! Draw of the photon's scattering angle phi
+  ! Uniform for an unpolarized wave
+  ! Following the Mie phase function for a polarized photon
+  ! C. Pinte    23/10/2004
+  ! Added case where Mueller matrices are given as input
+  ! 20/04/2023
 
   implicit none
 
@@ -1583,12 +1465,12 @@ subroutine angle_diff_phi(lambda,igrain, I, Q, U, itheta, frac, rand, phi)
 
 !  write(*,*) 'in',l, itheta, I, Q, U, rand
 
-  ! Flux polarisé et taux de pola
+  ! Polarized flux and polarization rate
   Q_dp=Q;U_dp=U
   Ip=sqrt(Q_dp*Q_dp+U_dp*U_dp)
   p=Ip/I
 
-  ! polarisabilite
+  ! polarizability
   pp= (tab_s12(itheta,igrain,lambda) * frac + tab_s12(itheta-1,igrain,lambda) * frac_m1) &
        / (tab_s11(itheta,igrain,lambda) * frac + tab_s11(itheta-1,igrain,lambda) * frac_m1)
 
@@ -1596,19 +1478,19 @@ subroutine angle_diff_phi(lambda,igrain, I, Q, U, itheta, frac, rand, phi)
 !  write(*,*) p,pp,ppp
 
   if (abs(ppp) > 1.e-3) then
-     ! Mesure de l'angle du plan de pola par rapport au Nord céleste
-     phi1=0.5*acos(Q_dp/Ip) ! C'est ici qu'on a besoin du dp
+     ! Measure the angle of the polarization plane relative to celestial North
+     phi1=0.5*acos(Q_dp/Ip) ! This is where we need the dp
      if (U < 0.0) then
         phi1= -phi1
      endif
-     ! Tirage de l'angle entre le plan de diffusion et le plan de pola
-     ! selon A = 2*phi - ppp*sin(2*phi)   A=4*pi*rand
+     ! draw of angle between the scattering plane and the polarization plane
+     ! according to A = 2*phi - ppp*sin(2*phi)   A=4*pi*rand
      phi2=rtsafe(funcd,0.,2*real(pi),1.e-4,ppp,4*real(pi)*rand)
 !     write(*,*) 'test', phi1 , Q/Ip
      phi=phi1+phi2
      if (phi > pi) phi = phi -2*pi
      if (phi < -pi) phi = phi +2*pi
-  else ! Tirage uniforme
+  else ! Uniform selection
      phi= pi * (2._dp*rand -1.0_dp)
   endif
 !  write(*,*) phi/pi
@@ -1620,10 +1502,10 @@ end subroutine angle_diff_phi
 !**********************************************************************
 
 real function rtsafe(funcd,x1,x2,xacc,ppp,A)
-! Trouve le zéro d'une fonction
-! Ici, l'angle de diffusion en phi pour un photon polarisé
-! suivant la fonction de répartion donnée par funcd
-! C. Pinte    23/10/2004
+  ! Find the zero of a function
+  ! Here, the scattering angle in phi for a polarized photon
+  ! following the distribution function given by funcd
+  ! C. Pinte    23/10/2004
 
   implicit none
   real, intent(in) :: x1,x2,xacc,ppp,A
@@ -1702,7 +1584,7 @@ subroutine radius_aggregate()
 
   open(unit=1,file=trim(aggregate_file), status='old')
   read(1,*) wavelength
-  if (abs(wavelength - tab_lambda(1)) < 1.0e-5) call error("walength does correspond to wavelength of the Mueller matrix")
+  if (abs(wavelength - tab_lambda(1)) < 1.0e-5) call error("wavelength does not correspond to wavelength of the Mueller matrix")
 
   read(1,*) n_grains_tot
   allocate(x(n_grains_tot), y(n_grains_tot), z(n_grains_tot), r(n_grains_tot), eps1(n_grains_tot), &

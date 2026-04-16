@@ -134,8 +134,8 @@ module grid
 !******************************************************************************
 
 subroutine define_physical_zones()
-  ! Recheche les connections de zone 2 a 2
-  ! on doit pouvoir faire mieux que ca
+  ! Searching for connections between zones 2 by 2
+  ! we should be able to do better than this
   ! C. Pinte
   ! 03/05/11
 
@@ -159,15 +159,15 @@ subroutine define_physical_zones()
         minR = disk_zone(i)%Rmin
         maxR = disk_zone(i)%Rmax
 
-        ! Besoin d'iterer au cas ou les connections entre zones sont multiples
-        ! probablement pas autant mais ca ne coute rien en calcul
+        ! Need to iterate in case connections between zones are multiple
+        ! probably not that many, but it costs nothing in calculation
         do iter=1, n_zones-1
            do j=i+1, n_zones
 
               r1 = disk_zone(j)%Rmin
               r2 = disk_zone(j)%Rmax
 
-              ! Test if the 2 zones are imbrigated
+              ! Test if the 2 zones are overlapping
               test_j_in_i = ((r1 > minR).and.(r1 < maxR)) .or. ((r2 > minR).and.(r2 <= maxR))
               test_i_in_j = ((minR > r1).and.(minR < r2)) .or. ((maxR > r1).and.(maxR <= r2))
 

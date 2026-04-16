@@ -58,7 +58,7 @@ contains
   r02 = xin*xin+yin*yin
   r2 = r02+zin*zin
 
-  ! Peut etre un bug en 0, 0 due a la correction sur grid_rmin dans define_grid3
+  ! Possible bug at 0, 0 due to correction on grid_rmin in define_grid3
   if (r2 < r_lim_2(0)) then
      ri_out=0
      thetaj_out=1
@@ -202,11 +202,11 @@ end subroutine indice_cellule_sph_theta
 
     ! Todo : can be calculated outside
 
-    ! Petit delta pour franchir la limite de la cell
-    ! et ne pas etre pile-poil dessus
+    ! Small delta to cross the cell boundary
+    ! and not sit exactly on it
     correct_moins = 1.0_dp - prec_grille_sph
     correct_plus = 1.0_dp + prec_grille_sph
-    precision = 1.0e-15_dp ! pour g95
+    precision = 1.0e-15_dp ! for g95
 
     uv = sqrt(u*u + v*v)
     ! end     ! Todo : can be calculated outside
@@ -214,15 +214,15 @@ end subroutine indice_cellule_sph_theta
     ! 3D cell indices
     call cell2cylindrical(cell, ri0,thetaj0,phik0)
 
-    ! Detection interface
+    ! Interface detection
     r0_2_cyl  = x0*x0+y0*y0
     r0_cyl = sqrt(r0_2_cyl)
     r0_2 = r0_2_cyl + z0*z0
     b   = (x0*u+y0*v+z0*w)
 
     if (ri0==0) then
-       ! Si on est avant le bord interne,  on passe forcement par rmin
-       ! et on cherche forcement la racine positive (unique)
+       ! If we are inside the inner boundary, we must pass through rmin
+       ! and we must find the unique positive root
        c=(r0_2-r_lim_2(0)*correct_plus)
        delta=b*b-c
        rac=sqrt(delta)
@@ -231,25 +231,25 @@ end subroutine indice_cellule_sph_theta
        delta_rad=1
        t_phi = huge_real
     else
-       ! 1) position interface radiale
-       ! on avance ou recule en r ? -> produit scalaire
+       ! 1) radial interface position
+       ! Moving inward or outward in r? -> dot product
        dotprod = b
        if (dotprod < 0.0_dp) then
-          ! on recule : on cherche radius inf�rieur
+          ! Moving inward: looking for the lower boundary radius
           c=(r0_2-r_lim_2(ri0-1)*correct_moins)
           delta=b*b-c
-          if (delta < 0.0_dp) then ! on ne rencontre pas le radius inf�rieur
-             ! on cherche le radius sup�rieur
+          if (delta < 0.0_dp) then ! We do not encounter the lower boundary radius
+             ! Looking for the upper boundary radius
              c=(r0_2-r_lim_2(ri0)*correct_plus)
-             delta=max(b*b-c,0.0_dp) ! on force 0.0 si pb de precision qui donnerait delta=-epsilon
+             delta=max(b*b-c,0.0_dp) ! force 0.0 to handle precision issues that could give delta=-epsilon
              delta_rad=1
           else
              delta_rad=-1
           endif
        else
-          ! on avance : on cherche le radius sup�rieur
+          ! Moving outward: looking for the upper boundary radius
           c=(r0_2-r_lim_2(ri0)*correct_plus)
-          delta=max(b*b-c,0.0_dp) ! on force 0.0 si pb de precision qui donnerait delta=-epsilon
+          delta=max(b*b-c,0.0_dp) ! force 0.0 to handle precision issues that could give delta=-epsilon
           delta_rad=1
        endif !dotprod
        rac=sqrt(delta)
@@ -260,8 +260,8 @@ end subroutine indice_cellule_sph_theta
           s=grid_prec
        endif
 
-       ! 2) position interface inclinaison
-       if (z0 >= 0.0_dp) then ! on est dans le bon sens
+       ! 2) inclination interface position
+       if (z0 >= 0.0_dp) then ! we are in the correct direction
           tan_angle_lim1 = tan_theta_lim(abs(thetaj0)) * correct_plus
           tan_angle_lim2 = tan_theta_lim(abs(thetaj0)-1) * correct_moins
        else
@@ -277,15 +277,15 @@ end subroutine indice_cellule_sph_theta
        c_theta = z0*z0 - tan2 * (x0*x0 + y0*y0)
 
        delta = b_theta * b_theta - a_theta * c_theta
-       if (delta < 0.0_dp) then ! Pas de sol reelle
+       if (delta < 0.0_dp) then ! No real solution
           t1 = 1.0e30_dp
-       else ! Au moins une sol reelle
+       else ! At least one real solution
           rac = sqrt(delta)
           t1_1 = (- b_theta - rac) * a_theta_m1
           t1_2 = (- b_theta + rac) * a_theta_m1
 
           if (t1_1 <= precision) then
-             if (t1_2 <= precision) then ! les 2 sont <0
+             if (t1_2 <= precision) then ! both are <0
                 t1=1.0e30_dp
              else   ! Seul t1_2 > 0
                 t1 = t1_2
@@ -307,15 +307,15 @@ end subroutine indice_cellule_sph_theta
        c_theta = z0*z0 - tan2 * (x0*x0 + y0*y0)
 
        delta = b_theta * b_theta - a_theta * c_theta
-       if (delta < 0.0_dp) then ! Pas de sol reelle
+       if (delta < 0.0_dp) then ! No real solution
           t2 = 1.0e30_dp
-       else ! Au moins une sol reelle
+       else ! At least one real solution
           rac = sqrt(delta)
           t2_1 = (- b_theta - rac) * a_theta_m1
           t2_2 = (- b_theta + rac) * a_theta_m1
 
           if (t2_1 <= precision) then
-             if (t2_2 <= precision) then ! les 2 sont <0
+             if (t2_2 <= precision) then ! both are <0
                 t2=1.0e30_dp
              else   ! Seul t2_2 > 0
                 t2 = t2_2
@@ -329,7 +329,7 @@ end subroutine indice_cellule_sph_theta
           endif
        endif ! signe delta
 
-       ! Selection limite theta
+       ! Select the theta boundary
        if (t1 < t2) then
           t=t1
           delta_theta = 1
@@ -340,15 +340,15 @@ end subroutine indice_cellule_sph_theta
           if (abs(thetaj0) == 1) delta_theta = 0
        endif
 
-       ! 3) position interface azimuthale
+       ! 3) azimuthal interface position
        if (l3D) then
           dotprod =  x0*v - y0*u
           if (abs(dotprod) < 1.0e-10) then
-             ! on ne franchit pas d'interface azimuthale
+             ! No azimuthal interface is crossed
              t_phi = 1.0e30
              delta_phi = 0
           else
-             ! Quelle cell on va franchir
+             ! Which cell boundary will be crossed
              if (dotprod > 0.0) then
                 tan_angle_lim = tan_phi_lim(phik0)
                 delta_phi=1
@@ -359,7 +359,7 @@ end subroutine indice_cellule_sph_theta
                 delta_phi=-1
              endif
              ! length av interserction
-             if (tan_angle_lim > 1.0d299) then ! inclus le cas 90 deg
+             if (tan_angle_lim > 1.0d299) then ! includes the 90 deg case
                 t_phi = -x0/u
              else
                 den= v-u*tan_angle_lim
@@ -385,7 +385,7 @@ end subroutine indice_cellule_sph_theta
     if ((s < t).and.(s < t_phi)) then ! r
        l=s
        delta_vol=s
-       ! Position au bord de la cell suivante
+       ! Position at the boundary of the next cell
        x1=x0+delta_vol*u
        y1=y0+delta_vol*v
        z1=z0+delta_vol*w
@@ -393,8 +393,8 @@ end subroutine indice_cellule_sph_theta
        thetaj1 = thetaj0
        phik1 = phik0
 
-       ! Calcul de l'indice theta quand on rentre dans la cell ri=1
-       ! Todo : calcul indice phi aussi ???
+       ! Compute the theta index when entering cell ri=1
+       ! Todo : also compute phi index ???
        if (ri0 == 0) then
           call indice_cellule_sph_theta(x1,y1,z1,thetaj1,phik1)
        endif
@@ -408,7 +408,7 @@ end subroutine indice_cellule_sph_theta
     else if (t < t_phi) then ! theta
        l=t
        delta_vol=t
-       ! Position au bord de la cell suivante
+       ! Position at the boundary of the next cell
        x1=x0+delta_vol*u
        y1=y0+delta_vol*v
        z1=z0+delta_vol*w
@@ -421,7 +421,7 @@ end subroutine indice_cellule_sph_theta
     else
        l=t_phi
        delta_vol=correct_plus*t_phi
-       ! Position au bord de la cell suivante
+       ! Position at the boundary of the next cell
        x1=x0+delta_vol*u
        y1=y0+delta_vol*v
        z1=z0+delta_vol*w
@@ -518,7 +518,7 @@ end subroutine indice_cellule_sph_theta
     call index_cell_sph(x,y,z, icell)
     ri = cell_map_i(icell)
 
-    ! Patch pour eviter BUG sur position radiale
+    ! Patch to avoid BUG on radial position
     ! a cause de limite de precision
     if (ri==0) then
        factor = rmin/ sqrt(x*x+y*y+z*z) * correct_plus
@@ -560,7 +560,7 @@ end subroutine indice_cellule_sph_theta
 !***********************************************************
 
   subroutine move_to_grid_sph(id, x,y,z,u,v,w, icell,lintersect)
-    ! Calcule la position au bord de la grid dans
+    ! Calculates la position au bord de la grid dans
     ! la direction donnee pour grid spherique
     ! C. Pinte
     ! 01/08/07

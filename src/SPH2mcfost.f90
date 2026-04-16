@@ -300,7 +300,7 @@ contains
     ! Densities
     !*************************
     call allocate_densities(n_cells_max = n_SPH + n_stars) ! we allocate all the SPH particule for libmcfost
-    ! Tableau de densite et mass de gaz
+    ! Gas density and mass arrays
     !do icell=1,n_cells
     !   gas_density(icell) = rho(icell) / mu_mH * m3_to_cm3 ! rho is in g/cm^3 --> part.m^3
     !   gas_mass(icell) =  gas_density(icell) * mu_mH * volume(icell)
@@ -328,10 +328,10 @@ contains
     if (lforce_Mgas) then ! Todo : testing for now, use a routine to avoid repeting code
        write(*,*) "Forcing gas mass to value in parameter file rather"
        ! Normalisation
-       if (mass > 0.0) then ! pour le cas ou gas_to_dust = 0.
+       if (mass > 0.0) then ! for the case where gas_to_dust = 0.
           factor = disk_zone(1)%diskmass * disk_zone(1)%gas_to_dust / mass
 
-          ! total_sum sur les zones pour densite finale
+          ! total sum over zones for final density
           do icell=1,n_cells
              gas_density(icell) = gas_density(icell) * factor
              gas_mass(icell) = gas_mass(icell) * factor
@@ -341,7 +341,7 @@ contains
        endif
     endif
 
-    ! Tableau de densite et mass de poussiere
+    ! Dust density and mass arrays
     ! interpolation en taille
     if (ldust_moments) then
        write(*,*) "Reconstructing grain size distribution from moments ..."
@@ -610,7 +610,7 @@ contains
 
           ! We reduce the density on cells that are touching a wall
           do i=Voronoi(icell)%first_neighbour, Voronoi(icell)%last_neighbour
-             id_n = neighbours_list(i) ! id du voisin
+             id_n = neighbours_list(i) ! neighbour id
              if (id_n < 0) then
                 n_force_empty = n_force_empty + 1
                 call reduce_density(icell, density_factor)

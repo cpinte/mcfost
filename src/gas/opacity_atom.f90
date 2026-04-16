@@ -34,7 +34,7 @@ module Opacity_atom
 
    function gmax_line(line)
    !compute the damping max of a given line line.
-   !assumes that eletronic densities, populations and thermodynamics
+   !assumes that electronic densities, populations and thermodynamics
    !quantities are set
       type (AtomicLine), intent(in) :: line
       integer :: i
@@ -51,7 +51,7 @@ module Opacity_atom
    end function gmax_line
    function gmin_line(line)
    !compute the damping min of a given line line.
-   !assumes that eletronic densities, populations and thermodynamics
+   !assumes that electronic densities, populations and thermodynamics
    !quantities are set
       type (AtomicLine), intent(in) :: line
       integer :: i
@@ -120,7 +120,7 @@ module Opacity_atom
       return
    end subroutine activate_continua
 
-   !could be parralel
+   !could be parallel
    subroutine alloc_atom_opac(N,x,limage)
       integer, intent(in) :: N
       real(kind=dp), dimension(N) :: x
@@ -146,7 +146,7 @@ module Opacity_atom
          endif
       !FOR NOW:
       !limit_mem == 2 ==> computed locally on tab_lambda_cont and interpolated locally on tab_lambda_nm.
-      !if faster compute it direclty on tab_lambda_nm but I think local computation on tab_lambda_cont + interp is faster.
+      !if faster compute it directly on tab_lambda_nm but I think local computation on tab_lambda_cont + interp is faster.
       !a linear interpolation is faster than the evaluation of the continua (and they are mostly flat...).
       else !computed and stored on tab_lambda_nm
          np = n
@@ -154,7 +154,7 @@ module Opacity_atom
          xp = x
          contopac_atom_loc => contopac_atom_loc_mem0
       endif
-      !always allocated enven with limit_mem = 2 but they are very small!!!
+      !always allocated even with limit_mem = 2 but they are very small!!!
       call alloc_gas_contopac(np,xp)
 
       if (limage) then
@@ -225,7 +225,7 @@ module Opacity_atom
                   atm%continua(kr)%lambda_file,atm%continua(kr)%alpha_file,atm%continua(kr)%Nlambdac,&
                   xp(atm%continua(kr)%Nbc:atm%continua(kr)%Nrc))
                atm%continua(kr)%alpha(atm%continua(kr)%Nlambdac) = atm%continua(kr)%alpha_file(size(atm%continua(kr)%alpha_file))
-            !to chheck the edge
+            !to check the edge
             endif
 
          enddo
@@ -401,7 +401,7 @@ module Opacity_atom
       return
    end subroutine contopac_atom_loc_mem2
 
-!change the index such that they point to diffezrent values if limit>0 or not
+!change the index such that they point to different values if limit>0 or not
 !only for the non-LTE mode and the flux mode ? for the ray-tracing of lines tab_lambda_nm=tab_lambda_cont already
    subroutine opacity_atom_bf_loc(icell,N,lambda,chi,Snu)
    !to do: remove lambda dep since it must be consistent with Nr, Nb
@@ -514,7 +514,7 @@ module Opacity_atom
 
             if (.not.atom%lines(kr)%lcontrib) cycle
 
-            !if .not.labs (image or LTE), Nred and Nblue includes the maxium extension of line
+            !if .not.labs (image or LTE), Nred and Nblue include the maximum extension of line
             !due to velocity fields (and not only the natural width + damping)
             Nred = atom%lines(kr)%Nr; Nblue = atom%lines(kr)%Nb
             Nlam = atom%lines(kr)%Nlambda
@@ -622,7 +622,7 @@ module Opacity_atom
                Uji_down(Nb-1+la,j,nact,id) = Uji_down(Nb-1+la,j,nact,id) + hc_fourPI * at%lines(kr)%Aji * phi0(la)!/wphi
 
                !there is a hc_fourpi factor that simplifies here, because integral is over dnu/hnu dOmega = dv/hc dOmega * hc/4pi
-               !dv dOmega/4pi which is whtat is contained in wl (for dv) and what the angular integration provides (dOmega/4pi)
+               !dv dOmega/4pi which is what is contained in wl (for dv) and what the angular integration provides (dOmega/4pi)
                chicc = wl * at%lines(kr)%Bij * (at%n(i,icell) - at%lines(kr)%gij*at%n(j,icell)) * phi0(la)/wphi
 
                chi_down(Nb-1+la,j,nact,id) = chi_down(Nb-1+la,j,nact,id) + chicc
@@ -794,12 +794,12 @@ module Opacity_atom
       return
    end subroutine cross_coupling_cont_i
 
-   function profile_art(line,id,icell,iray,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
+   function profile_art(line,id,icell,iray,lsubtract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
    use voigts, only : VoigtThomson
       ! phi = Voigt / sqrt(pi) / vbroad(icell)
       integer, intent(in)                    :: id, icell, N, iray
       type (AtomicLine), intent(in)          :: line
-      logical, intent(in)                    :: lsubstract_avg
+      logical, intent(in)                    :: lsubtract_avg
       real(kind=dp), dimension(N), intent(in):: lambda
       real(kind=dp), intent(in)              :: x,y,z,u,v,w,& !positions and angles used to project
                                              x1,y1,z1, &      ! velocity field and magnetic field
@@ -846,7 +846,7 @@ module Opacity_atom
       !in non-LTE:
       !the actual cell icell_nlte must be centered on 0 (moving at vmean).
       !the other cells icell crossed must be centered in v(icell) - vmean(icell_nlte)
-      if (lsubstract_avg) then!labs == .true.
+      if (lsubtract_avg) then!labs == .true.
          omegav(1:Nvspace) = omegav(1:Nvspace) - omegav_mean
          vlabs(iray,id) = omegav_mean
       else
@@ -892,9 +892,9 @@ module Opacity_atom
       return
    end function profile_art
 
-   function profile_art_i(line,id,icell,iray,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
+   function profile_art_i(line,id,icell,iray,lsubtract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
       integer, intent(in)                    :: icell, N, id, iray
-      logical, intent(in)                    :: lsubstract_avg
+      logical, intent(in)                    :: lsubtract_avg
       real(kind=dp), dimension(N), intent(in):: lambda
       real(kind=dp), intent(in)              :: x,y,z,u,v,w,& !positions and angles used to project
                                              x1,y1,z1, &      ! velocity field and magnetic field
@@ -939,7 +939,7 @@ module Opacity_atom
          omegav(Nvspace) = v1
          omegav_mean = sum(omegav(1:Nvspace))/real(Nvspace,kind=dp)
       endif
-      if (lsubstract_avg) then
+      if (lsubtract_avg) then
          omegav(1:Nvspace) = omegav(1:Nvspace) - omegav_mean
          vlabs(iray,id) = omegav_mean
       else
@@ -970,11 +970,11 @@ module Opacity_atom
       return
    end function profile_art_i
 
-   function gauss_profile(id,icell,iray,lsubstract_avg,N,vel,vth,x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
+   function gauss_profile(id,icell,iray,lsubtract_avg,N,vel,vth,x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
    use voigts, only : VoigtThomson
       ! phi = Voigt / sqrt(pi) / vbroad(icell)
       integer, intent(in)                    :: id,icell, iray,N
-      logical, intent(in)                    :: lsubstract_avg
+      logical, intent(in)                    :: lsubtract_avg
       real(kind=dp), dimension(N), intent(in):: vel
       real(kind=dp), intent(in)              :: x,y,z,u,v,w,& !positions and angles used to project
                                              x1,y1,z1, &      ! velocity field and magnetic field
@@ -1019,7 +1019,7 @@ module Opacity_atom
       !in non-LTE:
       !the actual cell icell_nlte must be centered on 0 (moving at vmean).
       !the other cells icell crossed must be centered in v(icell) - vmean(icell_nlte)
-      if (lsubstract_avg) then!labs == .true.
+      if (lsubtract_avg) then!labs == .true.
          omegav(1:Nvspace) = omegav(1:Nvspace) - omegav_mean
          vlabs(iray,id) = omegav_mean
       else

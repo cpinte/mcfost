@@ -19,10 +19,10 @@ contains
 
   subroutine mueller_coated_sphere(lambda,igrain,wl,amu1,amu2,amu1_coat,amu2_coat,qext,qsca,gsca)
     !***************************************************************
-    ! calcule les elements de la matrice de diffusion a partir de
-    ! la sous-routine dmilay (coated grains)
+    ! Computes the scattering matrix elements using
+    ! the dmilay subroutine (coated grains)
     !
-    !        calcule aussi "g" = le parametre d'asymetrie
+    !        Also computes 'g' = the asymmetry parameter
     !
     ! C. Pinte 19 Mars 2008
     ! G. Duchene 22 Avril 2011
@@ -52,7 +52,7 @@ contains
 
     if (modulo(nang_scatt,2)==1) call error("nang_scatt must be an EVEN number")
 
-    ! Si fonction de HG, on ne calcule pas la fonction de phase
+    ! If using the HG phase function, skip the phase function calculation
     if (aniso_method==2) then
        nang=1
     else
@@ -66,17 +66,17 @@ contains
     x = rshell * wvno
 
     call dMiLay(rcore,rshell,wvno,refrel_coat,refrel,nang, qext,qsca,qbs,gqsc,s1,s2)
-    gsca = gqsc / qsca ! dmilay return gsca * qsca
+    gsca = gqsc / qsca ! dmilay returns gsca * qsca
 
     if (lforce_HG) gsca = forced_g
 
 
-    ! Passage des valeurs dans les tableaux de mcfost
+    ! Store values in the mcfost arrays
     if (aniso_method==1) then
 
        !  QABS=QEXT-QSCA
-       ! Calcul des elements de la matrice de diffusion
-       ! indices decales de 1 par rapport a bhmie
+       ! Compute the scattering matrix elements
+       ! indices offset by 1 relative to bhmie
        do J=0,nang_scatt
           vi1 = cabs(S2(J+1))*cabs(S2(J+1))
           vi2 = cabs(S1(J+1))*cabs(S1(J+1))
@@ -86,32 +86,32 @@ contains
           s34(j)=aimag(S2(J+1)*conjg(S1(J+1)))
        enddo !j
 
-       ! Integration S11 pour tirer angle
+       ! Integrate S11 to draw the scattering angle
        if (scattering_method==1) then
           prob_s11(lambda,igrain,0)=0.0
           dtheta = pi/real(nang_scatt)
-          do j=2,nang_scatt ! probabilite de diffusion jusqu'a l'angle j, on saute j=0 car sin(theta) = 0
+          do j=2,nang_scatt ! scattering probability up to angle j, skip j=0 since sin(theta) = 0
              theta = real(j)*dtheta
              prob_s11(lambda,igrain,j)=prob_s11(lambda,igrain,j-1)+s11(j)*sin(theta)*dtheta
           enddo
 
-          ! s11 est calculee telle que la normalisation soit: 0.5*x**2*qsca
-          ! il y a un soucis numerique quand x >> 1 car la resolution en angle n'est pas suffisante
-          ! On rate le pic de diffraction (en particulier entre 0 et 1)
+          ! s11 is computed such that the normalisation is: 0.5*x**2*qsca
+          ! There is a numerical issue when x >> 1 because the angular resolution is insufficient
+          ! The diffraction peak is missed (particularly between 0 and 1)
           somme_prob = 0.5*x**2*qsca
           prob_s11(lambda,igrain,1:nang_scatt) = prob_s11(lambda,igrain,1:nang_scatt) + &
                somme_prob - prob_s11(lambda,igrain,nang_scatt)
 
-          ! Normalisation de la proba cumulee a 1
+          ! Normalise the cumulative probability to 1
           prob_s11(lambda,igrain,:)=prob_s11(lambda,igrain,:)/somme_prob
        endif ! scattering_method==1
 
        do j=0,nang_scatt
-          if (scattering_method==1) then ! Matrice de Mueller par grain
-             ! Normalisation pour diffusion selon fonction de phase (tab_s11=1.0 sert dans stokes)
+          if (scattering_method==1) then ! Mueller matrix per grain
+             ! Normalisation for scattering via phase function (tab_s11=1.0 used in Stokes)
              norm=s11(j)
-          else ! Sinon normalisation a Qsca
-             ! La normalisation par default : 0.5*x**2*Qsca --> correction par 0.5*x**2
+          else ! Otherwise normalise to Qsca
+             ! Default normalisation: 0.5*x**2*Qsca --> correction by 0.5*x**2
              norm = 0.5 * x**2
           endif
 
@@ -131,7 +131,7 @@ contains
 
   subroutine mueller_DHS(lambda,igrain,wl,amu1,amu2,qext,qsca,gsca)
     !***************************************************************
-    ! Adapte de la routine q_dhs de Michiel Min
+    ! Adapted from the q_dhs routine by Michiel Min
     !
     ! C. Pinte 30 janvier 2013
     !****************************************************************
@@ -145,7 +145,7 @@ contains
 
     integer :: i,j, nang, ipop
 
-    real :: Qext_HS, Qsca_HS, Qabs_HS, gqsc_HS, gsca_HS ! pour 1 HS
+    real :: Qext_HS, Qsca_HS, Qabs_HS, gqsc_HS, gsca_HS ! for one hollow sphere
     complex, dimension(nang_scatt+1) :: s1,s2, s1_HS, s2_HS
 
     real :: a, rcore, rshell, wvno, factor, Cext, Csca
@@ -165,7 +165,7 @@ contains
 
     if (modulo(nang_scatt,2)==1) call error("nang_scatt must be an EVEN number")
 
-    ! Si fonction de HG, on ne calcule pas la fonction de phase
+    ! If using the HG phase function, skip the phase function calculation
     if (aniso_method==2) then
        nang = 1
     else
@@ -179,9 +179,9 @@ contains
 
     ipop = grain(igrain)%pop
 
-    ! Calcul des poids pour integration de Gauss-Legendre
+    ! Compute weights for Gauss-Legendre integration
     call Gauss_Legendre_quadrature(0.0_dp,real(dust_pop(ipop)%dhs_maxf,kind=dp),N_vf, f, wf) ; wf = wf/sum(wf)
-    ! todo : a ne faire que pour 1 taille de grain et 1 lambda, sauf si n_vf change
+    ! todo: only need to do this for 1 grain size and 1 wavelength, unless n_vf changes
 
     Cext=0 ; Csca=0 ; gsca=0 ; s1=0 ; s2=0
     do i=1,N_vf
@@ -189,13 +189,13 @@ contains
        rcore = rshell * f(i)**one_third
 
        call dMilay(rcore,rshell,wvno,refrel_coat,refrel,nang, Qext_HS,Qsca_HS,Qabs_HS,gqsc_HS,s1_HS,s2_HS)
-       gsca_HS = gqsc_HS / qsca_HS ! dmilay return gsca * qsca
+       gsca_HS = gqsc_HS / qsca_HS ! dmilay returns gsca * qsca
 
        if(qext_HS < 0_dp) qext_HS = 0_dp
        if(qsca_HS < 0_dp) qsca_HS = 0_dp
 
        factor = pi*rshell**2 * wf(i)
-       Cext = Cext + factor * Qext_HS  ! pas sur que ce soit bon, verifier normalization qext, (rshell/lambda)**2 doit deja y etre
+       Cext = Cext + factor * Qext_HS  ! unsure if correct, check qext normalisation, (rshell/lambda)**2 should already be included
        Csca = Csca + factor * Qsca_HS
        gsca = gsca + factor * gqsc_HS ! gqsc_HS == gsca_HS * qsca_HS
 
@@ -210,12 +210,12 @@ contains
     qext = cext/factor
     qsca = csca/factor
 
-    ! Passage des valeurs dans les tableaux de mcfost
+    ! Store values in the mcfost arrays
     if (aniso_method==1) then
 
        ! QABS=QEXT-QSCA
-       ! Calcul des elements de la matrice de diffusion
-       ! indices decales de 1 par rapport a bhmie
+       ! Compute the scattering matrix elements
+       ! indices offset by 1 relative to bhmie
        do J=0,nang_scatt
           vi1 = cabs(s2(j+1))*cabs(s2(j+1))
           vi2 = cabs(s1(j+1))*cabs(s1(j+1))
@@ -227,27 +227,27 @@ contains
 
        prob_s11(lambda,igrain,0)=0.0
        dtheta = pi/real(nang_scatt)
-       do j=2,nang_scatt ! probabilite de diffusion jusqu'a l'angle j, on saute j=0 car sin(theta) = 0
+       do j=2,nang_scatt ! scattering probability up to angle j, skip j=0 since sin(theta) = 0
           theta = real(j)*dtheta
           prob_s11(lambda,igrain,j)=prob_s11(lambda,igrain,j-1)+s11(j)*sin(theta)*dtheta
        enddo
 
-       ! s11 est calculee telle que la normalisation soit: 0.5*x**2*qsca
-       ! il y a un soucis numerique quand x >> 1 car la resolution en angle n'est pas suffisante
-       ! On rate le pic de diffraction (en particulier entre 0 et 1)
+       ! s11 is computed such that the normalisation is: 0.5*x**2*qsca
+       ! There is a numerical issue when x >> 1 because the angular resolution is insufficient
+       ! The diffraction peak is missed (particularly between 0 and 1)
        somme_prob = 0.5*x**2*qsca
        prob_s11(lambda,igrain,1:nang_scatt) = prob_s11(lambda,igrain,1:nang_scatt) + &
             somme_prob - prob_s11(lambda,igrain,nang_scatt)
 
-       ! Normalisation de la proba cumulee a 1
+       ! Normalise the cumulative probability to 1
        prob_s11(lambda,igrain,:)=prob_s11(lambda,igrain,:)/somme_prob
 
        do j=0,nang_scatt
-          if (scattering_method==1) then ! Matrice de Mueller par grain
-             ! Normalisation pour diffusion selon fonction de phase (tab_s11=1.0 sert dans stokes)
+          if (scattering_method==1) then ! Mueller matrix per grain
+             ! Normalisation for scattering via phase function (tab_s11=1.0 used in Stokes)
              norm=s11(j)
-          else ! Sinon normalisation a Qsca
-             ! La normalisation par default : 0.5*x**2*Qsca --> correction par 0.5*x**2
+          else ! Otherwise normalise to Qsca
+             ! Default normalisation: 0.5*x**2*Qsca --> correction by 0.5*x**2
              norm = 0.5 * x**2
           endif
 

@@ -206,9 +206,9 @@ contains
     deallocate(rho,vx1,vx2,vx3)
 
     ! -- another copy and paste from read_fargo3d
-    ! Normalisation density : copy and paste from read_density_file for now : needs to go in subroutine
+    ! Normalization density : copy and paste from read_density_file for now : needs to go in subroutine
 
-    ! Calcul de la mass de gaz de la zone
+    ! Calculation of la mass de gaz de la zone
     mass = 0.
     do icell=1,n_cells
        mass = mass + gas_density(icell) *  mu_mH * volume(icell)
@@ -219,7 +219,7 @@ contains
     if (mass > 0.0) then ! pour le cas ou gas_to_dust = 0.
        factor = disk_zone(1)%diskmass * disk_zone(1)%gas_to_dust / mass
 
-       ! total_sum sur les zones pour densite finale
+       ! total_sum sur les zones pour density finale
        do icell=1,n_cells
           gas_density(icell) = gas_density(icell) * factor
           gas_mass(icell) = gas_density(icell) * mu_mH * volume(icell) * AU3_to_m3

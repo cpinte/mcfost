@@ -23,16 +23,16 @@ module init_mcfost
 contains
 
 subroutine set_default_variables()
-  ! Ajout du cas ou les matrices de Mueller sont donnees en entrees
+  ! Added case where Mueller matrices are provided as input
   ! 20/04/2023
 
-  ! Pour code sequentiel
+  ! For sequential code
   nb_proc=1 ; lpara=.false.
 
   n_zones=1
   lmcfost_lib = .false.
 
-  ! Pour code parallel
+  ! For parallel code
   !$omp parallel default(none) &
   !$omp shared(nb_proc, lpara)
   !$ nb_proc=omp_get_num_threads() ; lpara=.true.
@@ -228,10 +228,10 @@ subroutine set_default_variables()
 
   tmp_dir = "./"
 
-  ! Geometrie grid
+  ! Grid geometry
   z_scaling_env = 1.0
 
-  ! Methodes par defaut
+  ! Default methods
   RT_sed_method = 1
 
   system_age = "3Myr"
@@ -254,7 +254,7 @@ subroutine get_mcfost_utils_dir()
 
   ! Test if MCFOST_UTILS is defined
   call get_environment_variable('MCFOST_UTILS',mcfost_utils)
-  if (mcfost_utils == "") call error("environnement variable MCFOST_UTILS is not defined.")
+  if (mcfost_utils == "") call error("environment variable MCFOST_UTILS is not defined.")
   call get_environment_variable('MY_MCFOST_UTILS',my_mcfost_utils)
 
   ! Directories to search (ordered)
@@ -285,7 +285,7 @@ end subroutine get_mcfost_utils_dir
 !**********************************************
 
 subroutine initialisation_mcfost()
-! Ajout du cas ou les matrices de Mueller sont donnees en entrees
+! Added case where Mueller matrices are provided as input
 ! 20/04/2023
 
   implicit none
@@ -345,7 +345,7 @@ subroutine initialisation_mcfost()
   if (s/="") read(s,*) mcfost_auto_update
 
   if (mcfost_auto_update > 0) then
-     cmd = 'date +%s > date.tmp' ;   call appel_syst(cmd, syst_status)
+     cmd = 'date +%s > date.tmp' ;   call system_call(cmd, syst_status)
      open(unit=1,file="date.tmp",status="old")
      read(1,*) current_date
      close(unit=1,status="delete")
@@ -364,19 +364,19 @@ subroutine initialisation_mcfost()
         write(*,fmt=fmt1) mcfost_auto_update
         write(*,*) "Checking for update ..."
         lupdate = mcfost_update(.false.,.false., mcfost_auto_update)
-        if (lupdate) then ! On redemarre mcfost avec la meme ligne de commande
+        if (lupdate) then ! Restarting mcfost with the same command line
            write(*,*) "Restarting MCFOST ..."
            write(*,*) ""
-           call appel_syst(cmd_opt,syst_status)
+           call system_call(cmd_opt,syst_status)
            if (syst_status /=0) call error("MCFOST did not manage to restart")
         endif ! lupdate
      endif
   endif
 
-  ! Ligne de commande
+  ! Command line
   call get_command(cmd_opt)
 
-  ! Nbre d'arguments
+  ! Number of arguments
   n_args = command_argument_count()
   if (n_args < 1) call display_help()
 
@@ -426,7 +426,7 @@ subroutine initialisation_mcfost()
   ilen = index(para,'/',back=.true.) ! last position of the '/' character
   base_para = para(ilen+1:)
 
-  ! Les benchmarks
+  ! Benchmarks
   if (para(1:8)=="Pascucci") then
      lbenchmark_Pascucci = .true.
      write(*,*) "Running Pascucci et al 2004 benchmark"
@@ -455,7 +455,7 @@ subroutine initialisation_mcfost()
 
   i_arg=2
 
-  ! Options ligne de commande
+  ! Command line options
   do while (i_arg <= n_args)
      call get_command_argument(i_arg,s)
      select case(trim(s))
@@ -1517,7 +1517,7 @@ subroutine initialisation_mcfost()
      end select
   enddo ! while
 
-  ! Lecture du fichier de parameters
+  ! Reading the parameter file
   if (lProDiMo2mcfost) then
      call read_mcfost2ProDiMo(para)
   else
@@ -1624,7 +1624,7 @@ subroutine initialisation_mcfost()
 
   write(*,*) 'Input file read successfully'
 
-  ! Correction sur les valeurs du .para
+  ! Correction of the .para values
   if (lProDiMo) then
      if ((lsed_complete).or.(tab_wavelength(1:7) /= "ProDiMo")) then
         write(*,*) "WARNING: ProDiMo mode, forcing the wavelength grid using ProDiMo_UV3_9.lambda"
@@ -1641,9 +1641,9 @@ subroutine initialisation_mcfost()
      ! the dust properties
 
      if (lstop_after_init) then
-        ! on change les parameters par default pour gagner du temps
-        ! et pour avoir des quantites integrees !!!
-        ! BUG ici : +dust_prop renvoie les prop de la 1ere cell
+        ! changing default parameters to save time
+        ! and to get integrated quantities !!!
+        ! BUG here: +dust_prop returns properties of the 1st cell
         !limg=.false.
         !lmono=.false.
         !lmono0=.false.
@@ -1692,7 +1692,7 @@ subroutine initialisation_mcfost()
      lsed_complete=.false.
      lmono0=.true.
      n_lambda=1
-     if (wvl <= 1.0) then ! mcfost fait meme les accords grammaticaux 8-)
+     if (wvl <= 1.0) then ! mcfost even does grammatical agreements 8-)
         write(*,*) "Calculating image at wavelength =", real(wvl)," micron"
      else
         write(*,*) "Calculating image at wavelength =", real(wvl)," microns"
@@ -1712,7 +1712,7 @@ subroutine initialisation_mcfost()
   lmono = lmono0
 
   if (lProDiMo .and. (mcfost2ProDiMo_version == 1)) then
-     ! Version 1: lambda : 13 bins entre 0.0912 et 3410.85 microns donne les 11 bins de ProDiMo
+     ! Version 1: lambda: 13 bins between 0.0912 and 3410.85 microns gives the 11 bins of ProDiMo
      write(*,*) "***************************"
      write(*,*) "* Modelling for ProDiMo   *"
      write(*,*) "* Forcing wavelength grid *"
@@ -1730,9 +1730,9 @@ subroutine initialisation_mcfost()
      lscatt_ray_tracing = .false. ; call warning("turning ray-tracing off")
   endif
 
-  ! Discrimination type de run (image vs SED/Temp)
-  !                       et
-  ! verification coherence du fichier de parameters
+  ! Type of run discrimination (image vs SED/Temp)
+  !                       and
+  ! parameter file consistency check
   n_lambda2 = n_lambda
   if ((.not.lmono0).and.(lsed).and.(.not.lsed_complete)) call lect_lambda()
 
@@ -1769,7 +1769,7 @@ subroutine initialisation_mcfost()
   if (.not.limg) loutput_mc = .true.
 
   if (lPA) ang_disque = PA
-  ! rotation North vers East and red-shifted side to North if PA=0
+  ! rotation North to East and red-shifted side to North if PA=0
   ang_disque = -90 - ang_disque
   if (lold_PA) ang_disque = ang_disque + 90 ! old mcfost convention
 
@@ -1824,7 +1824,7 @@ subroutine initialisation_mcfost()
   endif
 
   cmd = 'date'
-  call appel_syst(cmd, syst_status)
+  call system_call(cmd, syst_status)
 
   data_dir = trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(basename_data_dir)
   do imol=1, n_molecules
@@ -2124,24 +2124,24 @@ subroutine save_data_prop(para, base_para)
   if (is_dir(trim(data_dir))) then
      write(*,*) "Directory "//trim(data_dir)//" already exists! Erasing it..."
      cmd = 'rm -Rf '//trim(data_dir)
-     call appel_syst(cmd,syst_status)
+     call system_call(cmd,syst_status)
   endif
 
-  ! Cree le dossier data
+  ! Create the data folder
   write (*,*) 'Creating directory '//trim(data_dir)
   cmd = 'mkdir -p '//trim(data_dir)//" ; "// &
-       ! copie le fichier de parameters
+       ! copy the parameter file
        'cp '//trim(para)//' '//trim(data_dir)//" ; "// &
-       ! options de la ligne de commande
+       ! command line options
        'echo " " >>  '//trim(data_dir)//'/'//trim(base_para)//" ; "// &
        'echo "Executed command line : '//trim(cmd_opt)//'" >> '//trim(data_dir)//'/'//trim(base_para)//" ; "// &
-       ! date du calcul
+       ! date of calculation
        'date >> '//trim(data_dir)//'/'//trim(base_para)//" ; "// &
-       ! machine de calcul
+       ! computing machine
        'uname -a >> '//trim(data_dir)//'/'//trim(base_para)//" ; "// &
        ! id SHA
        'echo sha = '//sha_id//' >> '//trim(data_dir)//'/'//trim(base_para)
-  call appel_syst(cmd,syst_status)
+  call system_call(cmd,syst_status)
 
   return
 
@@ -2151,7 +2151,7 @@ end subroutine save_data_prop
 
 subroutine save_data(para,base_para)
   !*************************************************
-  ! Si le dossier data existe on le sauve
+  ! If the data folder exists, save it
   !*************************************************
 
   implicit none
@@ -2198,15 +2198,15 @@ subroutine save_data(para,base_para)
 
      if (is_dir(trim(root_dir)//"/"//trim(seed_dir))) then
         if (is_dir(trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(local_basename_data_dir))) then
-           ! le dossier data existe
+           ! the data folder exists
            lnew_run = .true.
            lmove_data=.true.
-        else ! le dossier data n'existe pas
+        else ! the data folder does not exist
            lnew_run=.true.
            lmove_data=.false.
-        endif ! if y a un dossier data
+        endif ! if there is a data folder
      else
-        lnew_run = .true. ! le dossier data n'existe pas
+        lnew_run = .true. ! the data folder does not exist
      endif
 
      if (lmove_data) then
@@ -2218,32 +2218,32 @@ subroutine save_data(para,base_para)
               call error('Directory '//trim(local_data_dir)//'_old already exists : exiting!')
            endif
            cmd = 'mv '//trim(local_data_dir)//' '//trim(local_data_dir)//'_old'
-           call appel_syst(cmd,syst_status)
+           call system_call(cmd,syst_status)
         endif
      endif
 
      if (lnew_run) then
-        ! Cree le dossier data
+        ! Create the data folder
         write (*,*) 'Creating directory '//trim(local_data_dir)
         cmd = 'mkdir -p '//trim(local_data_dir)//" ; "// &
-             ! copie le fichier de parameters
+             ! copy the parameter file
              'cp '//trim(para)//' '//trim(local_data_dir)//" ; "// &
-             ! options de la ligne de commande
+             ! command line options
              'echo " " >>  '//trim(local_data_dir)//'/'//trim(base_para)//" ; "// &
              'echo "Executed command line : '//trim(cmd_opt)//'" >> '//trim(local_data_dir)//'/'//trim(base_para)//" ; "// &
-             ! date du calcul
+             ! date of calculation
              'date >> '//trim(local_data_dir)//'/'//trim(base_para)//" ; "// &
-             ! machine de calcul
+             ! computing machine
              'uname -a >> '//trim(local_data_dir)//'/'//trim(base_para)//" ; "// &
              ! id SHA
              'echo sha = '//sha_id//' >> '//trim(local_data_dir)//'/'//trim(base_para)
-        ! Copie du fichier lambda si besoin
+        ! Copy the lambda file if needed
         if (lsed.and.(.not.lsed_complete).and.(.not.lmono0).and.(etape==1)) then
            cmd = trim(cmd)//' ; cp '//trim(lambda_filename)//' '//trim(local_data_dir)
         endif
-        call appel_syst(cmd,syst_status)
+        call system_call(cmd,syst_status)
      endif
-  enddo ! etape
+  enddo ! andape
 
   return
 

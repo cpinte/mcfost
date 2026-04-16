@@ -220,7 +220,7 @@ module Voronoi_grid
     real(kind=dp), dimension(:), allocatable :: V_tmp
     integer, dimension(:), allocatable :: first_neighbours,last_neighbours
     integer, dimension(:), allocatable :: neighbours_list_loc
-    integer, dimension(:), allocatable :: n_neighbours ! nb_proc
+    integer, dimension(:), allocatable :: n_neighbours ! n_cpus
     logical(c_bool), dimension(:), allocatable :: was_cell_cut, was_cell_cut_tmp
     logical(c_bool), dimension(:), allocatable :: star_neighb_tmp, star_neighb
     logical, dimension(:), allocatable :: do_tesselation

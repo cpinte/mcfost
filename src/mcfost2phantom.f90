@@ -174,7 +174,7 @@ contains
     use Voronoi_grid, only : Voronoi
     use dust_transfer, only : emit_packet, propagate_packet
     use utils, only : progress_bar
-    use stars, only : repartition_energie_etoiles, repartition_energie_ISM
+    use stars, only : star_energy_distribution, ism_energy_distribution
     use grid,only : setup_grid
     use scattering, only : setup_scattering
     use optical_depth, only : no_dark_zone, integ_tau, opacity
@@ -251,7 +251,7 @@ contains
     write(*,*) "------------------------------"
     write(*,*)
 
-    ! debut de l'execution
+    ! start of execution
     call system_clock(time_begin,count_rate=time_tick,count_max=time_max)
     call cpu_time(cpu_time_begin)
 
@@ -313,8 +313,8 @@ contains
        call opacity(lambda, p_lambda)
     enddo !n
 
-    call repartition_energie_etoiles()
-    call repartition_energie_ISM(ISM)
+    call star_energy_distribution()
+    call ism_energy_distribution(ISM)
 
     ! ToDo : needs to be made parallel
     call init_reemission(lextra_heating,extra_heating)
@@ -356,7 +356,7 @@ contains
     !$omp reduction(+:E_abs_nRE)
     E_abs_nRE = 0.0
 
-    id = 1 ! Pour code sequentiel
+    id = 1 ! for sequential code
     !$ id = omp_get_thread_num() + 1
     ibar=1 ;  n_photons1_cumul = 0
 
@@ -370,12 +370,12 @@ contains
           rand = sprng(stream(id))
           call select_wl_em(rand,lambda)
 
-          ! Emission du paquet
+          ! Packet emission
           call emit_packet(id,lambda, icell,x,y,z,u,v,w,stokes,flag_star,flag_ISM,lintersect)
           Stokes = 0.0_dp ; Stokes(1) = 1.0_dp
           lpacket_alive = .true.
 
-          ! Propagation du packet
+          ! Packet propagation
           if (lintersect) then
              call propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,&
                 flag_star,flag_ISM,flag_scatt,lpacket_alive)
@@ -558,7 +558,7 @@ contains
        somme2 = 0.0_dp
        cst    = thermal_const/temp
        do lambda = 1,n_lambda
-          ! length d'onde en metre
+          ! wavelength in metres
           wl       = tab_lambda(lambda)*1.e-6
           delta_wl = tab_delta_lambda(lambda)*1.e-6
           cst_wl   = cst/wl

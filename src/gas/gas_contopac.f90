@@ -507,7 +507,7 @@ module gas_contopac
 
       !check here km_to_m = micron_to_nm
       alpha = hc_k / km_to_m ! hc_k = hc/k/nm_to_m
-      lambda0 = 1.6419 !micron, photo detachement threshold
+      lambda0 = 1.6419 !micron, photo detachment threshold
 
       nH = hydrogen%n(1,icell)
 

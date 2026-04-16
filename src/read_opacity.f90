@@ -42,7 +42,7 @@ subroutine read_opacity_file(pop)
     !      tmp_lambda, tmp_r_grain,  tmp_Q_ext, tmp_Q_abs, tmp_Q_sca, tmp_g, 4)
   endif
 
-  ! abs car le fichier de lambda pour les PAHs est a l'envers
+  ! abs because the lambda file for PAHs is in reverse order
   op_file_delta_lambda(1,pop) = abs(op_file_lambda(2,pop) - op_file_lambda(1,pop))
   if (n_lambda > 1) then
      op_file_delta_lambda(n_lambda,pop) = abs(op_file_lambda(n_lambda,pop) - op_file_lambda(n_lambda-1,pop))
@@ -128,7 +128,7 @@ end subroutine alloc_mem_opacity_file
 !*************************************************************
 
 subroutine free_mem_opacity_file()
-  ! Pas utilise pour le moment
+  ! Not used at the moment
 
   deallocate(op_file_Qext, op_file_Qsca, op_file_g, op_file_log_r_grain, &
        op_file_lambda, op_file_delta_lambda)
@@ -308,7 +308,7 @@ subroutine read_Misselt_specific_heat(pop)
   if (ios/=0) call error("cannot open SH file "//trim(sh_file(pop)))
   write(*,*) "Reading specific heat capacity: "//trim(sh_file(pop))
 
-  ! On elimine les lignes avec des commentaires
+  ! Remove lines with comments
   status = 1
   n_comment = 0
   do while (status /= 0)
@@ -319,7 +319,7 @@ subroutine read_Misselt_specific_heat(pop)
 
   ! Lecture proprement dite
   rewind(1)
-  ! On passe les commentaires
+  ! Skip comment lines
   do k=1, n_comment
      read(1,*)
   enddo
@@ -346,7 +346,7 @@ subroutine get_Misselt_specific_heat_dim(pop)
   if (ios/=0) call error("cannot open SH file "//trim(sh_file(pop)))
   write(*,*) "Reading specific heat capacity: "//trim(sh_file(pop))
 
-  ! On elimine les lignes avec des commentaires
+  ! Remove lines with comments
   status = 1
   n_comment = 0
   do while (status /= 0)
@@ -355,9 +355,9 @@ subroutine get_Misselt_specific_heat_dim(pop)
   enddo
   n_comment = n_comment - 1
 
-  ! On compte les lignes avec des donnees
+  ! Count lines with data
   status=0
-  n_Temperatures=1 ! On a deja lu une ligne en cherchant les commentaires
+  n_Temperatures=1 ! One line has already been read while searching for comments
   do while(status==0)
      n_Temperatures=n_Temperatures+1
      read(1,*,iostat=status)
