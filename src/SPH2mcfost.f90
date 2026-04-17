@@ -905,7 +905,7 @@ contains
 !    ierr = 0
 !
 !    cmd = "wc -l "//trim(filename)//" > ntest.txt"
-!    call appel_syst(cmd,syst_status)
+!    call system_call(cmd,syst_status)
 !    open(unit=1,file="ntest.txt",status="old")
 !    read(1,*) n_SPH
 !    n_SPH = n_SPH - 1 ! removing 1 line of comments

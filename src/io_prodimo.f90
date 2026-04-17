@@ -9,7 +9,7 @@ module ProDiMo
   use stars, only : star_spectrum, ProDiMo_star_HR, E_stars, R_ISM
   use read_params
   use sha
-  use utils, only : appel_syst
+  use utils, only : system_call
   use messages
   use thermal_emission
   use mcfost_env
@@ -1174,7 +1174,7 @@ contains
          //trim(ProDiMo_input_dir)//"/LineTransferList.in "&
          //trim(ProDiMo_input_dir)//"/Reactions.in "&
          //trim(ProDiMo_input_dir)//"/Species.in "//trim(data_ProDiMo)
-    call appel_syst(cmd,syst_status)
+    call system_call(cmd,syst_status)
 
 
     ! Copy and modify Parameter.in
@@ -1318,7 +1318,7 @@ contains
     ! Copie temporaire et lecture du fichier de parameters
     ! car je ne connais pas le nom du fichier .par dans data_th
     n_files = 0
-    cmd = "ls data_th/*.par* | wc -l > n_files.tmp" ; call appel_syst(cmd, syst_status)
+    cmd = "ls data_th/*.par* | wc -l > n_files.tmp" ; call system_call(cmd, syst_status)
     open(unit=1, file="n_files.tmp", status='old')
     read(1,*) n_files
     close(unit=1,status="delete")
@@ -1326,9 +1326,9 @@ contains
     if (n_files > 1) call error("There are more than 1 parameter file in data_th")
     if (n_files < 1) call error("There are less than 1 parameter file in data_th")
 
-    cmd = "cp data_th/*.par* data_th/forMCFOST.par" ; call appel_syst(cmd, syst_status)
+    cmd = "cp data_th/*.par* data_th/forMCFOST.par" ; call system_call(cmd, syst_status)
     call read_para("data_th/forMCFOST.par")
-    cmd = "rm -rf data_th/forMCFOST.par" ; call appel_syst(cmd, syst_status)
+    cmd = "rm -rf data_th/forMCFOST.par" ; call system_call(cmd, syst_status)
 
     ! parameters par defaut
     ltemp = .false.

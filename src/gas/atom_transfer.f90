@@ -131,12 +131,12 @@ module atom_transfer
    ! ------------------------------------------------------------------------------------ !
       integer :: etape, etape_start, etape_end, iray
       integer :: n_iter, id, i, alloc_status, n_rayons
-      ! integer :: , iray_start, n_radiuss_max
+      ! integer :: , iray_start, n_rayons_max
       integer :: nact
       integer :: icell, ilevel, nb, nr, unconverged_cells
       integer, parameter :: maxIter = 300!150!, maxIter3 = 10
       !ray-by-ray integration of the SEE
-      integer, parameter :: one_ray = 1!, n_radiuss_start3 = 100
+      integer, parameter :: one_ray = 1!, n_rayons_start3 = 100
       logical :: lfixed_Rays, lconverged, lprevious_converged
       real :: rand, rand2, rand3, unconverged_fraction
       real(kind=dp) :: precision, vth
@@ -216,7 +216,7 @@ module atom_transfer
       ! if (lprecise_pop) then
       ! !iray_start reset to 1 we recompute with twice has much rays but from the start
       !    etape_end = 3
-      !    n_radiuss_max =  n_radiuss_start3 * (2**(maxIter3-1))
+      !    n_rayons_max =  n_rayons_start3 * (2**(maxIter3-1))
       ! endif
       if (allocated(stream)) deallocate(stream)
       allocate(stream(nb_proc),stat=alloc_status)
@@ -277,7 +277,7 @@ module atom_transfer
          ! else if (etape==3) then
          ! !or solution with fixed rays that increase after each iteration??
          !    lfixed_rays = .false.
-         !    n_radiuss = n_radiuss_start3 !start, same as step 2
+         !    n_rayons = n_rayons_start3 !start, same as step 2
          !    conv_speed_limit = conv_speed_limit_mc
          !    precision = min(1d-1,10.0*dpops_max_error)
          !    !only once for all iterations on this step
@@ -345,7 +345,7 @@ module atom_transfer
             ! else
             !    !update rays weight
             !    if (allocated(wmu)) deallocate(wmu)
-            !    allocate(wmu(n_radiuss));wmu(:) = 1.0_dp / real(n_radiuss,kind=dp)
+            !    allocate(wmu(n_rayons));wmu(:) = 1.0_dp / real(n_rayons,kind=dp)
             end if
 
             !init here, to be able to stop/start electronic density iterations within MALI iterations
@@ -362,9 +362,9 @@ module atom_transfer
             !$omp private(l_iterate,weight,diff)&
             !$omp private(nact, at) & ! Acceleration of convergence
             !$omp shared(ne,ngpop,ng_index,Ng_Norder, accelerated, lng_turned_on, Jnu, iloc) & ! Ng's Acceleration of convergence
-            !$omp shared(etape,lforce_lte,n_cells,voronoi,r_grid,z_grid,phi_grid,n_radiuss,xmu,wmu,xmux,xmuy) &
+            !$omp shared(etape,lforce_lte,n_cells,voronoi,r_grid,z_grid,phi_grid,n_rayons,xmu,wmu,xmux,xmuy) &
             !$omp shared(pos_em_cell,labs,n_lambda,tab_lambda_nm, icompute_atomRT,lcell_converged,diff_loc,seed,nb_proc,gtype) &
-            !$omp shared(stream,n_radiuss_mc,lvoronoi,ibar,n_cells_done,l_iterate_ne,Itot,precision,lcswitch_enabled)
+            !$omp shared(stream,n_rayons_mc,lvoronoi,ibar,n_cells_done,l_iterate_ne,Itot,precision,lcswitch_enabled)
             !$omp do schedule(static,omp_chunk_size)
             do icell=1, n_cells
                !$ id = omp_get_thread_num() + 1
@@ -749,10 +749,10 @@ module atom_transfer
                   end if
                ! else
                !    !increase number of rays only if it converges already ?
-               !    n_radiuss = n_radiuss * 2
+               !    n_rayons = n_rayons * 2
                !       ! On continue en calculant 2 fois plus de radiuss
                !       ! Add them to the set of those previously calculated
-               !       ! iray_start = iray_start + n_radiuss
+               !       ! iray_start = iray_start + n_rayons
                !    if (n_iter >= maxIter3) then
                !       call warning("not enough rays to converge in step 3!!")
                !       lconverged = .true.
@@ -854,12 +854,12 @@ module atom_transfer
       ! write(100) Jnu
       ! close(100); deallocate(jnu)
       ! open(100, file="inu.b",form="unformatted",status='unknown',access="stream")
-      ! write(100) n_lambda,n_radiuss_max,n_cells
+      ! write(100) n_lambda,n_rayons_max,n_cells
       ! write(100) tab_lambda_nm
       ! if (lhealpix) then
       !    write(100) healpix_weight(healpix_lorder)
       ! else
-      !    write(100) 1.0/real(n_radiuss,kind=dp)!n_radiuss is max here at the moment
+      !    write(100) 1.0/real(n_rayons,kind=dp)!n_rayons is max here at the moment
       ! endif
       ! write(100) iloc
       ! deallocate(iloc); close(100)

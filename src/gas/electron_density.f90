@@ -597,11 +597,11 @@ module elecdensity
 
    !check if data file already exist, can be the case if initial solutions is OLD_POPULATIONS
    cmd = "ls "//trim(ne_filename)
-   call appel_syst(cmd, sys_status)
+   call system_call(cmd, sys_status)
    if (sys_status == 0) then !means the file exist
 
       cmd = "mv "//trim(ne_filename)//" "//"ne_old.fits.gz"
-      call appel_syst(cmd, sys_status)
+      call system_call(cmd, sys_status)
       if (sys_status /= 0) then
          call error("Error in copying old ne!")
       endif
@@ -666,7 +666,7 @@ module elecdensity
 
    !check if data file already exist, otherwise lead and return .false.
    cmd = "ls "//trim(ne_filename)
-   call appel_syst(cmd, sys_status)
+   call system_call(cmd, sys_status)
    if (sys_status == 0) then !means the file exist
       write(*,*) " Reading old ne.fits.gz file"
       lelectron_read = .true.

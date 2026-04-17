@@ -1296,6 +1296,59 @@ subroutine update_Stokes(S,u0,v0,w0,u1,v1,w1, M)
   return
 
 end subroutine update_Stokes
+
+!**********************************************************************
+
+subroutine get_Mueller_matrix_per_grain(lambda,itheta,frac,igrain, M)
+
+  integer, intent(in) :: lambda,itheta,igrain
+  real, intent(in) :: frac
+  real(kind=dp), dimension(4,4), intent(out) :: M
+
+  real :: frac_m1
+
+  frac_m1 = 1.0 - frac
+
+  M(:,:) = 0.0_dp
+  M(1,1) = tab_s11(itheta,igrain,lambda) * frac + tab_s11(itheta-1,igrain,lambda) * frac_m1
+  M(2,2) = tab_s22(itheta,igrain,lambda) * frac + tab_s22(itheta-1,igrain,lambda) * frac_m1
+  M(1,2) = tab_s12(itheta,igrain,lambda) * frac + tab_s12(itheta-1,igrain,lambda) * frac_m1
+  M(2,1) = M(1,2)
+  M(3,3) = tab_s33(itheta,igrain,lambda) * frac + tab_s33(itheta-1,igrain,lambda) * frac_m1
+  M(4,4) = tab_s44(itheta,igrain,lambda) * frac + tab_s44(itheta-1,igrain,lambda) * frac_m1
+  M(3,4) = -tab_s34(itheta,igrain,lambda)* frac - tab_s34(itheta-1,igrain,lambda) * frac_m1
+  M(4,3) = -M(3,4)
+
+  return
+
+end subroutine get_Mueller_matrix_per_grain
+
+!**********************************************************************
+
+subroutine get_Mueller_matrix_per_cell(lambda,itheta,frac,icell, M)
+
+  integer, intent(in) :: lambda,itheta,icell
+  real, intent(in) :: frac
+  real(kind=dp), dimension(4,4), intent(out) :: M
+
+  real :: frac_m1
+
+  frac_m1 = 1.0 - frac
+
+  M(:,:) = 0.0_dp
+  M(1,1) = 1.0 ! Mueller matrix is normalized to 1.0 as we select the scattering angle
+  M(2,2) = tab_s22_o_s11_pos(itheta,icell,lambda) * frac +  tab_s22_o_s11_pos(itheta-1,icell,lambda) * frac_m1
+  M(1,2) = tab_s12_o_s11_pos(itheta,icell,lambda) * frac +  tab_s12_o_s11_pos(itheta-1,icell,lambda) * frac_m1
+  M(2,1) = M(1,2)
+  M(3,3) = tab_s33_o_s11_pos(itheta,icell,lambda) * frac +  tab_s33_o_s11_pos(itheta-1,icell,lambda) * frac_m1
+  M(4,4) = tab_s44_o_s11_pos(itheta,icell,lambda) * frac +  tab_s44_o_s11_pos(itheta-1,icell,lambda) * frac_m1
+  M(3,4) = -tab_s34_o_s11_pos(itheta,icell,lambda)* frac -  tab_s34_o_s11_pos(itheta-1,icell,lambda) * frac_m1
+  M(4,3) = -M(3,4)
+
+  return
+
+end subroutine get_Mueller_matrix_per_cell
+
 !**********************************************************************
 
 subroutine hg(g, rand, itheta, cospsi)

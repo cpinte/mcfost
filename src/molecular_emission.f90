@@ -641,8 +641,8 @@ subroutine J_mol_loc(id,icell,n_rayons,ispeed)
 
   enddo ! iTrans
 
-  ! Normalization par le nombre de radiuss utilises
-!  Jmol(:,id) = Jmol(:,id) / n_radiuss
+  ! Normalization par le nombre de radiuss utilisesby the number of used radii
+  !Jmol(:,id) = Jmol(:,id) / n_rayons
 
   if (ldouble_RT) then
      Jmol2(:,id) = 0.0_dp

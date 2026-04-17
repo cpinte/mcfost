@@ -670,11 +670,11 @@ module io_atom
    else
       !check if data file already exist, can be the case if initial solutions is OLD_POPULATIONS
       cmd = "ls "//popsF!trim(atom%ID)//".fits.gz"
-      call appel_syst(cmd, sys_status)
+      call system_call(cmd, sys_status)
       if (sys_status == 0) then !means the file exist
 
          cmd = "mv "//trim(atom%ID)//".fits.gz"//" "//trim(atom%ID)//"_oldpop.fits.gz"
-         call appel_syst(cmd, sys_status)
+         call system_call(cmd, sys_status)
          if (sys_status /= 0) then
             call error("Error in copying old pops!")
          endif

@@ -2033,7 +2033,7 @@ module see
         !$omp parallel &
         !$omp default(none) &
         !$omp private(weight,n,id,icell,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02,argmt)&
-        !$omp shared(etape,n_cells,voronoi,r_grid,z_grid,phi_grid,n_radiuss,xmu,wmu,xmux,xmuy,NactiveAtoms) &
+        !$omp shared(etape,n_cells,voronoi,r_grid,z_grid,phi_grid,n_rayons,xmu,wmu,xmux,xmuy,NactiveAtoms) &
         !$omp shared(pos_em_cell,labs,n_lambda,tab_lambda_nm,icompute_atomRT,activeatoms,seed,nb_proc,gtype) &
         !$omp shared(stream,lvoronoi,ibar,n_cells_done,Itot)
         !$omp do schedule(static,1)

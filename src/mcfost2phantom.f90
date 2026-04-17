@@ -499,7 +499,7 @@ contains
   subroutine write_mcfost2phantom_temperature()
 
     use mcfost_env, only : data_dir
-    use utils, only : appel_syst
+    use utils, only : system_call
     use output, only : ecriture_temperature, write_disk_struct
     use messages, only : error
 
@@ -519,12 +519,12 @@ contains
     write(*,*) "**************************************************"
     write(*,*)
 
-    call appel_syst("rm -rf "//trim(data_dir)//" ; mkdir -p "//trim(data_dir), syst_status)
+    call system_call("rm -rf "//trim(data_dir)//" ; mkdir -p "//trim(data_dir), syst_status)
     call ecriture_temperature(1)
 
-    call appel_syst("rm -rf data_disk ; mkdir -p data_disk", syst_status)
+    call system_call("rm -rf data_disk ; mkdir -p data_disk", syst_status)
     call write_disk_struct(.false., .false.,.false.)
-    call appel_syst("mv data_disk/grid.fits.gz "//trim(data_dir), syst_status)
+    call system_call("mv data_disk/grid.fits.gz "//trim(data_dir), syst_status)
 
     return
 

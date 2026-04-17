@@ -70,7 +70,7 @@ module mhd2mcfost
         endif
 
            cmd = "wc -l "//trim(density_files(1))//" > ntest.txt"
-           call appel_syst(cmd,syst_status)
+           call system_call(cmd,syst_status)
            open(unit=1,file="ntest.txt",status="old")
            read(1,*) N_points
            close(unit=1)
@@ -193,7 +193,7 @@ module mhd2mcfost
    !      ! + Tschok
 
    !      cmd = "wc -l "//trim(filename)//" > ntest.txt"
-   !      call appel_syst(cmd,syst_status)
+   !      call system_call(cmd,syst_status)
    !      open(unit=1,file="ntest.txt",status="old")
    !      read(1,*) N_points
    !      close(unit=1)

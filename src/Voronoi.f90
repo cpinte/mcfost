@@ -3,7 +3,7 @@ module Voronoi_grid
   use constants
   use mcfost_env
   use parameters
-  use utils, only : appel_syst
+  use utils, only : system_call
   use sort, only : Knuth_shuffle, index_quicksort
   use naleat, only : seed, stream, gtype
   use cylindrical_grid, only : volume
@@ -770,7 +770,7 @@ module Voronoi_grid
        write(*,*) "Can't compute sha1 of "//trim(filename)
        return
     endif
-    call appel_syst(cmd, syst_status)
+    call system_call(cmd, syst_status)
     open(unit=1, file="voronoi.sha1", status='old',iostat=ios)
     read(1,*,iostat=ios) voronoi_sha1
     close(unit=1,status="delete",iostat=ios)
