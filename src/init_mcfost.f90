@@ -576,6 +576,7 @@ subroutine initialisation_mcfost()
         if (i_arg > nbr_arg) call error("izone needed")
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) izone_tilt
+        if (ios /= 0 .or. izone_tilt < 1) call error("izone must be a positive integer")
         i_arg= i_arg+1
      case("-rs")
         lremove=.true.
