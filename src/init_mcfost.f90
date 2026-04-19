@@ -565,12 +565,18 @@ subroutine initialisation_mcfost()
            call warning("forcing 3D mode")
            l3D=.true.
         endif
-        call warning("tilt will only be applied to 1st zone")
         ltilt=.true.
         i_arg = i_arg+1
         if (i_arg > nbr_arg) call error("tilt angle needed")
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) tilt_angle
+        i_arg= i_arg+1
+     case("-izone")
+        i_arg = i_arg+1
+        if (i_arg > nbr_arg) call error("izone needed")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) izone_tilt
+        if (ios /= 0 .or. izone_tilt < 1) call error("izone must be a positive integer")
         i_arg= i_arg+1
      case("-rs")
         lremove=.true.
@@ -1985,6 +1991,7 @@ subroutine display_help()
   write(*,*) "        : -3D : 3D geometrical grid"
   write(*,*) "        : -warp : <h_warp> @ reference radius"
   write(*,*) "        : -tilt : <angle> [degrees]"
+  write(*,*) "        : -izone : <zone_number> (to be used with -tilt, default: 1)"
   write(*,*) "        : -cavity <h0> <r0> <flaring exponent>"
   write(*,*) "        : -output_J"
   write(*,*) "        : -output_UV_field"
