@@ -2063,7 +2063,7 @@ subroutine read_Sigma_file()
   firstpix=1
   nullval=-999
 
-  ! determine the size of density file
+  ! Determine the size of density file
   nfound = 0 ! to fix ifort bug
   call ftgknj(unit,'NAXIS',1,2,naxes,nfound,status)
   if ((nfound < 1).or.(nfound > 2)) then
