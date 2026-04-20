@@ -1,8 +1,8 @@
 module PAH
 
-  use parametres
+  use parameters
   use grains
-  use constantes
+  use constants
   use dust_prop
   use utils, only : interp
   use sort, only : index_quicksort
@@ -11,25 +11,25 @@ module PAH
 
 contains
 
-function specific_heat(T, taille_grain)
+function specific_heat(T, igrain)
   ! C. Pinte
   ! 30/01/07
 
-  integer, intent(in) :: taille_grain ! indice taille de grain
+  integer, intent(in) :: igrain ! grain size index
   real(kind=dp), dimension(:), intent(in) :: T
   real(kind=dp), dimension(size(T)) :: specific_heat
   integer :: pop
 
-  pop =  grain(taille_grain)%pop
+  pop =  grain(igrain)%pop
 
   if (dust_pop(pop)%is_Misselt_opacity_file) then
-     specific_heat = Misselt_specific_heat(T,taille_grain)
+     specific_heat = Misselt_specific_heat(T,igrain)
   else if (dust_pop(pop)%is_DustEM_opacity_file) then
-     specific_heat = DustEM_specific_heat(T,taille_grain)
-  else if (grain(taille_grain)%is_PAH) then
-     specific_heat = PAH_specific_heat(T, taille_grain)
+     specific_heat = DustEM_specific_heat(T,igrain)
+  else if (grain(igrain)%is_PAH) then
+     specific_heat = PAH_specific_heat(T, igrain)
   else
-     specific_heat = astrosil_specific_heat(T, taille_grain)
+     specific_heat = astrosil_specific_heat(T, igrain)
   endif
 
   return
@@ -38,17 +38,17 @@ end function specific_heat
 
 !**********************************************************************
 
-function astrosil_specific_heat(T, taille_grain)
+function astrosil_specific_heat(T, igrain)
   ! C. Pinte
   ! 26/01/07
 
-  integer, intent(in) :: taille_grain ! indice taille de grain
+  integer, intent(in) :: igrain ! grain size index
   real(kind=dp), dimension(:), intent(in) :: T
   real(kind=dp), dimension(size(T)) :: astrosil_specific_heat
 
   real :: Na
 
-  Na = get_astrosil_Na(taille_grain)
+  Na = get_astrosil_Na(igrain)
 
   ! specific heat [J/K]
   astrosil_specific_heat = (Na-2.)* kb * (2.*sh_helper(T/500., 2) + sh_helper(T/1500., 3))
@@ -57,14 +57,14 @@ end function astrosil_specific_heat
 
 !**********************************************************************
 
-function PAH_specific_heat(T,taille_grain)
+function PAH_specific_heat(T,igrain)
   ! return the specific heat capacity for PAHs, in [erg/K]
   ! input is Temperature [K] and grain radius [cm]
   ! optional output are mode energies hbarw [erg] and modes/energy g
   ! C. Pinte
   ! 30/01/07
 
-  integer, intent(in) :: taille_grain
+  integer, intent(in) :: igrain
   real(kind=dp), dimension(:), intent(in) :: T
   real(kind=dp), dimension(size(T)) :: PAH_specific_heat
 
@@ -83,7 +83,7 @@ function PAH_specific_heat(T,taille_grain)
 
   logical, save :: l_first_time = .true.
 
-  a = r_grain(taille_grain)
+  a = r_grain(igrain)
 
   nT=size(T)
 
@@ -217,21 +217,21 @@ end subroutine test_PAH_specific_heat
 
 !******************************************************
 
-function Misselt_specific_heat(T,taille_grain)
+function Misselt_specific_heat(T,igrain)
   ! return the specific heat capacity in [erg/K]
 
-  integer, intent(in) :: taille_grain ! indice taille de grain
+  integer, intent(in) :: igrain ! grain size index
   real(kind=dp), dimension(:), intent(in) :: T
   real(kind=dp), dimension(size(T)) :: Misselt_specific_heat
 
   integer :: k, pop
 
-  pop =  grain(taille_grain)%pop
+  pop =  grain(igrain)%pop
 
   ! todo : interpoler a l'avance dans read_file_specific_heat
   do k=1,size(T)
-     Misselt_specific_heat(k) = interp(file_sh(:,pop), file_sh_T(:,pop), T(k)) * M_grain(taille_grain)  / 1.e7  * 0.5  ! todo : c'est des Joules l'unite non ?
-     ! todo 2 : facteur 0.5 ??? donne un meilleur accord mais je ne capte pas pourquoi
+     Misselt_specific_heat(k) = interp(file_sh(:,pop), file_sh_T(:,pop), T(k)) * M_grain(igrain)  / 1.e7  * 0.5  ! todo : c'est des Joules l'unite non ?
+     ! todo 2 : factor 0.5 ??? donne un meilleur accord mais je ne capte pas pourquoi
   enddo
 
   return
@@ -240,20 +240,20 @@ end function Misselt_specific_heat
 
 !**********************************************************************
 
-function DustEM_specific_heat(T,taille_grain)
+function DustEM_specific_heat(T,igrain)
   ! return the specific heat capacity in [erg/K]
 
-  integer, intent(in) :: taille_grain ! indice taille de grain
+  integer, intent(in) :: igrain ! grain size index
   real(kind=dp), dimension(:), intent(in) :: T
   real(kind=dp), dimension(size(T)) :: DustEM_specific_heat
 
   integer :: k, pop
 
-  pop =  grain(taille_grain)%pop
+  pop =  grain(igrain)%pop
 
   ! todo : interpoler a l'avance dans read_file_specific_heat
   do k=1,size(T)
-     DustEM_specific_heat(k) = interp(file_sh(:,pop), file_sh_T(:,pop), T(k)) * M_grain(taille_grain)
+     DustEM_specific_heat(k) = interp(file_sh(:,pop), file_sh_T(:,pop), T(k)) * M_grain(igrain)
   enddo
 
   return
@@ -262,16 +262,16 @@ end function DustEM_specific_heat
 
 !**********************************************************************
 
-real function get_astrosil_Na(taille_grain)
+real function get_astrosil_Na(igrain)
   ! C. Pinte
   ! 26/01/07
 
   implicit none
 
-  integer, intent(in) :: taille_grain
+  integer, intent(in) :: igrain
   real :: a
 
-  a=r_grain(taille_grain)
+  a=r_grain(igrain)
 
   get_astrosil_Na=4.*pi/3. * a**3 * 3.7e10
 

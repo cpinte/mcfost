@@ -7,15 +7,15 @@ module read_1d_models
 ! TO DO:
 !	direct interface with these different codes (and format)
 !
-        use parametres
+        use parameters
         use messages
         use mcfost_env
-        use constantes
+        use constants
         use elements_type
         use grid, only : cell_map, vfield3d, alloc_atomrt_grid, nHtot, ne, v_char, lmagnetized, vturb, T, icompute_atomRT, &
              lcalc_ne, check_for_zero_electronic_density
 	use density, only : dust_density
-	use grains, only : M_grain, nbre_grains, dust_pop
+	use grains, only : M_grain, n_grains, dust_pop
 
 	implicit none
 
@@ -91,17 +91,17 @@ module read_1d_models
 
 		n_rad = atmos_1d%nr - 1
 		n_cells = n_rad
-		n_etoiles = 1 !force
+		n_stars = 1 !force
 
 		Rmin = minval(atmos_1d%r) * atmos_1d%rstar * m_to_au
 		Rmax = maxval(atmos_1d%r,mask=(atmos_1d%iz>0)) * atmos_1d%rstar* m_to_au
 		Rmax_c = maxval(atmos_1d%r) * atmos_1d%rstar * m_to_au !corona extent
 		!it is not the star but the inner boundary of the model !
 		!Because the star is the model (in general !) !
-		etoile(1)%r = Rmin
-		etoile(1)%x = 0.0_dp
-		etoile(1)%y = 0.0_dp
-		etoile(1)%z = 0.0_dp
+		star(1)%r = Rmin
+		star(1)%x = 0.0_dp
+		star(1)%y = 0.0_dp
+		star(1)%z = 0.0_dp
 
 		!convert to au
 		atmos_1d%r = atmos_1d%r * atmos_1d%rstar * m_to_au
@@ -157,7 +157,7 @@ module read_1d_models
 		!allows to properly balance that effect.
 		if (lcell_centered) then
 			!core temperature, read from file as "Tstar"
-			! etoile(1)%T = real(	atmos_1d%T(1) ) ! + something else here
+			! star(1)%T = real(	atmos_1d%T(1) ) ! + something else here
 			icell = n_cells + 1
 			nrad_0 = n_rad
 			icell0 = n_cells
@@ -188,7 +188,7 @@ module read_1d_models
 				icompute_atomRT(n_cells) = atmos_1d%iz(n_rad+1)
 			endif
 			!core temperature, read from file as "Tstar"
-			! etoile(1)%T = real(	atmos_1d%T(1) ) ! + irrad ?
+			! star(1)%T = real(	atmos_1d%T(1) ) ! + irrad ?
 			icompute_atomRT(:) = atmos_1d%iz(2:n_cells+1)
 			T(:) = atmos_1d%T(2:n_cells+1)
 			nHtot(:) = atmos_1d%rho(2:n_cells+1) * rho_to_nH
@@ -200,7 +200,7 @@ module read_1d_models
 		endif
 ! TO DO: renorm to the column mass of the input points
 
-		write(*,*) "Tbot (1d model)", etoile(1)%T, ' K'
+		write(*,*) "Tbot (1d model)", star(1)%T, ' K'
 
 		!column mass
 		allocate(cm(n_cells))
@@ -255,11 +255,11 @@ module read_1d_models
 			dust_dens_max = 0d0; dust_dens_min = 1d30
 			do icell=1, n_cells
                                 if (lvariable_dust) then
-                                   rho_d = sum(dust_density(:,icell) * nbre_grains(:) * M_grain(:))
+                                   rho_d = sum(dust_density(:,icell) * n_grains(:) * M_grain(:))
                                 else
                                    rho_d = 0.0_dp
                                    do pop=1, n_pop
-                                      rho_d = rho_d + dust_density(dust_pop(pop)%zone,icell) * nbre_grains(pop) * M_grain(pop)
+                                      rho_d = rho_d + dust_density(dust_pop(pop)%zone,icell) * n_grains(pop) * M_grain(pop)
                                    enddo
                                 endif
                                 if (rho_d<=0.0) cycle

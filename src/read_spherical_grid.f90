@@ -2,11 +2,11 @@ module read_spherical_grid
   !
   ! Read model generated on a structured spherical mesh (e.g. with numpy.meshgrid).!
   !
-  use constantes
+  use constants
   use elements_type
   use grid, only : cell_map, vfield3d, alloc_atomrt_grid, nHtot, ne, v_char, lmagnetized, vturb, T, icompute_atomRT, &
        lcalc_ne, check_for_zero_electronic_density
-  use parametres
+  use parameters
   use messages
   use utils
   use cylindrical_grid
@@ -47,8 +47,8 @@ contains
     read(1,iostat=ios) pluto%x1(:)
     !Rmin to Rmax
     pluto%x1_min = minval(pluto%x1); pluto%x1_max = maxval(pluto%x1)
-    ! write(*,*) "r_limits [Rstar(1)] (read)=", pluto%x1(:) / etoile(1)%r
-    write(*,*) "r_limits [Rstar(1)] (read)=", pluto%x1(1) / etoile(1)%r, pluto%x1(pluto%nx1+1) / etoile(1)%r
+    ! write(*,*) "r_limits [Rstar(1)] (read)=", pluto%x1(:) / star(1)%r
+    write(*,*) "r_limits [Rstar(1)] (read)=", pluto%x1(1) / star(1)%r, pluto%x1(pluto%nx1+1) / star(1)%r
     read(1,iostat=ios) pluto%nx2
     allocate(pluto%x2(pluto%nx2+1))
     read(1,iostat=ios) pluto%x2(:)
@@ -174,7 +174,7 @@ contains
     close(unit=1)
 
     dust_density = 0.0_dp
-    masse_gaz = 0.0_dp
+    gas_mass = 0.0_dp
     disk_zone(1)%diskmass = 0.0
 
     do i=1, n_rad
@@ -202,28 +202,28 @@ contains
              !-> wrapper for dust RT.
              !-> taking into account proper weights assuming only molecular gas in dusty regions
              if (rho_dust(i,j,k) > 0.0) then ! dusty region
-                densite_gaz(icell) = rho(i,j,k) * 1d3 / mu_mH !total molecular gas density in H2/m^3
+                gas_density(icell) = rho(i,j,k) * 1d3 / mu_mH !total molecular gas density in H2/m^3
                 dust_density(1,icell) = rho_dust(i,j,k) * 1d3 / mu_mH ! [m^-3]
                 disk_zone(1)%diskmass = disk_zone(1)%diskmass + rho_dust(i,j,k) * volume(icell)
              else !No dust.
-                densite_gaz(icell) = nHtot(icell) * wght_per_H !total atomic gas density in [m^-3]
+                gas_density(icell) = nHtot(icell) * wght_per_H !total atomic gas density in [m^-3]
              endif
-             masse_gaz(icell) = rho(i,j,k) * volume(icell)
+             gas_mass(icell) = rho(i,j,k) * volume(icell)
           enddo ! phi
        enddo bz ! theta
     enddo ! r
-    masse_gaz = masse_gaz * AU3_to_m3 * 1d3 ! [g]
+    gas_mass = gas_mass * AU3_to_m3 * 1d3 ! [g]
     deallocate(rho,ne_tmp,T_tmp,vt_tmp,dz,vtmp)
 
     disk_zone(1)%diskmass = disk_zone(1)%diskmass * AU3_to_m3 * kg_to_Msun
     if (allocated(rho_dust)) deallocate(rho_dust)
 
-    mass = sum(masse_gaz) * g_to_Msun
+    mass = sum(gas_mass) * g_to_Msun
     if (mass <= 0.0) call error('Gas mass is 0')
 
-    write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
+    write(*,*) 'Total  gas mass in model:', real(sum(gas_mass) * g_to_Msun),' Msun'
     if (disk_zone(1)%diskmass > 0.0_dp) then
-       dust_pop(:)%masse = disk_zone(1)%diskmass
+       dust_pop(:)%mass = disk_zone(1)%diskmass
        call normalize_dust_density()
        if (lemission_atom) ldust_atom = .true.
     endif

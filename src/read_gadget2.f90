@@ -1,7 +1,7 @@
 module read_gadget2
 
-  use parametres
-  use constantes
+  use parameters
+  use constants
   use utils
 
   implicit none
@@ -27,7 +27,7 @@ contains
     ! others are required for data read but not used
     integer :: npart(0:5), ntot, len, flag_sfr, flag_feedback, unused(33), nall(0:5), n_stars, alloc_status
     ! massarr gives particle mass per type (as with npart) for particle
-    ! types of uniform mass (only type 0 SPH particles here)
+    ! types of uniform dust_mass(only type 0 SPH particles here)
     double precision :: massarr(0:5), time, redshift
     ! position, velocity, mass, internal energy, density and smoothing length arrays
     real, allocatable :: pos(:,:), vel(:,:), mass_stars(:), u(:), rho(:), hsml(:)
@@ -214,16 +214,16 @@ contains
     write(*,*) "Found", n_stars, "stars in the Gadget-2 file"
     if (n_stars > 0) then
        write(*,*) "Updating the stellar properties"
-       if (allocated(etoile)) deallocate(etoile)
-       allocate(etoile(n_stars))
+       if (allocated(star)) deallocate(star)
+       allocate(star(n_stars))
 
        do i=1,n_stars
-          etoile(i)%x = pos(1,n_SPH + i) * ulength_au
-          etoile(i)%y = pos(2,n_SPH + i) * ulength_au
-          etoile(i)%z = pos(3,n_SPH + i) * ulength_au
+          star(i)%x = pos(1,n_SPH + i) * ulength_au
+          star(i)%y = pos(2,n_SPH + i) * ulength_au
+          star(i)%z = pos(3,n_SPH + i) * ulength_au
 
-          etoile(i)%M =  mass_stars(i) * usolarmass
-          write(*,*) i, etoile(i)%M
+          star(i)%M =  mass_stars(i) * usolarmass
+          write(*,*) i, star(i)%M
        enddo
     endif
 

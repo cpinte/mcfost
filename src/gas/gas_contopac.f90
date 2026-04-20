@@ -14,9 +14,9 @@ module gas_contopac
       PassiveAtoms, Npassiveatoms
    use elements_type, only : elems
    use grid, only : T, ne, nHmin, nHtot, icompute_atomrt
-   use constantes
+   use constants
    use utils, only : bilinear, linear_1D_sorted, Bpnu, locate
-   use parametres, only : ldissolve, n_cells
+   use parameters, only : ldissolve, n_cells
    use messages, only : error
 
    implicit none
@@ -507,7 +507,7 @@ module gas_contopac
 
       !check here km_to_m = micron_to_nm
       alpha = hc_k / km_to_m ! hc_k = hc/k/nm_to_m
-      lambda0 = 1.6419 !micron, photo detachement threshold
+      lambda0 = 1.6419 !micron, photo detachment threshold
 
       nH = hydrogen%n(1,icell)
 

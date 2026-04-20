@@ -7,10 +7,10 @@ contains
   subroutine init_mcfost_phantom(mcfost_para_filename, ndusttypes, use_SPH_limits_file, SPH_limits_file, SPH_limits, ierr, &
        keep_particles, fix_star, turn_on_Lacc, turn_on_dust_subl, use_ISM_heating)
 
-    use parametres
+    use parameters
     use init_mcfost, only : set_default_variables, get_mcfost_utils_dir
     use read_params, only : read_para
-    use dust_prop, only : build_grain_size_distribution, init_indices_optiques, prop_grains
+    use dust_prop, only : build_grain_size_distribution, init_optical_indices, prop_grains
     use grid, only : define_physical_zones, order_zones
     use wavelengths, only : init_lambda, n_lambda
     use optical_depth, only : no_dark_zone
@@ -108,7 +108,7 @@ contains
 
     ! Building the wavelength & basic dust properties grid
     call init_lambda()
-    call init_indices_optiques()
+    call init_optical_indices()
 
     ! Building the dust grain population
     call build_grain_size_distribution()
@@ -161,8 +161,8 @@ contains
        xyzmh_ptmass,vxyz_ptmass,hfact,umass,utime,udist,ndudt,dudt,compute_Frad,SPH_limits,&
        Tphantom, n_packets,mu_gas,ierr,write_T_files,ISM,T_gas,apr_level,use_apr)
 
-    use parametres
-    use constantes, only : mu
+    use parameters
+    use constants, only : mu
     use read_phantom
     use stars, only : E_ISM
     use radiation_field, only : xN_abs
@@ -174,10 +174,10 @@ contains
     use Voronoi_grid, only : Voronoi
     use dust_transfer, only : emit_packet, propagate_packet
     use utils, only : progress_bar
-    use stars, only : repartition_energie_etoiles, repartition_energie_ISM
+    use stars, only : star_energy_distribution, ism_energy_distribution
     use grid,only : setup_grid
     use scattering, only : setup_scattering
-    use optical_depth, only : no_dark_zone, integ_tau, opacite
+    use optical_depth, only : no_dark_zone, integ_tau, opacity
     use wavelengths, only : n_lambda, tab_lambda
     use Temperature, only : Tdust
     use mcfost_env
@@ -230,7 +230,7 @@ contains
     real(kind=dp) :: nnfot2
     real(kind=dp) :: x,y,z, u,v,w, mass_per_H
     real :: rand, time, cpu_time_begin, cpu_time_end
-    integer :: n_SPH, icell, nbre_phot2, ibar, id, nnfot1_cumul, i_SPH, i, lambda_seuil
+    integer :: n_SPH, icell, n_photons2, ibar, id, n_photons1_cumul, i_SPH, i, lambda_threshold
     integer :: itime, ieos, alloc_status
     logical :: lpacket_alive, lintersect, laffichage, flag_star, flag_scatt, flag_ISM, ldust_moments
     integer, target :: lambda, lambda0
@@ -251,7 +251,7 @@ contains
     write(*,*) "------------------------------"
     write(*,*)
 
-    ! debut de l'execution
+    ! start of execution
     call system_clock(time_begin,count_rate=time_tick,count_max=time_max)
     call cpu_time(cpu_time_begin)
 
@@ -277,12 +277,12 @@ contains
     ! We allocate the total number of SPH cells as the number of Voronoi cells mays vary
     if (lfirst_time) then
        if (use_apr) then
-          call alloc_dynamique(n_cells_max = n_SPH*8 + n_etoiles) ! this is the value currently used
+          call alloc_dynamique(n_cells_max = n_SPH*8 + n_stars) ! this is the value currently used
        else                                                       ! in Phantom (config.F90)
-          call alloc_dynamique(n_cells_max = n_SPH + n_etoiles)
+          call alloc_dynamique(n_cells_max = n_SPH + n_stars)
        endif
        alloc_status = 0
-       allocate(xN_abs(n_SPH + n_etoiles,1,nb_proc),  stat=alloc_status)
+       allocate(xN_abs(n_SPH + n_stars,1,nb_proc),  stat=alloc_status)
        if (alloc_status /= 0) call error("Allocation error xN_abs")
        lfirst_time = .false.
     endif
@@ -310,11 +310,11 @@ contains
 
     ! ToDo : needs to be made parallel
     do lambda=1,n_lambda
-       call opacite(lambda, p_lambda)
+       call opacity(lambda, p_lambda)
     enddo !n
 
-    call repartition_energie_etoiles()
-    call repartition_energie_ISM(ISM)
+    call star_energy_distribution()
+    call ism_energy_distribution(ISM)
 
     ! ToDo : needs to be made parallel
     call init_reemission(lextra_heating,extra_heating)
@@ -331,16 +331,16 @@ contains
 
     letape_th  = .true.
     laffichage = .true.
-    nbre_phot2 = nbre_photons_eq_th
+    n_photons2 = n_photons_eq_th
 
     test_tau : do lambda=1,n_lambda
        if (tab_lambda(lambda) > wl_seuil) then
-          lambda_seuil=lambda
+          lambda_threshold=lambda
           exit test_tau
        endif
     enddo test_tau
-    write(*,*) "lambda =", real(tab_lambda(lambda_seuil))
-    call integ_tau(lambda_seuil)
+    write(*,*) "lambda =", real(tab_lambda(lambda_threshold))
+    call integ_tau(lambda_threshold)
 
     write(*,*) "Computing temperature structure ..."
     ! Making the MC run
@@ -350,32 +350,32 @@ contains
     !$omp firstprivate(lambda,p_lambda) &
     !$omp private(id,icell,lpacket_alive,lintersect,nnfot2,rand) &
     !$omp private(x,y,z,u,v,w,Stokes,flag_star,flag_ISM,flag_scatt) &
-    !$omp shared(nbre_photons_loop) &
-    !$omp shared(nbre_phot2,nb_proc) &
-    !$omp shared(stream,laffichage,nbre_photons_lambda, nnfot1_cumul,ibar) &
+    !$omp shared(n_photons_loop) &
+    !$omp shared(n_photons2,nb_proc) &
+    !$omp shared(stream,laffichage,n_photons_lambda, n_photons1_cumul,ibar) &
     !$omp reduction(+:E_abs_nRE)
     E_abs_nRE = 0.0
 
-    id = 1 ! Pour code sequentiel
+    id = 1 ! for sequential code
     !$ id = omp_get_thread_num() + 1
-    ibar=1 ;  nnfot1_cumul = 0
+    ibar=1 ;  n_photons1_cumul = 0
 
     !$omp do schedule(dynamic,1)
-    do nnfot1=1,nbre_photons_loop
+    do nnfot1=1,n_photons_loop
        nnfot2 = 0.0_dp
-       photon : do while ((nnfot2 < nbre_phot2))
+       photon : do while ((nnfot2 < n_photons2))
           nnfot2=nnfot2+1.0_dp
 
-          ! Choix longueur d'onde
+          ! Choix length d'onde
           rand = sprng(stream(id))
           call select_wl_em(rand,lambda)
 
-          ! Emission du paquet
+          ! Packet emission
           call emit_packet(id,lambda, icell,x,y,z,u,v,w,stokes,flag_star,flag_ISM,lintersect)
           Stokes = 0.0_dp ; Stokes(1) = 1.0_dp
           lpacket_alive = .true.
 
-          ! Propagation du packet
+          ! Packet propagation
           if (lintersect) then
              call propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,&
                 flag_star,flag_ISM,flag_scatt,lpacket_alive)
@@ -384,9 +384,9 @@ contains
 
        ! Progress bar
        !$omp atomic
-       nnfot1_cumul = nnfot1_cumul+1
+       n_photons1_cumul = n_photons1_cumul+1
        if (laffichage) then
-          if (real(nnfot1_cumul) > 0.02*ibar * real(nbre_photons_loop)) then
+          if (real(n_photons1_cumul) > 0.02*ibar * real(n_photons_loop)) then
              call progress_bar(ibar)
              !$omp atomic
              ibar = ibar+1
@@ -499,7 +499,7 @@ contains
   subroutine write_mcfost2phantom_temperature()
 
     use mcfost_env, only : data_dir
-    use utils, only : appel_syst
+    use utils, only : system_call
     use output, only : ecriture_temperature, write_disk_struct
     use messages, only : error
 
@@ -519,12 +519,12 @@ contains
     write(*,*) "**************************************************"
     write(*,*)
 
-    call appel_syst("rm -rf "//trim(data_dir)//" ; mkdir -p "//trim(data_dir), syst_status)
+    call system_call("rm -rf "//trim(data_dir)//" ; mkdir -p "//trim(data_dir), syst_status)
     call ecriture_temperature(1)
 
-    call appel_syst("rm -rf data_disk ; mkdir -p data_disk", syst_status)
+    call system_call("rm -rf data_disk ; mkdir -p data_disk", syst_status)
     call write_disk_struct(.false., .false.,.false.)
-    call appel_syst("mv data_disk/grid.fits.gz "//trim(data_dir), syst_status)
+    call system_call("mv data_disk/grid.fits.gz "//trim(data_dir), syst_status)
 
     return
 
@@ -538,27 +538,27 @@ contains
     ! Diffusion coefficient is D = 1/(rho * opacity)
     ! This opacity/diffusion coefficient includes scattering
     ! See Min et al 2009 and Robitaille et al 2010
-    use parametres
-    use constantes
+    use parameters
+    use constants
     use wavelengths, only : n_lambda, tab_lambda, tab_delta_lambda
     use Temperature, only : Tdust
     use dust_prop, only : kappa
     use cylindrical_grid, only : volume
-    use density, only : masse_gaz, densite_gaz
+    use density, only : gas_mass, gas_density
 
     real(dp), intent(in)  :: temp
     integer,  intent(in)  :: icell
     real(dp), intent(out) :: kappa_diffusion ! cm2/g (ie per gram of gas)
 
     integer :: lambda
-    real(dp) :: somme, somme2, cst, cst_wl, B, dB_dT, coeff_exp, wl, delta_wl
+    real(dp) :: total_sum, somme2, cst, cst_wl, B, dB_dT, coeff_exp, wl, delta_wl
 
     if (temp > 1) then
-       somme  = 0.0_dp
+       total_sum  = 0.0_dp
        somme2 = 0.0_dp
-       cst    = cst_th/temp
+       cst    = thermal_const/temp
        do lambda = 1,n_lambda
-          ! longueur d'onde en metre
+          ! wavelength in metres
           wl       = tab_lambda(lambda)*1.e-6
           delta_wl = tab_delta_lambda(lambda)*1.e-6
           cst_wl   = cst/wl
@@ -570,12 +570,12 @@ contains
              B = 0.0_dp
              !dB_dT = 0.0_dp
           endif
-          somme  = somme  + B/kappa(icell,lambda)*delta_wl
+          total_sum  = total_sum  + B/kappa(icell,lambda)*delta_wl
           somme2 = somme2 + B*delta_wl
        enddo
-       kappa_diffusion = somme2/somme &
-          *cm_to_AU/(densite_gaz(icell)*mu_mH*(cm_to_m)**3) ! cm^2/g
-       ! check : somme2/somme * cm_to_AU /(masse_gaz(icell)/(volume(icell)*AU_to_cm**3))
+       kappa_diffusion = somme2/total_sum &
+          *cm_to_AU/(gas_density(icell)*mu_mH*(cm_to_m)**3) ! cm^2/g
+       ! check : somme2/total_sum * cm_to_AU /(gas_mass(icell)/(volume(icell)*AU_to_cm**3))
     else
        kappa_diffusion = 0.
     endif

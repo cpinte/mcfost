@@ -3,7 +3,7 @@
 ! --------------------------------------------------------------------------- !
 module voigts
 
-    use constantes, only : pi, sqrtpi
+    use constants, only : pi, sqrtpi
     use mcfost_env, only : dp
 
     implicit none
