@@ -1423,11 +1423,11 @@ end function integ_ray_dust
 !***********************************************************
 
 subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
-! Definition of the extent of the dark zone
-! defines the logical array l_dark_zone
-! and the limiting radii r_in_opacite for the first radius
-! C. Pinte
-! 22/04/05
+  ! Definition of the extent of the dark zone
+  ! defines the logical array l_dark_zone
+  ! and the limiting radii r_in_opacite for the first radius
+  ! C. Pinte
+  ! 22/04/05
 
   implicit none
 

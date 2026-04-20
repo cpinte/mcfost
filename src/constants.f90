@@ -5,7 +5,6 @@ module constants
   implicit none
   save
 
-  ! Quelques reels utiles
   real(kind=dp), parameter :: pi = 3.141592653589793238462643383279502884197_dp
   real(kind=dp), parameter :: two_pi = 2.0_dp * pi
   real(kind=dp), parameter :: inv_two_pi = 1.0_dp/two_pi
@@ -18,10 +17,10 @@ module constants
   ! --- 1/(2sqrt(2)), needed for anisotropy of radiation ---
   real(kind=dp), parameter ::  twosqrttwo = 0.35355339059327
 
-  ! constants en SI
+  ! SI constants
   real(kind=dp), parameter :: hp = 6.626070040e-34_dp  ! Planck (J.s) CODATA 2014
   real(kind=dp), parameter :: kb = 1.38064852e-23_dp   ! Boltzmann (J.K^-1) CODATA 2014
-  real(kind=dp), parameter :: c_light = 299792458._dp  ! velocity lumiere (m.s^-1) CODATA 2014
+  real(kind=dp), parameter :: c_light = 299792458._dp  ! speed of light (m.s^-1) CODATA 2014
   real, parameter :: thermal_const=c_light*hp/kb  ! pour Calculation of (h c)/(lambda k T)
   real, parameter :: sigma = 5.670367e-8     ! Stefan (en W/(m^2.K^4)) CODATA 2014
   real, parameter :: Ggrav = 6.67428e-11   ! (m^3.s^-2.kg^-1) e-8 en cgs, CODATA 2016, value recommended by IAU 2015 B3

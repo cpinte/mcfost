@@ -105,7 +105,7 @@ end subroutine select_star
 
 !**********************************************************************
 
-subroutine emit_packet_uniform_sphere(id, i_star,rand1,rand2,rand3,aleat4, icell,x,y,z,u,v,w,w2,lintersect)
+subroutine emit_packet_uniform_sphere(id, i_star,rand1,rand2,rand3,rand4, icell,x,y,z,u,v,w,w2,lintersect)
 ! Chooses the emission position uniformly
 ! on the surface of the star and the flight direction
 ! according to the cosine of the angle with the normal
@@ -115,7 +115,7 @@ subroutine emit_packet_uniform_sphere(id, i_star,rand1,rand2,rand3,aleat4, icell
   implicit none
 
   integer, intent(in) :: id, i_star
-  real, intent(in) :: rand1, rand2, rand3, aleat4
+  real, intent(in) :: rand1, rand2, rand3, rand4
   integer, intent(out) :: icell
 
   real(kind=dp), intent(out) :: x, y, z, u, v, w, w2
@@ -133,7 +133,7 @@ subroutine emit_packet_uniform_sphere(id, i_star,rand1,rand2,rand3,aleat4, icell
 
   ! Choice of flight direction: uniform sphere
   cospsi = sqrt(rand3) ! !TODO : This is strange. rand3 works with the benchmark: but not the same thing for the stellar surface in RT. sqrt(rand3) ~ OK with TORUS in MC mode
-  phi = 2.0_dp*pi*aleat4
+  phi = 2.0_dp*pi*rand4
   ! (x,y,z) defines the normal (here, it still has norm=1)
   ! cospsi and phi are defined relative to this normal
   ! a rotation is required
@@ -742,7 +742,7 @@ subroutine emit_packet_ISM(id, icell,x,y,z,u,v,w,stokes,lintersect)
   real(kind=dp), dimension(4), intent(out) :: stokes
   logical, intent(out) :: lintersect
 
-  real :: rand1, rand2, rand3, aleat4
+  real :: rand1, rand2, rand3, rand4
   real(kind=dp) :: srw02, argmt, cospsi, phi, l, w2
 
   ! Energy at 1
@@ -761,10 +761,10 @@ subroutine emit_packet_ISM(id, icell,x,y,z,u,v,w,stokes,lintersect)
   ! Choice of flight direction: uniform sphere
   ! emission towards the interior
   rand3 = sprng(stream(id))
-  aleat4 = sprng(stream(id))
+  rand4 = sprng(stream(id))
 
   cospsi = -sqrt(rand3)
-  phi = 2.0_dp*pi*aleat4
+  phi = 2.0_dp*pi*rand4
   ! (x,y,z) defines the normal (here, it still has norm=1)
   ! cospsi and phi are defined relative to this normal
   ! a rotation is required
