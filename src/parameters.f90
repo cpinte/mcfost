@@ -207,6 +207,7 @@ module parameters
   real :: puffed_rim_h, puffed_rim_r, puffed_rim_delta_r
 
   real :: z_warp, tilt_angle
+  integer :: izone_tilt = 1
 
   ! SPH
   real :: SPH_keep_particles, planet_az, delta_planet_az

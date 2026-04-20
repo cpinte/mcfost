@@ -123,7 +123,7 @@ subroutine define_gas_density()
      !$omp shared(gas_density_midplane_tmp) &
      !$omp shared(lwarp,r_grid,z_grid,phi_grid,lpuffed_rim,puffed_rim_h,puffed_rim_r,puffed_rim_delta_r) &
      !$omp shared(z_warp,ltilt,tilt_angle,lsigma_file,cst_gaz,z_lim,lgap_gaussian,f_gap_gaussian) &
-     !$omp shared(r_gap_gaussian,sigma_gap_gaussian,n_cells,z_scaling_env,surface_density,volume) &
+     !$omp shared(r_gap_gaussian,sigma_gap_gaussian,n_cells,z_scaling_env,surface_density,volume,izone_tilt) &
      !$omp reduction(+: mass)
 
      if (dz%geometry <= 2) then ! Disk
@@ -167,7 +167,7 @@ subroutine define_gas_density()
                  if (lwarp) then
                     z0 = z_warp * (rcyl/dz%rref)**3 * cos(phi)
                  else if (ltilt) then
-                    if (izone==1) then
+                    if (izone==izone_tilt) then
                        z0 = rcyl * cos(phi) * tan(tilt_angle * deg_to_rad)
                     else
                        z0 = 0.0
@@ -273,7 +273,7 @@ subroutine define_gas_density()
                  if (lwarp) then
                     z0 = z_warp * (rcyl/dz%rref)**3 * cos(phi)
                  else if (ltilt) then
-                    if (izone==1) then
+                    if (izone==izone_tilt) then
                        z0 = rcyl * cos(phi) * tan(tilt_angle * deg_to_rad)
                     else
                        z0 = 0.0
@@ -552,7 +552,7 @@ subroutine define_dust_density()
                  if (lwarp) then
                     z0 = z_warp * (rcyl/dz%rref)**3 * cos(phi)
                  else if (ltilt) then
-                    if (izone==1) then
+                    if (izone==izone_tilt) then
                        z0 = rcyl * cos(phi) * tan(tilt_angle * deg_to_rad)
                     else
                        z0 = 0.0
@@ -867,7 +867,7 @@ subroutine define_dust_density()
                  if (lwarp) then
                     z0 = z_warp * (rcyl/dz%rref)**3 * cos(phi)
                  else if (ltilt) then
-                    if (izone==1) then
+                    if (izone==izone_tilt) then
                        z0 = rcyl * cos(phi) * tan(tilt_angle * deg_to_rad)
                     else
                        z0 = 0.0
@@ -1433,8 +1433,8 @@ subroutine read_density_file()
            n_a_sph(i) = n_a_sph(i) / tmp
            write(*,*) i, a_sph(i), "microns, relative number density =", n_a_sph(i)
            ! Checking values as we will take the log a bit later
-           if (a_sph(i) < tiny_real) call error("grain sizes must be > 0")
-           if (n_a_sph(i) < tiny_real) call error("grain number density must be > 0")
+           if (a_sph(i) < 0.0_sp) call error("grain sizes must be > 0")
+           if (n_a_sph(i) < 0.0_sp) call error("grain number density must be > 0")
         enddo
         write(*,*) "These densities will be used to set the integrated grain size distribution"
         write(*,*) "Densities will be interpolated on the grain sizes defined"
