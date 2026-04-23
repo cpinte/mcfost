@@ -1,9 +1,9 @@
 module Voronoi_grid
 
-  use constantes
+  use constants
   use mcfost_env
-  use parametres
-  use utils, only : appel_syst
+  use parameters
+  use utils, only : system_call
   use sort, only : Knuth_shuffle, index_quicksort
   use naleat, only : seed, stream, gtype
   use cylindrical_grid, only : volume
@@ -220,7 +220,7 @@ module Voronoi_grid
     real(kind=dp), dimension(:), allocatable :: V_tmp
     integer, dimension(:), allocatable :: first_neighbours,last_neighbours
     integer, dimension(:), allocatable :: neighbours_list_loc
-    integer, dimension(:), allocatable :: n_neighbours ! nb_proc
+    integer, dimension(:), allocatable :: n_neighbours ! n_cpus
     logical(c_bool), dimension(:), allocatable :: was_cell_cut, was_cell_cut_tmp
     logical(c_bool), dimension(:), allocatable :: star_neighb_tmp, star_neighb
     logical, dimension(:), allocatable :: do_tesselation
@@ -255,8 +255,8 @@ module Voronoi_grid
     Rmax = sqrt( (limits(2)-limits(1))**2 + (limits(4)-limits(3))**2 + (limits(6)-limits(5))**2 )
 
     alloc_status = 0
-    allocate(x_tmp(n_points+n_etoiles), y_tmp(n_points+n_etoiles), z_tmp(n_points+n_etoiles), h_tmp(n_points+n_etoiles), &
-         SPH_id(n_points+n_etoiles), SPH_original_id(n_points+n_etoiles), do_tesselation(n_points), stat=alloc_status)
+    allocate(x_tmp(n_points+n_stars), y_tmp(n_points+n_stars), z_tmp(n_points+n_stars), h_tmp(n_points+n_stars), &
+         SPH_id(n_points+n_stars), SPH_original_id(n_points+n_stars), do_tesselation(n_points), stat=alloc_status)
     if (alloc_status /=0) call error("Allocation error Voronoi temp arrays")
 
     ! Pre-filter to check if we need to do the tesselation for each particle
@@ -293,14 +293,14 @@ module Voronoi_grid
                    ! We also test if the edge of the cell can be inside the star
                    is_outside_stars = .true.
 
-                   loop_stars : do istar=1, n_etoiles
-                      dx = x(i) - etoile(istar)%x
-                      dy = y(i) - etoile(istar)%y
-                      dz = z(i) - etoile(istar)%z
+                   loop_stars : do istar=1, n_stars
+                      dx = x(i) - star(istar)%x
+                      dy = y(i) - star(istar)%y
+                      dz = z(i) - star(istar)%z
 
-                      if (min(dx,dy,dz) < etoile(istar)%r) then
+                      if (min(dx,dy,dz) < star(istar)%r) then
                          dist2 = dx**2 + dy**2 + dz**2
-                         if (dist2 < 4.0*etoile(istar)%r**2) then
+                         if (dist2 < 4.0*star(istar)%r**2) then
                             is_outside_stars = .false.
                             n_sublimate = n_sublimate + 1
                             exit loop_stars
@@ -356,19 +356,19 @@ module Voronoi_grid
     endif
 
     ! Filtering stars outside the limits
-    etoile(:)%out_model = .true.
-    etoile(:)%icell = 0
+    star(:)%out_model = .true.
+    star(:)%icell = 0
     icell = n_cells_before_stars
-    do i=1, n_etoiles
+    do i=1, n_stars
        ! We test is the star is in the model
-       if ((etoile(i)%x > limits(1)).and.(etoile(i)%x < limits(2))) then
-          if ((etoile(i)%y > limits(3)).and.(etoile(i)%y < limits(4))) then
-             if ((etoile(i)%z > limits(5)).and.(etoile(i)%z < limits(6))) then
+       if ((star(i)%x > limits(1)).and.(star(i)%x < limits(2))) then
+          if ((star(i)%y > limits(3)).and.(star(i)%y < limits(4))) then
+             if ((star(i)%z > limits(5)).and.(star(i)%z < limits(6))) then
                 icell = icell + 1
                 SPH_id(icell) = 0 ; SPH_original_id(icell) = 0
-                x_tmp(icell) = etoile(i)%x ; y_tmp(icell) = etoile(i)%y ; z_tmp(icell) = etoile(i)%z ; h_tmp(icell) = huge_real ;
-                etoile(i)%out_model = .false.
-                etoile(i)%icell = icell
+                x_tmp(icell) = star(i)%x ; y_tmp(icell) = star(i)%y ; z_tmp(icell) = star(i)%z ; h_tmp(icell) = huge_real ;
+                star(i)%out_model = .false.
+                star(i)%icell = icell
              endif
           endif
        endif
@@ -408,8 +408,8 @@ module Voronoi_grid
        enddo
     endif
 
-    do i=1, n_etoiles
-       if (etoile(i)%icell > 0) Voronoi(etoile(i)%icell)%is_star = .true.
+    do i=1, n_stars
+       if (star(i)%icell > 0) Voronoi(star(i)%icell)%is_star = .true.
     enddo
 
     call system_clock(time1)
@@ -453,11 +453,11 @@ module Voronoi_grid
 
        n_in = 0 ! We initialize value at 0 as we have a reduction + clause
        !$omp parallel default(none) num_threads(nb_proc_voro) &
-       !$omp shared(n_cells,limits,x_tmp,y_tmp,z_tmp,h_tmp,nb_proc_voro,n_cells_per_cpu,etoile) &
+       !$omp shared(n_cells,limits,x_tmp,y_tmp,z_tmp,h_tmp,nb_proc_voro,n_cells_per_cpu,star) &
        !$omp shared(first_neighbours,last_neighbours,neighbours_list_loc,n_neighbours,PS) &
        !$omp private(id,n,icell_start,icell_end,ierr) &
        !$omp private(V_tmp,was_cell_cut_tmp,alloc_status,star_neighb_tmp) &
-       !$omp shared(volume,was_cell_cut,star_neighb, n_etoiles) &
+       !$omp shared(volume,was_cell_cut,star_neighb, n_stars) &
        !$omp reduction(+:n_in)
        id = 1
        !$ id = omp_get_thread_num() + 1
@@ -472,7 +472,7 @@ module Voronoi_grid
        call voro(n_cells,max_neighbours,limits,x_tmp,y_tmp,z_tmp,h_tmp, threshold, PS%n_faces, &
             PS%vectors, PS%cutting_distance_o_h, icell_start-1,icell_end-1, id-1,nb_proc_voro,n_cells_per_cpu, &
             n_in,V_tmp,first_neighbours,last_neighbours,n_neighbours,neighbours_list_loc,was_cell_cut_tmp,&
-            n_etoiles, etoile(:)%icell-1,etoile(:)%r,star_neighb_tmp, ierr) ! icell & id shifted by 1 for C
+            n_stars, star(:)%icell-1,star(:)%r,star_neighb_tmp, ierr) ! icell & id shifted by 1 for C
        if (ierr /= 0) then
           write(*,*) "Voro++ excited with an error", ierr, "thread #", id
           write(*,*) "Exiting"
@@ -552,7 +552,7 @@ module Voronoi_grid
        	endif
     enddo
     if (n_average_neighb_stars>0) write(*,'(" Mean number of stellar neighbours = ",(1I5))') &
-    	int(real(size(pack(Voronoi(:)%is_star_neighbour,mask=Voronoi(:)%is_star_neighbour)))/real(n_etoiles))
+    	int(real(size(pack(Voronoi(:)%is_star_neighbour,mask=Voronoi(:)%is_star_neighbour)))/real(n_stars))
 
 
     ! Saving position of the first neighbours to save time on memory access
@@ -770,7 +770,7 @@ module Voronoi_grid
        write(*,*) "Can't compute sha1 of "//trim(filename)
        return
     endif
-    call appel_syst(cmd, syst_status)
+    call system_call(cmd, syst_status)
     open(unit=1, file="voronoi.sha1", status='old',iostat=ios)
     read(1,*,iostat=ios) voronoi_sha1
     close(unit=1,status="delete",iostat=ios)
@@ -828,7 +828,7 @@ module Voronoi_grid
        rand2 = sprng(stream(id))
        rand3 = sprng(stream(id))
 
-       call pos_em_cellule_Voronoi(icell,rand,rand2,rand3, x,y,z)
+       call pos_em_cell_voronoi(icell,rand,rand2,rand3, x,y,z)
        write(*,*) x,y,z
     enddo
 
@@ -882,7 +882,7 @@ module Voronoi_grid
 
        if (id_n==previous_cell) cycle nb_loop
 
-       if (id_n > 0) then ! cellule
+       if (id_n > 0) then ! cell
           if (l <= n_saved_neighbours) then ! we used an ordered array to limit cache misses
              r_neighbour(:) = Voronoi_neighbour_xyz(:,l,icell)
           else
@@ -926,7 +926,7 @@ module Voronoi_grid
        ! We correct the cell index and do not move the packet
        x1 = x ; y1 = y ; z1 = z ; s = 0.0
        if (is_in_volume(x,y,z)) then
-          call indice_cellule_voronoi(x,y,z, next_cell)
+          call index_cell_voronoi(x,y,z, next_cell)
           if (icell == next_cell) then ! that means we are out of the grid already
              next_cell = -1 ! the exact index does not matter
           endif
@@ -982,7 +982,7 @@ module Voronoi_grid
        if (i_star > 0) then
           if (d_to_star < s) then ! indeed a star, we use d_to_stars and set next_cell
              s_contrib = d_to_star
-             next_cell = etoile(i_star)%icell
+             next_cell = star(i_star)%icell
           endif
        endif
     endif
@@ -1025,7 +1025,7 @@ module Voronoi_grid
        l = l+1
        id_n = neighbours_list(i) ! id du voisin
 
-       if (id_n > 0) then ! cellule
+       if (id_n > 0) then ! cell
           if (l <= n_saved_neighbours) then ! we used an ordered array to limit cache misses
              r_neighbour(:) = Voronoi_neighbour_xyz(:,l,icell)
           else
@@ -1115,7 +1115,7 @@ module Voronoi_grid
 
        if (id_n==previous_cell) cycle
 
-       if (id_n > 0) then ! cellule
+       if (id_n > 0) then ! cell
           if (l <= n_saved_neighbours) then ! we used an ordered array to limit cache misses
              r_neighbour(:) = Voronoi_neighbour_xyz(:,l,icell)
           else
@@ -1189,7 +1189,7 @@ module Voronoi_grid
        ! We correct the cell index and do not move the packet
        x1 = x ; y1 = y ; z1 = z ; s = 0.0
        if (is_in_volume(x,y,z)) then
-          call indice_cellule_voronoi(x,y,z, next_cell)
+          call index_cell_voronoi(x,y,z, next_cell)
           if (icell == next_cell) then ! that means we are out of the grid already
              next_cell = -1 ! the exact index does not matter
           endif
@@ -1339,10 +1339,10 @@ module Voronoi_grid
     distance_to_star = huge(1.0_dp)
 
     i_star = 0
-    star_loop : do i = 1, n_etoiles
-     	delta_r(:)  = r(:) - (/etoile(i)%x, etoile(i)%y, etoile(i)%z/)
+    star_loop : do i = 1, n_stars
+     	delta_r(:)  = r(:) - (/star(i)%x, star(i)%y, star(i)%z/)
      	b = dot_product(delta_r,k)
-     	c = dot_product(delta_r,delta_r) - (etoile(i)%r)**2
+     	c = dot_product(delta_r,delta_r) - (star(i)%r)**2
      	delta = b*b - c
 
      	if (delta >= 0.) then ! the packet will encounter (or has encoutered) the star
@@ -1507,15 +1507,15 @@ end function find_Voronoi_cell_brute_force
 
 !----------------------------------------
 
-subroutine pos_em_cellule_Voronoi(icell,aleat1,aleat2,aleat3, x,y,z)
-! Choisit la position d'emission uniformement dans la cellule
+subroutine pos_em_cell_voronoi(icell,rand1,rand2,rand3, x,y,z)
+! Choisit la position d'emission uniformement dans la cell
 ! C. Pinte
 ! 20/05/14
 
   implicit none
 
   integer, intent(in) :: icell
-  real, intent(in) :: aleat1, aleat2, aleat3
+  real, intent(in) :: rand1, rand2, rand3
   real(kind=dp), intent(out) :: x,y,z
 
   real(kind=dp) :: u, v, w, srw2, argmt, x1,y1,z1
@@ -1523,29 +1523,29 @@ subroutine pos_em_cellule_Voronoi(icell,aleat1,aleat2,aleat3, x,y,z)
   real(kind=dp) :: l, l_contrib, l_void_before
 
   ! Direction aleatoire
-  w = 2.0_dp * aleat1 - 1.0_dp
+  w = 2.0_dp * rand1 - 1.0_dp
   srw2 = sqrt(1.0_dp-w*w)
-  argmt = pi*(2.0_dp*aleat2-1.0_dp)
+  argmt = pi*(2.0_dp*rand2-1.0_dp)
   u = srw2 * cos(argmt)
   v = srw2 * sin(argmt)
 
-  ! Distance jusqu'au bord de la cellule
+  ! Distance jusqu'au bord de la cell
   previous_cell = 0
   x = Voronoi(icell)%xyz(1) ; y = Voronoi(icell)%xyz(2) ; z = Voronoi(icell)%xyz(3)
   call cross_Voronoi_cell(x,y,z, u,v,w, icell, previous_cell, x1,y1,z1, next_cell, l, l_contrib, l_void_before)
 
   ! Repartition uniforme selon cette direction
-  l = l_contrib * aleat3**(1./3)
-  !x=x+l ; y=y+l*v ; z=z+l*w ! emission au centre cellule si cette ligne est commentee
+  l = l_contrib * rand3**(1./3)
+  !x=x+l ; y=y+l*v ; z=z+l*w ! emission au centre cell si cette ligne est commentee
 
   return
 
-end subroutine pos_em_cellule_Voronoi
+end subroutine pos_em_cell_voronoi
 
 
 !----------------------------------------
 
-subroutine indice_cellule_Voronoi(xin,yin,zin, icell)
+subroutine index_cell_voronoi(xin,yin,zin, icell)
 
     implicit none
 
@@ -1569,7 +1569,7 @@ subroutine indice_cellule_Voronoi(xin,yin,zin, icell)
 
     return
 
-  end subroutine indice_cellule_Voronoi
+  end subroutine index_cell_voronoi
 
 !----------------------------------------
 

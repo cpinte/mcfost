@@ -1,6 +1,6 @@
 module MRW
   use mcfost_env, only : dp
-  use constantes, only : pi
+  use constants, only : pi
   use utils, only : interp
 
   implicit none

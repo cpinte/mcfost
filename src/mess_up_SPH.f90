@@ -1,6 +1,6 @@
 module mess_up_SPH
 
-  use constantes
+  use constants
 
   implicit none
 

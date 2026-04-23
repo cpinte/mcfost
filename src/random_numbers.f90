@@ -1,14 +1,14 @@
 module naleat
 !**********************************************************
-! Parametres des nombres aleatoires
+! parameters des nombres aleatoires
 !**********************************************************
-! SPRNG renvoie un nbre aleatoire dans [0,1[
+! SPRNG returns a random number in [0,1[
 ! faire attention a conversion dp -> sp sur machine 64 bits
 ! qui peut donner 1.0 -> BUG
 !**********************************************************
 
   use mcfost_env, only : dp
-  use constantes, only : pi
+  use constants, only : pi
 
   implicit none
 

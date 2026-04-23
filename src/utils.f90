@@ -2,7 +2,7 @@ module utils
 
   use mcfost_env
   use naleat, only : stream
-  use constantes
+  use constants
   use sha
   use messages
 
@@ -12,7 +12,7 @@ module utils
   real, parameter :: AIR_TO_VACUUM_LIMIT=199.9352
 
 !  public :: interp, integrate_trap, span, spanl, in_dir, Blambda, Bpnu, &
-!       Bnu, appel_syst, get_NH, linear_1D_sorted, vacuum2air, is_file, is_dir, &
+!       Bnu, system_call, get_NH, linear_1D_sorted, vacuum2air, is_file, is_dir, &
 !       mcfost_update, get_mcfost_utils_version, is_nan_infinity, is_nan_infinity_vector, &
 !       is_nan_infinity_matrix, locate, gaussslv, cross_product, &
 !       gauss_legendre_quadrature, progress_bar, rotation_3d, cdapres, &
@@ -128,10 +128,10 @@ end function spanl_dp
 !************************************************************
 
 real(kind=sp) function interp_sp(y, x, xp)
-! interpole lineaire entre les points
-! fait une extrapolation lineaire entre les 2 premiers ou 2 derniers points
-! en cas de point cp en dehors de x
-! Modif : pas d'extrapolation : renvoie valeur a xmin ou xmax
+! linear interpolation between points
+! performs a linear extrapolation between the first 2 or last 2 points
+! in case of point cp outside x
+! Modification: no extrapolation: returns value at xmin or xmax
 ! C. Pinte
 ! 26/01/07
 
@@ -148,9 +148,9 @@ real(kind=sp) function interp_sp(y, x, xp)
   !   write(*,*) "Error in interp : y and x must have same dim"
   !endif
 
-  ! PAS D'EXTRAPOLATION
+  ! NO EXTRAPOLATION
   if (xp < minval(x)) then
-     if (x(n) > x(1)) then ! xcroissant
+     if (x(n) > x(1)) then ! x increasing
         interp_sp = y(1)
      else
         interp_sp = y(n)
@@ -158,7 +158,7 @@ real(kind=sp) function interp_sp(y, x, xp)
      return
   endif
   if (xp > maxval(x)) then
-     if (x(n) > x(1)) then ! xcroissant
+     if (x(n) > x(1)) then ! x increasing
         interp_sp = y(n)
      else
         interp_sp = y(1)
@@ -166,14 +166,14 @@ real(kind=sp) function interp_sp(y, x, xp)
      return
   endif
 
-  ! Suivant la croissance ou decroissance de x
-  if (x(n) > x(1)) then ! xcroissant
+  ! Following the increase or decrease of x
+  if (x(n) > x(1)) then ! x increasing
      search : do j=2,n-1
         if (x(j) > xp) exit search
      enddo search
      frac = (xp-x(j-1))/(x(j)-x(j-1))
      interp_sp = y(j-1) * (1.-frac)   + y(j) * frac
-  else ! x decroissant
+  else ! x decreasing
      search2 : do j=2,n-1
         if (x(j) < xp) exit search2
      enddo search2
@@ -188,10 +188,10 @@ end function interp_sp
 !----------------------------
 
 real(kind=dp) function interp_dp(y, x, xp)
-! interpole lineaire entre les points
-! fait une extrapolation lineaire entre les 2 premiers ou 2 derniers points
-! en cas de point cp en dehors de x
-! Modif : pas d'extrapolation : renvoie valeur a xmin ou xmax
+! linear interpolation between points
+! performs a linear extrapolation between the first 2 or last 2 points
+! in case of point cp outside x
+! Modification: no extrapolation: returns value at xmin or xmax
 ! C. Pinte
 ! 26/01/07
 
@@ -209,9 +209,9 @@ real(kind=dp) function interp_dp(y, x, xp)
   !endif
 
 
-  ! PAS D'EXTRAPOLATION
+  ! NO EXTRAPOLATION
   if (xp < minval(x)) then
-     if (x(n) > x(1)) then ! xcroissant
+     if (x(n) > x(1)) then ! x increasing
         interp_dp = y(1)
      else
         interp_dp = y(n)
@@ -219,7 +219,7 @@ real(kind=dp) function interp_dp(y, x, xp)
      return
   endif
   if (xp > maxval(x)) then
-     if (x(n) > x(1)) then ! xcroissant
+     if (x(n) > x(1)) then ! x increasing
         interp_dp = y(n)
      else
         interp_dp = y(1)
@@ -227,14 +227,14 @@ real(kind=dp) function interp_dp(y, x, xp)
      return
   endif
 
-  ! Suivant la croissance ou decroissance de x
-  if (x(n) > x(1)) then ! xcroissant
+  ! Following the increase or decrease of x
+  if (x(n) > x(1)) then ! x increasing
      search : do j=2,n-1
         if (x(j) > xp) exit search
      enddo search
      frac = (xp-x(j-1))/(x(j)-x(j-1))
      interp_dp = y(j-1) * (1.-frac)   + y(j) * frac
-  else ! x decroissant
+  else ! x decreasing
      search2 : do j=2,n-1
         if (x(j) < xp) exit search2
      enddo search2
@@ -344,8 +344,8 @@ subroutine Jacobi_sparse(a,b,x,n)
 end subroutine jacobi_sparse
 
 subroutine GaussSlv(a, b, n)
-  ! Resolution d'un systeme d'equation par methode de Gauss
-  ! Non optimise : meme pas de recherche du pivot max !!!
+  ! Solving a system of equations using Gauss elimination
+  ! Not optimized: no partial pivoting search!!!
   ! C. Pinte
   ! 22/09/07
 
@@ -363,11 +363,11 @@ subroutine GaussSlv(a, b, n)
      return
   end if
 
-  ! Triangularisation de la matrice
-  do i=1,n-1 ! Boucle sur colonnes
-     do k=i+1,n ! Boucle sur lignes
+  ! Matrix triangulation
+  do i=1,n-1 ! Loop over columns
+     do k=i+1,n ! Loop over rows
         factor = a(k,i)/a(i,i)
-        ! Operation sur la ligne
+        ! Row operation
         do j=i+1,n
            a(k,j) = a(k,j) - a(i,j) * factor
         end do
@@ -376,7 +376,7 @@ subroutine GaussSlv(a, b, n)
   end do
   b(n) = b(n) / a(n,n)
 
-  ! Resolution de la matrice triangulaire
+  ! Solving the triangular matrix
   do i=1,n-1
      k = n-i
      l = k+1
@@ -551,11 +551,11 @@ end subroutine check_ng_pops
 !***********************************************************
 
 subroutine rotation(xinit,yinit,zinit,u1,v1,w1,xfin,yfin,zfin)
-  ! Effectue une rotation du vecteur (xinit,yinit,zinit)
-  ! Le resultat (xfin,yfin,zfin) est dans
+  ! Performs a rotation of the vector (xinit,yinit,zinit)
+  ! The result (xfin,yfin,zfin) is in
   ! le systeme de coordonnees o� le vecteur (u1,v1,w1)=(1,0,0).
-  ! ie applique la meme rotation que celle qui transforme
-  ! (1,0,0) en (u1,v1,w1) sur (xinit,yinit,zinit)
+  ! i.e. applies the same rotation that transforms
+  ! (1,0,0) to (u1,v1,w1) on (xinit,yinit,zinit)
   ! C. Pinte : 1/03/06
   ! Nouvelle version d'une routine de F. M�nard
 
@@ -577,7 +577,7 @@ subroutine rotation(xinit,yinit,zinit,u1,v1,w1,xfin,yfin,zfin)
         sing=sqrt(1.0 - w1*w1)
      else
    !     x=v1/u1
-   !     !c'est pas un atan mais un atan2 d'on le sign(u1)
+   !     !it's not an atan but an atan2, hence the sign(u1)
    !     cost=sign(1.0/sqrt(1.0+x*x),u1)        !cos(atan(x)) = 1/(1+sqrt(x*x))
    !     sint=x*cost                            !sin(atan(x)) = x/(1+sqrt(x*x))
         ! Equivalent  �  (~ meme tps cpu):
@@ -601,9 +601,9 @@ end subroutine rotation
 !***********************************************************
 
 function calc_mu0(mu,a)
-  ! Resout l'equation de degre 3:   mu0**3 +(a-1)*mu0 - a*mu == 0
-  ! Forme speciale de l'equation:  x**3 +a1*x**2 +a2*x +a3,
-  ! Utilisation des formules de Tartaglia-Cardan
+  ! Solves the cubic equation: mu0**3 + (a-1)*mu0 - a*mu == 0
+  ! Special form of the equation: x**3 + a1*x**2 + a2*x + a3,
+  ! Using Tartaglia-Cardan formulas
   ! C. Pinte
   ! 01/09/08
 
@@ -626,8 +626,8 @@ function calc_mu0(mu,a)
      denom = sqrt(q3)
      theta = acos(r/denom)
      mu01 = -2.0_dp*qh*cos(theta/3.0_dp) - a1/3.0_dp
-     mu02 = -2._dp*qh*cos((theta + deux_pi)/3.0_dp) - a1/3.0_dp
-     mu03 = -2._dp*qh*cos((theta + quatre_pi)/3.0_dp) - a1/3.0_dp
+     mu02 = -2._dp*qh*cos((theta + two_pi)/3.0_dp) - a1/3.0_dp
+     mu03 = -2._dp*qh*cos((theta + four_pi)/3.0_dp) - a1/3.0_dp
      if ((mu01 > 0.0_dp).and.(mu02 > 0.0_dp)) then
         call error("calc_mu0: 2 positives roots, mu01, mu02")
      else if ((mu01 > 0.0_dp).and.(mu03 > 0.0_dp)) then
@@ -642,7 +642,7 @@ function calc_mu0(mu,a)
 
   else
      factor = sqrt(r**2 - q3) + abs(r)
-     factor3 = factor**un_tiers
+     factor3 = factor**one_third
      calc_mu0 = -1.0_dp*sign(1.0_dp,r)*(factor3 + q/factor3) - a1/3.0_dp
   endif
 
@@ -653,9 +653,9 @@ end function calc_mu0
 !***********************************************************
 
 function Bnu(nu,T)
-! Loi de Planck
-! Bnu en SI : W.m-2.Hz-1.sr-1
-! nu en Hz
+! Planck's law
+! Bnu in SI: W.m-2.Hz-1.sr-1
+! nu in Hz
 ! C. Pinte
 ! 17/10/7
 
@@ -711,9 +711,9 @@ end function bpnu
 !***********************************************************
 
 function Blambda(wl,T)
-! Loi de Planck
-! Blambda en SI : W.m-2.m-1.sr-1
-! wl en m
+! Planck's law
+! Blambda in SI: W.m-2.m-1.sr-1
+! wl in m
 ! C. Pinte
 ! 23/05/09
 
@@ -740,9 +740,9 @@ end function Blambda
 !******************************************************
 
 function Blambda_dp(wl,T)
-! Loi de Planck
-! Blambda en SI : W.m-2.s-1.sr-1
-! wl en m
+! Planck.s law
+! Blambda in SI : W.m-2.s-1.sr-1
+! wl in m
 ! C. Pinte
 ! 23/05/09
 
@@ -798,10 +798,10 @@ subroutine mcfost_setup()
   integer ::  syst_status, mcfost_git
 
   call get_utils()
-  ! Write date of the last time an update was search for
+  ! Write date of the last time an update was searched for
   cmd = "rm -rf "//trim(mcfost_utils)//"/.last_update"//" ; date +%s > "&
        //trim(mcfost_utils)//"/.last_update"
-  call appel_syst(cmd, syst_status)
+  call system_call(cmd, syst_status)
 
   ! We do not need to download the parameter files if we use the sources
   call get_environment_variable('MCFOST_GIT',s)
@@ -810,7 +810,7 @@ subroutine mcfost_setup()
      if (mcfost_git /= 1) call mcfost_get_ref_para()
   endif
 
-  write(*,*) "MCFOST set-up was sucessful"
+  write(*,*) "MCFOST set-up was successful"
 
   write(*,*) "You can find the full documentation at:"
   write(*,*) trim(doc_webpage)
@@ -841,7 +841,7 @@ function mcfost_update(lforce_update, lmanual, n_days)
   !cmd = "curl "//trim(webpage)//"version.txt -O -s"
   cmd = "curl "//trim(raw_webpage)//trim(version_file)//&
        ' -s | grep mcfost_release | awk ''NF>1{print $NF}'' | sed s/\"//g > version.txt'
-  call appel_syst(cmd, syst_status)
+  call system_call(cmd, syst_status)
   if (syst_status/=0) then
      write(*,*) "ERROR: Cannot connect to MCFOST server."
      call exit_update(lmanual, n_days, lupdate)
@@ -898,13 +898,13 @@ function mcfost_update(lforce_update, lmanual, n_days)
 
      ! Download
      write(*,'(a32, $)') "Downloading the new version ..."
-     cmd = "curl -L "//trim(url)//" -o mcfost_bin.tgz -s"    ; call appel_syst(cmd, syst_status)
-     cmd = "curl -L "//trim(url_sha1)//" -o mcfost.sha1 -s"  ; call appel_syst(cmd, syst_status)
+     cmd = "curl -L "//trim(url)//" -o mcfost_bin.tgz -s"    ; call system_call(cmd, syst_status)
+     cmd = "curl -L "//trim(url_sha1)//" -o mcfost.sha1 -s"  ; call system_call(cmd, syst_status)
      if (syst_status==0) then
         write(*,*) "Done"
      else
         cmd = "rm -rf mcfost_bin.tgz"
-        call appel_syst(cmd, syst_status)
+        call system_call(cmd, syst_status)
         write(*,*) "ERROR during download. MCFOST has not been updated."
         call exit_update(lmanual, n_days, lupdate)
         return
@@ -917,7 +917,7 @@ function mcfost_update(lforce_update, lmanual, n_days)
      else if (operating_system=="Darwin") then
         cmd = "openssl sha1 mcfost_bin.tgz | awk '{print $2}' > mcfost_update.sha1"
      endif
-     call appel_syst(cmd, syst_status)
+     call system_call(cmd, syst_status)
 
      open(unit=1, file="mcfost.sha1", status='old',iostat=ios)
      read(1,*,iostat=ios) mcfost_sha1
@@ -928,7 +928,7 @@ function mcfost_update(lforce_update, lmanual, n_days)
      close(unit=1,status="delete",iostat=ios)
 
      if ( (ios/=0) .or. (mcfost_sha1/=mcfost_update_sha1)) then
-        !cmd = "rm -rf mcfost_update" ; call appel_syst(cmd, syst_status)
+        !cmd = "rm -rf mcfost_update" ; call system_call(cmd, syst_status)
         write(*,*) " "
         write(*,*) "ERROR: binary sha1 is incorrect. MCFOST has not been updated."
         write(*,*) "The downloaded file has sha1: "
@@ -941,7 +941,7 @@ function mcfost_update(lforce_update, lmanual, n_days)
         write(*,*) "Done"
         write(*,'(a25, $)') "Decompressing binary ..."
         cmd = "mkdir -p mcfost_update ; tar xzf mcfost_bin.tgz -C mcfost_update ; rm -rf mcfost_bin.tgz"
-        call appel_syst(cmd, syst_status)
+        call system_call(cmd, syst_status)
         write(*,*) "Done"
      endif
 
@@ -951,7 +951,7 @@ function mcfost_update(lforce_update, lmanual, n_days)
         write(*,'(a28, $)') "Locating current binary ..."
         cmd = "rm -rf which_mcfost_binary.txt && which "//trim(current_binary)// &
              " | awk '{print "//' "\"" $NF "\""'//"}' > which_mcfost_binary.txt"
-        call appel_syst(cmd, syst_status)
+        call system_call(cmd, syst_status)
 
         ios=0
         open(unit=1, file="which_mcfost_binary.txt", status='old',iostat=ios)
@@ -970,7 +970,7 @@ function mcfost_update(lforce_update, lmanual, n_days)
      ! make binary executable and update it
      write(*,'(a20, $)') "Updating binary ..."
      cmd = "chmod a+x mcfost_update/mcfost ; mv mcfost_update/mcfost "//trim(current_binary)//" ; rm -rf mcfost_update"
-     call appel_syst(cmd, syst_status)
+     call system_call(cmd, syst_status)
      if (syst_status /= 0) then
         write(*,*) "ERROR : the update failed for some unknown reason"
         write(*,*) "You may want to have a look at the file named mcfost_update"
@@ -981,9 +981,9 @@ function mcfost_update(lforce_update, lmanual, n_days)
      write(*,*) "MCFOST has been updated"
   endif ! lupdate
 
-  ! Write date of the last time an update was search for
+  ! Write date of the last time an update was searched for
   cmd = "rm -rf "//trim(mcfost_utils)//"/.last_update"//" ; date +%s > "//trim(mcfost_utils)//"/.last_update"
-  call appel_syst(cmd, syst_status)
+  call system_call(cmd, syst_status)
 
   mcfost_update = lupdate
 
@@ -1010,12 +1010,12 @@ subroutine exit_update(lmanual, n_days, lupdate)
      call exit(1)
   else ! if it is an auto-update, we don't exit
      lupdate = .false.
-     ! We try again tomorrow : Write date of the last time an update was search for - (mcfost_auto_update -1) days
-     write(*,*) "WARNING: Skiping auto-update. MCFOST will try again tomorrow."
+     ! We try again tomorrow : Write date of the last time an update was searched for - (mcfost_auto_update -1) days
+     write(*,*) "WARNING: Skipping auto-update. MCFOST will try again tomorrow."
      write(s,*) (n_days-1) * 3600 * 24
      cmd = "rm -rf "//trim(mcfost_utils)//"/.last_update"//" ; expr `date +%s` - "&
           //trim(s)//" > "//trim(mcfost_utils)//"/.last_update"
-     call appel_syst(cmd, syst_status)
+     call system_call(cmd, syst_status)
   endif
 
   return
@@ -1032,7 +1032,7 @@ subroutine mcfost_history()
   ! Last version
   write(*,*) "Getting MCFOST history ..."
   cmd = "curl "//trim(webpage)//"history.txt"
-  call appel_syst(cmd, syst_status)
+  call system_call(cmd, syst_status)
   if (syst_status/=0) call error("Cannot get MCFOST history")
   write(*,*) " "
 
@@ -1066,11 +1066,11 @@ subroutine mcfost_get_ref_para()
 
   write(*,*) "Getting MCFOST reference files: "//ref_file//" & "//ref_file_multi//" & "//ref_file_3D
   cmd = "curl "//trim(raw_webpage)//ref_file//" -O -s"
-  call appel_syst(cmd, syst_status)
+  call system_call(cmd, syst_status)
   cmd = "curl "//trim(raw_webpage)//ref_file_multi//" -O -s"
-  call appel_syst(cmd, syst_status)
+  call system_call(cmd, syst_status)
   cmd = "curl "//trim(raw_webpage)//ref_file_3D//" -O -s"
-  call appel_syst(cmd, syst_status)
+  call system_call(cmd, syst_status)
   if (syst_status/=0) call error("Cannot get MCFOST reference file")
   write(*,*) "Done"
 
@@ -1094,7 +1094,7 @@ subroutine mcfost_get_yorick()
   cmd = "curl "//trim(webpage)//trim(yo_dir)//trim(yo_file1)//" -O -s ; "//&
        "curl "//trim(webpage)//trim(yo_dir)//trim(yo_file2)//" -O -s"
 
-  call appel_syst(cmd, syst_status)
+  call system_call(cmd, syst_status)
   if (syst_status/=0) call error("Cannot get MCFOST yorick package")
   write(*,*) "Done"
 
@@ -1128,7 +1128,7 @@ subroutine mcfost_v()
   write(*,*) "Checking last version ..."
   cmd = "curl "//trim(raw_webpage)//trim(version_file)//&
        ' -s | grep mcfost_release | awk ''NF>1{print $NF}'' | sed s/\"//g > version.txt'
-  call appel_syst(cmd, syst_status)
+  call system_call(cmd, syst_status)
   if (syst_status/=0) &
        call error("Cannot get MCFOST last version number (Error 1)","'"//trim(cmd)//"' did not run as expected.")
 
@@ -1149,12 +1149,12 @@ subroutine mcfost_v()
      write(*,*)
      write(*,*) "Getting MCFOST history ..."
      cmd = "curl "//trim(webpage)//"history.txt -O -s"
-     call appel_syst(cmd, syst_status)
+     call system_call(cmd, syst_status)
      if (syst_status/=0) call error("Cannot get MCFOST history")
 
      ! Getting line number of current version in history
      cmd = "grep -n "//trim(mcfost_release)//" history.txt | awk -F : '{print $1}' > line_number.txt"
-     call appel_syst(cmd, syst_status)
+     call system_call(cmd, syst_status)
      open(unit=1, file="line_number.txt", status='old',iostat=ios)
      read(1,*,iostat=ios) line_number
      close(unit=1,status="delete",iostat=ios)
@@ -1165,7 +1165,7 @@ subroutine mcfost_v()
            write(sline_number,*)  line_number-1
            write(*,*) "Changes since your version:"
            cmd = "head -"//trim(adjustl(sline_number))//" history.txt ; rm -rf history.txt"
-           call appel_syst(cmd, syst_status)
+           call system_call(cmd, syst_status)
         else
            write(*,*) "No changes found since your version (?????)"
         endif
@@ -1174,7 +1174,7 @@ subroutine mcfost_v()
         write(*,*) "The new version can be downloaded with mcfost -u"
      else
         cmd = "rm -rf history.txt"
-        call appel_syst(cmd, syst_status)
+        call system_call(cmd, syst_status)
         write(*,*) "ERROR: I did not find any modifications in the history"
         write(*,*) "Exiting"
      endif ! ios
@@ -1201,7 +1201,7 @@ subroutine update_utils(lforce_update)
   write(*,*) "Checking last version of MCFOST UTILS ..."
 
   cmd = "curl "//trim(utils_webpage)//"Version -O -s"
-  call appel_syst(cmd, syst_status)
+  call system_call(cmd, syst_status)
   if (syst_status/=0) call error("Cannot get MCFOST UTILS last version number (Error 1)")
   open(unit=1, file="Version", status='old',iostat=ios)
   read(1,*,iostat=ios) s_last_version
@@ -1251,7 +1251,7 @@ subroutine get_utils()
 
   cmd = "mkdir -p "//trim(mcfost_utils)//&
   " ; curl "//trim(utils_webpage)//"mcfost_utils.tgz | tar xzf - -C"//trim(mcfost_utils)
-  call appel_syst(cmd, syst_status)
+  call system_call(cmd, syst_status)
   if (syst_status == 0) then
      write(*,*) "Done"
   else
@@ -1428,7 +1428,7 @@ end function in_dir
 
 !************************************************************
 
-subroutine appel_syst(cmd, status)
+subroutine system_call(cmd, status)
 
 #if defined (__INTEL_COMPILER)
   use IFPORT, only : system
@@ -1444,7 +1444,7 @@ subroutine appel_syst(cmd, status)
 
   return
 
-end subroutine appel_syst
+end subroutine system_call
 
 !************************************************************
 
@@ -1635,21 +1635,21 @@ end subroutine progress_bar
 
 subroutine cdapres(cospsi, phi, u0, v0, w0, u1, v1, w1)
 !***************************************************
-!*--------COSINUS DIRECTEURS APRES LA DIFFUSION-----
+!*--------DIRECTION COSINES AFTER SCATTERING-----
 !*
-!*        U0,V0 ET W0 ; COSINUS DIRECTEURS AVANT
-!*        U1,V1 ET W1 ; COSINUS DIRECTEURS APRES
-!*        U ; SELON X
-!*        V ; SELON Y    X VERS L'OBSERVATEUR
-!*        W ; SELON Z
+!*        U0,V0 ET W0 ; DIRECTION COSINES BEFORE
+!*        U1,v1 and w1 ; DIRECTION COSINES AFTER
+!*        U ; ALONG X
+!*        V ; ALONG Y    X TOWARDS OBSERVER
+!*        W ; ALONG Z
 !*
-!*        COSPSI = COSINUS DE L'ANGLE DE DIFFUSION
+!*        COSPSI = COSINE OF THE SCATTERING ANGLE
 !*        PHI = AZIMUTH
 !*
 !*        FRANCOIS MENARD, 21 NOVEMBRE 1988, UDEM
 !*
 !***************************************************
-! 06/12/05 : - passage double car bug sous Icare
+! 06/12/05 : - double precision due to bug on Icare
 !            - reduction nbre d'op�rations
 !            (C. Pinte)
 !***************************************************
@@ -1669,7 +1669,7 @@ subroutine cdapres(cospsi, phi, u0, v0, w0, u1, v1, w1)
   a = spsi * cphi
   b = spsi * sphi
 
-  ! Calcul de u1,v1 et w1
+  ! Calculation of u1,v1 and w1
   if ( abs(w0) <= 0.999999 ) then
      c = sqrt(1.0_dp - w0*w0)
      cm1 = 1.0_dp/c

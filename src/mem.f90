@@ -1,6 +1,6 @@
 module mem
 
-  use parametres
+  use parameters
   use grains
   use dust_prop
   use naleat
@@ -28,9 +28,9 @@ subroutine allocate_densities(n_cells_max)
      Nc = n_cells
   endif
 
-  allocate(masse(Nc), stat=alloc_status)
-  if (alloc_status > 0) call error('Allocation error mass')
-  masse = 0.0
+  allocate(dust_mass(Nc), stat=alloc_status)
+  if (alloc_status > 0) call error('Allocation error dust_mass')
+  dust_mass = 0.0
 
   if (lvariable_dust) then
      allocate(dust_density(n_grains_tot,Nc), stat=alloc_status)
@@ -40,9 +40,9 @@ subroutine allocate_densities(n_cells_max)
   if (alloc_status > 0) call error('Allocation error dust_density')
   dust_density = 0.0
 
-  allocate(densite_gaz(Nc), densite_gaz_midplane(n_rad,n_az), masse_gaz(Nc), stat=alloc_status)
-  if (alloc_status > 0) call error('Allocation error densite_gaz')
-  densite_gaz = 0.0 ; densite_gaz_midplane = 0.0 ; masse_gaz = 0.0
+  allocate(gas_density(Nc), gas_density_midplane(n_rad,n_az), gas_mass(Nc), stat=alloc_status)
+  if (alloc_status > 0) call error('Allocation error gas_density')
+  gas_density = 0.0 ; gas_density_midplane = 0.0 ; gas_mass = 0.0
 
 end subroutine allocate_densities
 
@@ -50,7 +50,7 @@ end subroutine allocate_densities
 
 subroutine deallocate_densities
 
-  if (allocated(masse)) deallocate(masse,dust_density,densite_gaz,densite_gaz_midplane,masse_gaz)
+  if (allocated(dust_mass)) deallocate(dust_mass,dust_density,gas_density,gas_density_midplane,gas_mass)
 
   return
 
@@ -59,7 +59,7 @@ end subroutine deallocate_densities
 !*****************************************************************
 
 subroutine alloc_dust_prop()
- ! Ajout du cas ou les matrices de Mueller sont donnees en entrees
+ ! Added support for Mueller matrices provided as input
  ! 20/04/2023
 
   integer ::  alloc_status
@@ -79,7 +79,7 @@ subroutine alloc_dust_prop()
   tab_g = 0
 
   ! **************************************************
-  ! tableaux relatifs aux prop optiques des grains
+  ! arrays related to grain optical properties
   ! **************************************************
   allocate(tab_s11(0:nang_scatt,n_grains_tot,n_lambda), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error tab_s11')
@@ -116,12 +116,12 @@ end subroutine alloc_dust_prop
 !*****************************************************************
 
 subroutine alloc_dynamique(n_cells_max)
-  ! Alloue les tableaux dynamiquement en fonction de l'organisation
-  ! des calculs, de la presence de stratification ...
-  ! Permet d'optimiser la taille mémoire
+  ! Dynamically allocates arrays based on the organisation
+  ! of the calculations and the presence of stratification ...
+  ! Allows memory footprint optimisation
   ! C. Pinte
   ! 12/05/05
-  ! Ajout du cas ou les matrices de Mueller sont donnees en entrees
+  ! Added support for Mueller matrices provided as input
   ! 20/04/2023
 
   use stars, only : allocate_stellar_spectra
@@ -170,13 +170,13 @@ subroutine alloc_dynamique(n_cells_max)
   if (l3D) zj_inf_dark_zone=0
 
   ! **************************************************
-  ! Tableaux relatifs aux prop en fct de lambda
+  ! Arrays related to wavelength-dependent properties
   ! **************************************************
   call allocate_stellar_spectra(n_lambda)
 
   call allocate_thermal_energy(Nc)
 
-  ! Tableaux relatifs aux prop optiques des cellules
+  ! Arrays related to cell optical properties
   allocate(kappa(p_Nc,n_lambda), kappa_abs_LTE(p_Nc,n_lambda), tab_albedo_pos(p_Nc,n_lambda), kappa_factor(Nc), stat=alloc_status)
   kappa=0.0 ; kappa_abs_LTE=0.0 ; tab_albedo_pos = 0
   if (alloc_status > 0) then
@@ -210,9 +210,9 @@ subroutine alloc_dynamique(n_cells_max)
   endif
 
   ! **************************************************
-  ! Tableaux relatifs aux prop optiques des cellules ou des grains
+  ! Arrays related to optical properties of cells or grains
   ! **************************************************
-  if (scattering_method == 2) then ! prop par cellule
+  if (scattering_method == 2) then ! prop par cell
      if (lsepar_pola) then
         mem_size = (5. * nang_scatt) * p_Nc * p_n_lambda_pos * 4. / 1024.**3
      else
@@ -259,18 +259,18 @@ subroutine alloc_dynamique(n_cells_max)
   endif ! method
 
   ! **************************************************
-  ! Tableaux relatifs aux prop d'emission des cellules
+  ! Arrays related to cell emission properties
   ! **************************************************
   if (lweight_emission) call allocate_weight_proba_emission(Nc)
   if (lorigine) call allocate_origin()
 
   ! **************************************************
-  ! Tableaux de temperature
+  ! Temperature arrays
   ! **************************************************
   call allocate_temperature(Nc)
 
   ! **************************************************
-  ! Tableaux relatifs au *calcul* de la temperature
+  ! Arrays related to the *computation* of temperature
   ! **************************************************
   if (lTemp) call allocate_thermal_emission(Nc, p_Nc)
 
@@ -287,7 +287,7 @@ subroutine alloc_dynamique(n_cells_max)
   if (lmono0.and.loutput_mc) call allocate_mc_images()
 
   ! **************************************************
-  ! Tableaux relatifs a l'emission moleculaire
+  ! Arrays related to molecular emission
   ! **************************************************
   if (lemission_mol) then
      allocate(tab_abundance(Nc), Tcin(Nc), lcompute_molRT(Nc), stat=alloc_status)
@@ -321,7 +321,7 @@ end subroutine alloc_dynamique
 !**********************************************************************
 
 subroutine deallocate_em_th_mol()
- ! Ajout du cas ou les matrices de Mueller sont donnees en entrees
+ ! Added support for Mueller matrices provided as input
  ! 20/04/2023
 
   use thermal_emission, only : deallocate_thermal_emission
@@ -349,7 +349,7 @@ subroutine deallocate_em_th_mol()
   deallocate(tab_albedo_pos)
   if (allocated(tab_g_pos)) deallocate(tab_g_pos)
 
-  if (scattering_method == 2) then ! prop par cellule
+  if (scattering_method == 2) then ! prop par cell
      deallocate(tab_s11_pos,prob_s11_pos)
      if (lsepar_pola) deallocate(tab_s12_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos)
   else ! prop par grains
@@ -397,7 +397,7 @@ subroutine realloc_dust_mol(imol)
   if (alloc_status > 0) call error('Allocation error C_ext (realloc)')
   C_ext = 0 ; C_sca = 0 ; C_abs = 0 ; C_abs_norm = 0 ; tab_g = 0
 
-  ! Tableaux relatifs aux prop optiques des cellules
+  ! Arrays related to cell optical properties
   allocate(kappa(p_n_cells,iTrans_min:iTrans_max),kappa_abs_LTE(p_n_cells,iTrans_min:iTrans_max), kappa_factor(n_cells), &
        emissivite_dust(n_cells,iTrans_min:iTrans_max), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error emissivite_dust (realloc)')
@@ -430,7 +430,7 @@ end subroutine realloc_dust_mol
 subroutine clean_mem_dust_mol()
 
   ! Ne reste que tab_lambda, tab_delta_lambda, tab_lambda_inf, tab_lambda_sup, kappa, emissivite_dust
-  ! et spectre_etoiles, spectre_etoiles_cumul
+  ! et star_spectrum, star_spectrum_cumul
   deallocate(tab_amu1, tab_amu2,tab_amu1_coating, tab_amu2_coating)
   deallocate(tab_albedo)
   deallocate(C_ext, C_sca, C_abs, C_abs_norm, tab_g)
@@ -478,7 +478,7 @@ subroutine realloc_dust_atom()
   if (alloc_status > 0) call error('Allocation error C_ext (realloc)')
   C_ext = 0 ; C_sca = 0 ; C_abs = 0 ; C_abs_norm = 0 ; tab_g = 0
 
-  ! Tableaux relatifs aux prop optiques des cellules
+  ! Arrays related to cell optical properties
   if (allocated(kappa)) deallocate(kappa)
   if (allocated(kappa_abs_LTE)) deallocate(kappa_abs_LTE)
   if (allocated(kappa_factor)) deallocate(kappa_factor)
@@ -520,7 +520,7 @@ end subroutine realloc_dust_atom
 !******************************************************************************
 
 subroutine realloc_step2()
-! Ajout du cas ou les matrices de Mueller sont donnees en entrees
+! Added support for Mueller matrices provided as input
 ! 20/04/2023
 
   use dust_ray_tracing, only : select_scattering_method
@@ -539,15 +539,15 @@ subroutine realloc_step2()
   endif
   p_n_lambda_pos = p_n_lambda2_pos ! just in case
 
-  ! parametrage methode de diffusion
+  ! diffusion method configuration
   call select_scattering_method(p_n_cells)
 
-  ! Liberation memoire
+  ! Free memory
   if (lTemp) call deallocate_temperature_calculation()
 
   call allocate_radiation_field_step2()
 
-  ! Liberation memoire step1 et reallocation step 2
+  ! Free memory from step 1 and reallocate for step 2
   deallocate(tab_lambda,tab_lambda_inf,tab_lambda_sup,tab_delta_lambda,tab_amu1,tab_amu2,tab_amu1_coating,tab_amu2_coating)
   allocate(tab_lambda(n_lambda2),tab_lambda_inf(n_lambda2),tab_lambda_sup(n_lambda2),tab_delta_lambda(n_lambda2),&
        tab_amu1(n_lambda2,n_pop),tab_amu2(n_lambda2,n_pop), &
@@ -703,13 +703,13 @@ end subroutine realloc_step2
 !**********************************************************************
 
 subroutine realloc_ray_tracing_scattering_matrix()
-! Ajout du cas ou les matrices de Mueller sont donnees en entrees
+! Added support for Mueller matrices provided as input
 ! 20/04/2023
 
   integer, parameter :: p_n_lambda2_pos = 1
   integer :: alloc_status
 
-  ! parametrage methode de diffusion
+  ! diffusion method configuration
   scattering_method = 2
   write(*,fmt='(" Using scattering method ",i1)') scattering_method
   lscattering_method1 = (scattering_method==1)
@@ -760,8 +760,8 @@ subroutine alloc_emission_mol(imol)
   n_speed = mol(imol)%n_speed_rt ! I use the same now
 
   if (lmol_LTE) then ! Reducing memory in LTE mode
-     iTrans_min = minval(mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing))
-     iTrans_max = maxval(mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing))
+     iTrans_min = minval(mol(imol)%index_trans_ray_tracing(1:mol(imol)%nTrans_raytracing))
+     iTrans_max = maxval(mol(imol)%index_trans_ray_tracing(1:mol(imol)%nTrans_raytracing))
 
      level_min = iTransLower(iTrans_min)
      level_max = iTransUpper(iTrans_max)
@@ -793,7 +793,7 @@ subroutine alloc_emission_mol(imol)
   !if (alloc_status > 0) call error('Allocation error maser_map')
   !maser_map = 0.0
 
-  allocate(tab_v(-n_largeur_Doppler*n_speed:n_largeur_Doppler*n_speed), stat=alloc_status)
+  allocate(tab_v(-n_doppler_width*n_speed:n_doppler_width*n_speed), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error tab_v')
   tab_v=0.0
 
@@ -844,13 +844,13 @@ subroutine dealloc_emission_mol()
 
   use stars, only : deallocate_stellar_spectra
 
-  ! Dealloue ce qui n'a pas ete libere par  clean_mem_dust_mol
+  ! Deallocates what was not freed by clean_mem_dust_mol
   deallocate(tab_lambda, tab_delta_lambda, tab_lambda_inf, tab_lambda_sup)
   deallocate(kappa,kappa_abs_LTE,kappa_factor,emissivite_dust)
 
   call deallocate_stellar_spectra()
 
-  deallocate(Level_energy,poids_stat_g,j_qnb,v_qnb,Aul,fAul,Bul,fBul,Blu,fBlu,transfreq, &
+  deallocate(Level_energy,stat_weight_g,j_qnb,v_qnb,Aul,fAul,Bul,fBul,Blu,fBlu,transfreq, &
        itransUpper,itransLower,nCollTrans,nCollTemps,collTemps,collBetween, &
        iCollUpper,iCollLower)
 
@@ -862,7 +862,7 @@ subroutine dealloc_emission_mol()
 
   if (ldouble_RT) deallocate(kappa_mol_o_freq2, emissivite_mol_o_freq2, tab_nLevel2, Jmol2)
 
-  deallocate(I0, I0c, tab_speed_rt) ! besoin de dealouer tab_speed_rt pour plusieurs rayons
+  deallocate(I0, I0c, tab_speed_rt) ! need to deallocate tab_speed_rt for multiple rays
   if (lorigine) deallocate(origine_mol)
 
   return

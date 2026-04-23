@@ -1,6 +1,6 @@
 module reconstruct_from_moments
 
-  use constantes
+  use constants
 
   implicit none
 
