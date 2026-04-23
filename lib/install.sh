@@ -131,8 +131,7 @@ pushd .
 #-- Downloading libraries
 #wget -N http://sprng.org/Version2.0/sprng2.0b.tar.gz
 git clone https://github.com/cpinte/sprng2.0b.git
-wget -N https://heasarc.gsfc.nasa.gov/FTP/software/fitsio/c/cfitsio-4.6.3.tar.gz
-#wget  -O cfitsio-4.3.0.tar.gz  "https://drive.usercontent.google.com/download?export=download&id=1qIz6nr1sv40FjvVooiYIuCpnJoDyUGTg&confirm=t" # temporary due to issues on heasarc
+git clone https://github.com/HEASARC/cfitsio.git
 git clone https://github.com/cpinte/voro
 if [ "$SKIP_HDF5" != "yes" ]; then
     wget -N https://support.hdfgroup.org/releases/hdf5/v1_14/v1_14_6/downloads/hdf5-1.14.6.tar.gz
@@ -178,8 +177,6 @@ echo "Done"
 # CFITSIO
 #-------------------------------------------
 echo "Compiling CFITSIO ..."
-tar xzvf cfitsio-4.6.3.tar.gz
-mv cfitsio-4.6.3 cfitsio
 cd cfitsio
 git checkout cfitsio-4.4.1
 ./configure --enable-ssse3 --disable-curl
