@@ -10,7 +10,7 @@ module input
   use messages
   use wavelengths
   use temperature
-  use density, only : dust_density
+  use density, only : dust_density_o_n_grains
 
   implicit none
 
@@ -204,7 +204,7 @@ subroutine lect_Temperature()
 
   !future: lgas_transfer. Dust could not always be present in the gas RT.
   if (lemission_atom) then
-     there_is_dust = (maxval(dust_density) > 0_dp)
+     there_is_dust = (maxval(dust_density_o_n_grains) > 0_dp)
      if ( .not.there_is_dust ) then
         call warning("(lect_Temperature) Do not attempt to read Tdust file when there is not dust!")
         return

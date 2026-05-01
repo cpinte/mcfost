@@ -1985,7 +1985,7 @@ subroutine display_help()
   write(*,*) " "
   write(*,*) " Options related to disk structure"
   write(*,*) "        : -disk_struct : computes the density structure and stops:"
-  write(*,*) "                         gas_density.fits.gz and dust_density.fits.gz -> density map"
+  write(*,*) "                         gas_density.fits.gz and dust_density_o_n_grains.fits.gz -> density map"
   write(*,*) "                         grid.fits.gz -> radii and height in the grid"
   write(*,*) "                         volume.fits.gz -> volume per cell at each radius"
   write(*,*) "        : -3D : 3D geometrical grid"

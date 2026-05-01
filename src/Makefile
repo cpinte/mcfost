@@ -205,6 +205,12 @@ else
 endif
 
 #-- HDF5 library
+ifeq ($(IS_DARWIN),1)
+    ifeq ($(cpu),arm64)
+        HDF5_DIR ?= /opt/homebrew
+    endif
+endif
+
 ifndef HDF5_DIR
     HDF5_LIB= $(LIBS)
     HDF5_INC= $(MCFOST_INSTALL)/include/hdf5

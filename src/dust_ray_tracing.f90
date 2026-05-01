@@ -862,7 +862,7 @@ subroutine calc_Jth(lambda)
                   cst_wl=thermal_const/(Temp*wl)
                   coeff_exp=exp(cst_wl)
                   J_th(icell) = J_th(icell) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
-                       C_abs_norm(l,lambda) * dust_density(p_l,icell) * n_grains(l)
+                       C_abs_norm(l,lambda) * dust_density_o_n_grains(p_l,icell) * n_grains(l)
                endif
             enddo ! l
         enddo ! icell
@@ -878,7 +878,7 @@ subroutine calc_Jth(lambda)
                      cst_wl=thermal_const/(Temp*wl)
                      coeff_exp=exp(cst_wl)
                      J_th(icell) = J_th(icell) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
-                          C_abs_norm(l,lambda) * dust_density(p_l,icell) * n_grains(l)
+                          C_abs_norm(l,lambda) * dust_density_o_n_grains(p_l,icell) * n_grains(l)
                   endif !cst_wl
               else ! the grain has a temperature probability distribution ---> todo: we can compute BB outside of loop
                  do T=1,n_T
@@ -887,7 +887,7 @@ subroutine calc_Jth(lambda)
                        cst_wl=thermal_const/(Temp*wl)
                        coeff_exp=exp(cst_wl)
                        J_th(icell) = J_th(icell) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
-                            C_abs_norm(l,lambda) * dust_density(p_l,icell) * n_grains(l) * Proba_Tdust(T,l,icell)
+                            C_abs_norm(l,lambda) * dust_density_o_n_grains(p_l,icell) * n_grains(l) * Proba_Tdust(T,l,icell)
                     endif !cst_wl
                  enddo ! T
               endif ! l_RE
