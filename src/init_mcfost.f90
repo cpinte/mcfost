@@ -3,7 +3,7 @@ module init_mcfost
   use parameters
   use naleat
   use grains, only : aggregate_file, mueller_aggregate_file
-  use density, only : species_removed, T_rm, is_density_file_Voronoi
+  use density, only : species_removed, T_rm, check_density_file_Voronoi_variable_dust
   use molecular_emission
   !$ use omp_lib
   use benchmarks
@@ -1530,7 +1530,7 @@ subroutine initialisation_mcfost()
      call read_para(para)
   endif
 
-  if (ldensity_file) call is_density_file_Voronoi()
+  if (ldensity_file) call check_density_file_Voronoi_variable_dust()
 
   if (lfargo3d) then
      l3D = .true.

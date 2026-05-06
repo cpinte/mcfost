@@ -18,7 +18,7 @@ module density
   real, public :: T_rm
 
   public :: gas_density, gas_mass, surface_density, gas_density_midplane, dust_density_o_n_grains, dust_mass, icell_not_empty, &
-       define_density, define_density_wall3d, define_dust_density, read_density_file, is_density_file_Voronoi, &
+       define_density, define_density_wall3d, define_dust_density, read_density_file, check_density_file_Voronoi_variable_dust, &
        densite_seb_charnoz2, densite_seb_charnoz, remove_species, read_sigma_file, normalize_dust_density, &
        reduce_density, read_Voronoi_fits_file, find_non_empty_cell
 
@@ -1038,7 +1038,7 @@ end subroutine define_density_wall3D
 
 !********************************************************************
 
-subroutine is_density_file_Voronoi()
+subroutine check_density_file_Voronoi_variable_dust()
 
   integer :: unit, status, naxis, readwrite, blocksize, nfound
   character(len=8) :: comment
@@ -1054,12 +1054,8 @@ subroutine is_density_file_Voronoi()
   call ftopen(unit,density_files(1),readwrite,blocksize,status)
   if (status /= 0) call error("density file needed")
 
-  !nfound=0
   call ftgkyj(unit,'NAXIS',naxis,comment,status)
   if (status /= 0) call error("error reading density file")
-
-  nfound=0
-  call ftgknj(unit,'NAXIS',1,4,naxes,nfound,status)
 
   if (naxis == 1) then
      write(*,*) "Found 1D density structure, using a Voronoi mesh"
@@ -1071,15 +1067,33 @@ subroutine is_density_file_Voronoi()
      lVoronoi = .false.
   endif
 
+
+  nfound=0
+  call ftgknj(unit,'NAXIS',1,4,naxes,nfound,status)
+
+  if ((nfound /= 3) .and. (nfound /= 4)) then
+     write(*,*) "I found", nfound, "axis instead of 3 or 4"
+     call error('failed to read the NAXIS keyword in HDU 1 of '//trim(density_files(1))//' file')
+  endif
+
+  if (nfound == 3) then
+     write(*,*) "No grain size found"
+     lvariable_dust = .false.
+  else
+     lvariable_dust = .true.
+     write(*,*) naxes(4), "grain sizes found"
+  endif
+
   ! Closing file
   call ftclos(unit, status)
   call ftfiou(unit, status)
 
   return
 
-end subroutine is_density_file_Voronoi
+end subroutine check_density_file_Voronoi_variable_dust
 
 !********************************************************************
+
 
 subroutine read_density_file()
   ! New routine to read density grids
@@ -1272,15 +1286,15 @@ subroutine read_density_file()
 
   if (nfound == 3) then
      n_a = 1
-     write(*,*) "No grain size found"
+     !write(*,*) "No grain size found"
      npixels=naxes(1)*naxes(2)*naxes(3)
   else
      if (.not.lvariable_dust) then
-        call warning("Forcing variable dust")
+        !call warning("Forcing variable dust")
         lvariable_dust = .true.
      endif
      n_a = naxes(4)
-     write(*,*) n_a, "grain sizes found"
+     !write(*,*) n_a, "grain sizes found"
      npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
   endif
 
