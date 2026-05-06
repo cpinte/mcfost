@@ -1685,65 +1685,68 @@ subroutine read_density_file()
      write(*,*) "Differential spatial distribution"
      l=1
      do k=1,n_grains_tot
-        if (r_grain(k) < a_sph(1)) then  ! Small grains
-           do phik=1, n_az
-              do j=j_start,nz
-                 if (j==0) cycle
-                 if (l3D_file) then
-                    if (j > 0) then
-                       jj = j + nz
+        if (n_grains(k) > 0.0_dp) then
+           if (r_grain(k) < a_sph(1)) then  ! Small grains
+              do phik=1, n_az
+                 do j=j_start,nz
+                    if (j==0) cycle
+                    if (l3D_file) then
+                       if (j > 0) then
+                          jj = j + nz
+                       else
+                          jj = j + nz + 1
+                       endif
                     else
-                       jj = j + nz + 1
+                       jj = abs(j)
                     endif
-                 else
-                    jj = abs(j)
-                 endif
-                 do i=1, n_rad
-                    dust_density_o_n_grains(k,cell_map(i,j,phik)) = sph_dens(i,jj,phik,1) / n_grains(k)
-                 enddo ! phik
-              enddo ! j
-           enddo ! i
-        else if (r_grain(k) > a_sph(n_a)) then ! Large grains
+                    do i=1, n_rad
+                       dust_density_o_n_grains(k,cell_map(i,j,phik)) = sph_dens(i,jj,phik,1) / n_grains(k)
+                    enddo ! i
+                 enddo ! j
+              enddo ! phik
+           else if (r_grain(k) > a_sph(n_a)) then ! Large grains
+              do phik=1, n_az
+                 do j=j_start,nz
+                    if (l3D_file) then
+                       if (j > 0) then
+                          jj = j + nz
+                       else
+                          jj = j + nz + 1
+                       endif
+                    else
+                       jj = abs(j)
+                    endif
+                    if (j==0) cycle
+                    do i=1, n_rad
+                       dust_density_o_n_grains(k,cell_map(i,j,phik)) = sph_dens(i,jj,phik,n_a) / n_grains(k)
+                    enddo ! i
+                 enddo ! j
+              enddo ! phik
+           else  ! Other grains : interpolation
+              if (r_grain(k) > a_sph(l+1)) l = l+1
+              f = (r_grain(k)-a_sph(l))/(a_sph(l+1)-a_sph(l))
 
-           do phik=1, n_az
-              do j=j_start,nz
-                 if (l3D_file) then
-                    if (j > 0) then
-                       jj = j + nz
+              do phik=1, n_az
+                 do j=j_start,nz
+                    if (j==0) cycle
+                    if (l3D_file) then
+                       if (j > 0) then
+                          jj = j + nz
+                       else
+                          jj = j + nz + 1
+                       endif
                     else
-                       jj = j + nz + 1
+                       jj = abs(j)
                     endif
-                 else
-                    jj = abs(j)
-                 endif
-                 if (j==0) cycle
-                 do i=1, n_rad
-                    dust_density_o_n_grains(k,cell_map(i,j,phik)) = sph_dens(i,jj,phik,n_a) / n_grains(k)
-                 enddo ! phik
-              enddo ! j
-           enddo ! i
-        else  ! Other grains : interpolation
-           if (r_grain(k) > a_sph(l+1)) l = l+1
-           f = (r_grain(k)-a_sph(l))/(a_sph(l+1)-a_sph(l))
-
-           do phik=1, n_az
-              do j=j_start,nz
-                 if (j==0) cycle
-                 if (l3D_file) then
-                    if (j > 0) then
-                       jj = j + nz
-                    else
-                       jj = j + nz + 1
-                    endif
-              else
-                    jj = abs(j)
-                 endif
-                 do i=1, n_rad
-                    dust_density_o_n_grains(k,cell_map(i,j,phik)) = &
-                         ( sph_dens(i,jj,phik,l) + f * ( sph_dens(i,jj,phik,l+1) -  sph_dens(i,jj,phik,l) ) ) / n_grains(k)
-                 enddo ! phik
-              enddo ! j
-           enddo ! i
+                    do i=1, n_rad
+                       dust_density_o_n_grains(k,cell_map(i,j,phik)) = &
+                            ( sph_dens(i,jj,phik,l) + f * ( sph_dens(i,jj,phik,l+1) -  sph_dens(i,jj,phik,l) ) ) / n_grains(k)
+                    enddo ! phik
+                 enddo ! j
+              enddo ! i
+           endif
+        else
+           dust_density_o_n_grains(k,cell_map(i,j,phik)) = 0.0_dp
         endif
      enddo
   else ! All grains follow the gas
