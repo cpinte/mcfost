@@ -17,6 +17,7 @@ module init_mcfost
   use read_idefix, only : read_idefix_parameters
   use read_pluto, only : read_pluto_parameters
   use read_spherical_grid, only : read_spherical_grid_parameters
+  use read_phantom, only : check_phantom_file_variable_dust
 
   implicit none
 
@@ -1531,6 +1532,7 @@ subroutine initialisation_mcfost()
   endif
 
   if (ldensity_file) call check_density_file_Voronoi_variable_dust()
+  if (lphantom_file) call check_phantom_file_variable_dust()
 
   if (lfargo3d) then
      l3D = .true.
