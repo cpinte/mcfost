@@ -8,7 +8,111 @@ module read_phantom
 
   implicit none
 
+  public :: read_phantom_bin_files, read_phantom_hdf_files, check_phantom_file_variable_dust
+
 contains
+
+  subroutine check_phantom_file_variable_dust()
+
+    use HDF5_utils, only: open_hdf5file, close_hdf5file, open_hdf5group, close_hdf5group, read_from_hdf5, HID_T
+
+    integer :: ilen, ierr, iunit
+    character(len=200) :: filename
+    logical :: is_hdf5, got
+
+    integer :: ndusttypes, ndustsmall, ndustlarge, idust, i
+    logical :: ldust_moments, tagged
+    real(dp) :: mass_per_H
+
+    integer(HID_T) :: hdf5_file_id, hdf5_group_id
+    type(dump_h) :: hdr
+    character(len=lenid) :: fileid
+    integer, parameter :: maxinblock = 128
+
+    filename = trim(density_files(1))
+
+    ilen = index(filename,'.',back=.true.)
+    if (ilen > 0) then
+       if (filename(ilen:ilen+3) == ".h5") then
+          is_hdf5 = .true.
+       else
+          is_hdf5 = .false.
+       endif
+    else
+       is_hdf5 = .false.
+    endif
+
+    if (is_hdf5) then
+       call open_hdf5file(filename,hdf5_file_id,ierr)
+       if (ierr /= 0) call error("cannot open Phantom HDF file: "//trim(filename))
+
+       call open_hdf5group(hdf5_file_id,'header',hdf5_group_id,ierr)
+       if (ierr /= 0) call error("cannot open Phantom HDF header group in "//trim(filename))
+
+       call read_from_hdf5(ndusttypes,'ndusttypes',hdf5_group_id,got,ierr)
+       if (.not. got) then
+          ndustsmall = 0
+          ndustlarge = 0
+          ndusttypes = 0
+          call read_from_hdf5(ndustsmall,'ndustsmall',hdf5_group_id,got,ierr)
+          if (got)  ndusttypes = ndustsmall
+          call read_from_hdf5(ndustlarge,'ndustlarge',hdf5_group_id,got,ierr)
+          if (got) ndusttypes = ndusttypes + ndustlarge
+       endif
+
+       ! Check for mass_per_H for ldust_moments
+       call read_from_hdf5(mass_per_h,'mass_per_H',hdf5_group_id,got,ierr)
+       ldust_moments = got
+
+       call close_hdf5group(hdf5_group_id,ierr)
+       call close_hdf5file(hdf5_file_id,ierr)
+
+    else
+       ! Binary file
+       iunit = 1
+       call open_dumpfile_r(iunit,filename,fileid,ierr,requiretags=.true.)
+       if (ierr /= 0) call error("cannot open "//trim(filename))
+
+       if (fileid(2:2)=='T') then
+          tagged = .true.
+       else
+          tagged = .false.
+       endif
+       call read_header(iunit,hdr,tagged,ierr)
+       if (.not.tagged) call error("Phantom dump too old to be read by MCFOST")
+
+       call extract('ndusttypes',ndusttypes,hdr,ierr,default=0)
+       if (ierr /= 0) then
+          call extract('ndustsmall',ndustsmall,hdr,ierr,default=0)
+          call extract('ndustlarge',ndustlarge,hdr,ierr,default=0)
+          ndusttypes = ndustsmall + ndustlarge
+          if (ndusttypes==0 .and. ierr/=0) then
+             idust = 0
+             do i = 1,maxinblock
+                if (hdr%realtags(i)=='grainsize') idust = idust + 1
+             enddo
+             ndusttypes = idust
+          endif
+       endif
+
+       call extract('mass_per_H',mass_per_h,hdr,ierr)
+       if (ierr /= 0) then
+          ldust_moments = .false.
+       else
+          ldust_moments = .true.
+       endif
+
+       call free_header(hdr, ierr)
+       close(iunit)
+    endif
+
+    if (ldust_moments .or. (ndusttypes > 1)) then
+       lvariable_dust = .true.
+    else
+       lvariable_dust = .false.
+    endif
+
+  end subroutine check_phantom_file_variable_dust
 
   subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_gas,particle_id,massgas,massdust,&
        rhogas,rhodust,extra_heating,ndusttypes,SPH_grainsizes,mask,n_SPH,ldust_moments,dust_moments,mass_per_h,ierr)

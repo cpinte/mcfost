@@ -319,7 +319,7 @@ contains
              icell = cell_map(i,j,phik)
 
              gas_density(icell) =  rho(i,jj,phik) * udens
-             dust_density(:,icell) = rho(i,jj,phik) * udens
+             dust_density_o_n_grains(:,icell) = rho(i,jj,phik) * udens
 
              vfield3d(icell,1)  = vx1(i,jj,phik) * uvelocity! vr
              vfield3d(icell,2)  = (vx3(i,jj,phik) + r_grid(icell)/ulength_au * Omega_p) * uvelocity ! vphi : planet at r=1

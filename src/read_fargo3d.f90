@@ -255,7 +255,7 @@ contains
              icell = cell_map(i,j,phik)
 
              gas_density(icell) = fargo3d_density(phik,i,jj) * udens
-             dust_density(:,icell) = fargo3d_density(phik,i,jj) * udens
+             dust_density_o_n_grains(:,icell) = fargo3d_density(phik,i,jj) * udens
 
              vfield3d(icell,1)  = fargo3d_vy(phik,i,jj) * uvelocity ! vr
              vfield3d(icell,2)  = (fargo3d_vx(phik,i,jj) + r_grid(icell)/ulength_au * Omega) * uvelocity ! vphi : planet at r=1

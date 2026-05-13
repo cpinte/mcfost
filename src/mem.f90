@@ -33,12 +33,12 @@ subroutine allocate_densities(n_cells_max)
   dust_mass = 0.0
 
   if (lvariable_dust) then
-     allocate(dust_density(n_grains_tot,Nc), stat=alloc_status)
+     allocate(dust_density_o_n_grains(n_grains_tot,Nc), stat=alloc_status)
   else
-     allocate(dust_density(n_zones,Nc), stat=alloc_status)
+     allocate(dust_density_o_n_grains(n_zones,Nc), stat=alloc_status)
   endif
-  if (alloc_status > 0) call error('Allocation error dust_density')
-  dust_density = 0.0
+  if (alloc_status > 0) call error('Allocation error dust_density_o_n_grains')
+  dust_density_o_n_grains = 0.0
 
   allocate(gas_density(Nc), gas_density_midplane(n_rad,n_az), gas_mass(Nc), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error gas_density')
@@ -50,7 +50,7 @@ end subroutine allocate_densities
 
 subroutine deallocate_densities
 
-  if (allocated(dust_mass)) deallocate(dust_mass,dust_density,gas_density,gas_density_midplane,gas_mass)
+  if (allocated(dust_mass)) deallocate(dust_mass,dust_density_o_n_grains,gas_density,gas_density_midplane,gas_mass)
 
   return
 

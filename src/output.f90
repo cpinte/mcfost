@@ -1744,7 +1744,8 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
      !  Write the array to the FITS file.
      dust_dens(:,:) = 0.0
      do icell=1,n_cells
-        dust_dens(icell,:) = merge(dust_density(:,icell), dust_density(grain(:)%zone,icell), lvariable_dust) * &
+        dust_dens(icell,:) = merge(dust_density_o_n_grains(:,icell), &
+             dust_density_o_n_grains(grain(:)%zone,icell), lvariable_dust) * &
              n_grains(:) * m3_to_cm3
      enddo !icell
 
@@ -1806,7 +1807,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
   !  Write the array to the FITS file.
   dens(:) = 0.0
   do icell=1,n_cells
-     dens(icell) = sum(merge(dust_density(:,icell), dust_density(grain(:)%zone,icell), lvariable_dust) * &
+     dens(icell) = sum(merge(dust_density_o_n_grains(:,icell), dust_density_o_n_grains(grain(:)%zone,icell), lvariable_dust) * &
           n_grains(:) * M_grain(:))
   enddo
   call ftppre(unit,group,fpixel,nelements,dens,status)
@@ -2947,8 +2948,8 @@ subroutine taille_moyenne_grains()
      total_sum=0.0
      do l=1, n_grains_tot
         p_l = merge(l, grain(l)%zone, lvariable_dust)
-        a_moyen(icell) = a_moyen(icell) + dust_density(p_l,icell) * n_grains(l) * r_grain(l)**2
-        total_sum = total_sum + dust_density(p_l,icell)  * n_grains(l)
+        a_moyen(icell) = a_moyen(icell) + dust_density_o_n_grains(p_l,icell) * n_grains(l) * r_grain(l)**2
+        total_sum = total_sum + dust_density_o_n_grains(p_l,icell)  * n_grains(l)
      enddo
      a_moyen(icell) = sqrt(a_moyen(icell) / total_sum)
   enddo

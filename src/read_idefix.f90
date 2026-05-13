@@ -194,7 +194,7 @@ contains
              icell = cell_map(i,j,phik)
 
              gas_density(icell) = rho(i,i2,i3) * udens
-             dust_density(:,icell) = rho(i,i2,i3) * udens  ! flat dust distribution
+             dust_density_o_n_grains(:,icell) = rho(i,i2,i3) * udens  ! flat dust distribution
 
              ! todo : check in cyl
              vfield3d(icell,1)  = vx1(i,i2,i3) * uvelocity ! vr

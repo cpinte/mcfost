@@ -173,7 +173,7 @@ contains
     read(1, iostat=ios) rho_dust(:,:,:)
     close(unit=1)
 
-    dust_density = 0.0_dp
+    dust_density_o_n_grains = 0.0_dp
     gas_mass = 0.0_dp
     disk_zone(1)%diskmass = 0.0
 
@@ -203,7 +203,7 @@ contains
              !-> taking into account proper weights assuming only molecular gas in dusty regions
              if (rho_dust(i,j,k) > 0.0) then ! dusty region
                 gas_density(icell) = rho(i,j,k) * 1d3 / mu_mH !total molecular gas density in H2/m^3
-                dust_density(1,icell) = rho_dust(i,j,k) * 1d3 / mu_mH ! [m^-3]
+                dust_density_o_n_grains(1,icell) = rho_dust(i,j,k) * 1d3 / mu_mH ! [m^-3]
                 disk_zone(1)%diskmass = disk_zone(1)%diskmass + rho_dust(i,j,k) * volume(icell)
              else !No dust.
                 gas_density(icell) = nHtot(icell) * wght_per_H !total atomic gas density in [m^-3]

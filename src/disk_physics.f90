@@ -3,7 +3,7 @@ module disk_physics
   use grains
   use mcfost_env
   use dust_prop
-  use density, only : gas_density, dust_density
+  use density, only : gas_density, dust_density_o_n_grains
   use constants
   use stars, only : star_spectrum
   use messages
@@ -143,7 +143,7 @@ subroutine sublimate_dust()
 
               if (.not.dust_pop(ipop)%is_PAH) then
                  if (Tdust(icell) > dust_pop(ipop)%T_sub) then
-                    dust_density(k,icell) = 0.0
+                    dust_density_o_n_grains(k,icell) = 0.0
                  endif
               endif
            enddo
@@ -160,7 +160,7 @@ subroutine sublimate_dust()
         do k=1,n_az
            icell = cell_map(i,j,k)
            do l=1,n_grains_tot
-              mass=mass + dust_density(l,icell) * n_grains(l) * M_grain(l) * (volume(icell) * AU3_to_cm3)
+              mass=mass + dust_density_o_n_grains(l,icell) * n_grains(l) * M_grain(l) * (volume(icell) * AU3_to_cm3)
            enddo
         enddo
      enddo

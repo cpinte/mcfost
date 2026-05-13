@@ -3,7 +3,7 @@ module init_mcfost
   use parameters
   use naleat
   use grains, only : aggregate_file, mueller_aggregate_file
-  use density, only : species_removed, T_rm, is_density_file_Voronoi
+  use density, only : species_removed, T_rm, check_density_file_Voronoi_variable_dust
   use molecular_emission
   !$ use omp_lib
   use benchmarks
@@ -17,6 +17,7 @@ module init_mcfost
   use read_idefix, only : read_idefix_parameters
   use read_pluto, only : read_pluto_parameters
   use read_spherical_grid, only : read_spherical_grid_parameters
+  use read_phantom, only : check_phantom_file_variable_dust
 
   implicit none
 
@@ -1530,7 +1531,8 @@ subroutine initialisation_mcfost()
      call read_para(para)
   endif
 
-  if (ldensity_file) call is_density_file_Voronoi()
+  if (ldensity_file) call check_density_file_Voronoi_variable_dust()
+  if (lphantom_file) call check_phantom_file_variable_dust()
 
   if (lfargo3d) then
      l3D = .true.
@@ -1985,7 +1987,7 @@ subroutine display_help()
   write(*,*) " "
   write(*,*) " Options related to disk structure"
   write(*,*) "        : -disk_struct : computes the density structure and stops:"
-  write(*,*) "                         gas_density.fits.gz and dust_density.fits.gz -> density map"
+  write(*,*) "                         gas_density.fits.gz and dust_density_o_n_grains.fits.gz -> density map"
   write(*,*) "                         grid.fits.gz -> radii and height in the grid"
   write(*,*) "                         volume.fits.gz -> volume per cell at each radius"
   write(*,*) "        : -3D : 3D geometrical grid"

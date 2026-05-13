@@ -193,7 +193,7 @@ contains
     ! mask : integer array, 1 if a SPH particle will be made transparent, 2 if deleted before tesselation
     ! ************************************************************************************ !
     use Voronoi_grid
-    use density, only : gas_density, gas_mass, dust_density, dust_mass
+    use density, only : gas_density, gas_mass, dust_density_o_n_grains, dust_mass
     use grains, only : n_grains_tot, M_grain
     use disk_physics, only : compute_othin_sublimation_radius
     use mem
@@ -367,7 +367,7 @@ contains
        !$omp default(none) &
        !$omp private(icell,iSPH,use_single_grain,rhoi,ki,err,ierr,lambsol,rho_monomers,a,i,norm,mdust) &
        !$omp shared(n_cells,Voronoi,gas_density,n_grains_tot,r_grain,mass_factor,dN_ds,N_monomers) &
-       !$omp shared(dust_density,n_grains,dust_moments,gas_mass,volume) &
+       !$omp shared(dust_density_o_n_grains,n_grains,dust_moments,gas_mass,volume) &
        !$omp reduction(+:N_pb)
        !$omp do schedule(dynamic,1)
        do icell=1,n_cells
@@ -389,19 +389,19 @@ contains
                 endif
              enddo
 
-             dust_density(:,icell) = rho_monomers(:) * dN_ds(:)
+             dust_density_o_n_grains(:,icell) = rho_monomers(:) * dN_ds(:)
 
              ! Simple approximation : we assume 1 single grain size
              if (use_single_grain) then
-                dust_density(:,icell) = 0._dp
+                dust_density_o_n_grains(:,icell) = 0._dp
                 if (dust_moments(1,iSPH) > tiny_dp) then
                    a = a0 * dust_moments(2,iSPH)/dust_moments(1,iSPH)
                    i = locate(1.0_dp*r_grain(:),a)
-                   dust_density(i,icell) = 1.0
+                   dust_density_o_n_grains(i,icell) = 1.0
                 endif
              endif
           else ! iSPH == 0, star
-             dust_density(:,icell) = 0._dp
+             dust_density_o_n_grains(:,icell) = 0._dp
           endif
        enddo ! icell
        !$omp end do
@@ -417,7 +417,7 @@ contains
 
           mass = 0.0_dp
           do l=1,n_grains_tot
-             mass=mass + (dust_density(l,icell) * n_grains(l) *1.0_dp) * M_grain(l)
+             mass=mass + (dust_density_o_n_grains(l,icell) * n_grains(l) *1.0_dp) * M_grain(l)
           enddo !l
           mass = mass * volume(icell)
 
@@ -426,7 +426,7 @@ contains
 
           if (mass > tiny_dp) then
              factor = mdust/ mass
-             dust_density(:,icell) = dust_density(:,icell) * factor
+             dust_density_o_n_grains(:,icell) = dust_density_o_n_grains(:,icell) * factor
           endif
        enddo !icell
        call normalize_dust_density(mdust_tot) ! this should only calculates the array mass
@@ -531,18 +531,22 @@ contains
 
              l=1
              do k=1,n_grains_tot
-                if (r_grain(k) < a_SPH(1)) then ! small grains
-                   dust_density(k,icell) = rho_dust(1) / n_grains(k)
-                else if (r_grain(k) > a_SPH(ndusttypes+1)) then ! large grains
-                   dust_density(k,icell) = rho_dust(ndusttypes+1) / n_grains(k)
-                else ! interpolation
-                   if (r_grain(k) > a_sph(l+1)) l = l+1
-                   f = (log(r_grain(k))-log_a_sph(l))/(log_a_sph(l+1)-log_a_sph(l))
-                   dust_density(k,icell) = (rho_dust(l) + f * (rho_dust(l+1)  - rho_dust(l))) / n_grains(k)
+                if (n_grains(k) > 0.0_dp) then
+                   if (r_grain(k) < a_SPH(1)) then ! small grains
+                      dust_density_o_n_grains(k,icell) = rho_dust(1) / n_grains(k)
+                   else if (r_grain(k) > a_SPH(ndusttypes+1)) then ! large grains
+                      dust_density_o_n_grains(k,icell) = rho_dust(ndusttypes+1) / n_grains(k)
+                   else ! interpolation
+                      if (r_grain(k) > a_sph(l+1)) l = l+1
+                      f = (log(r_grain(k))-log_a_sph(l))/(log_a_sph(l+1)-log_a_sph(l))
+                      dust_density_o_n_grains(k,icell) = (rho_dust(l) + f * (rho_dust(l+1)  - rho_dust(l))) / n_grains(k)
+                   endif
+                else
+                   dust_density_o_n_grains(k,icell) = 0.0_dp
                 endif
              enddo !k
           else ! iSPH == 0, star
-             dust_density(:,icell) = 0.
+             dust_density_o_n_grains(:,icell) = 0.
           endif
        enddo ! icell
 
@@ -556,14 +560,14 @@ contains
 
        do icell=1,n_cells
           dust_mass(icell) = 0.
-          dust_density(1,icell) = gas_density(icell)
+          dust_density_o_n_grains(1,icell) = gas_density(icell)
           do k=1,n_grains_tot
-             dust_mass(icell) = dust_mass(icell) + dust_density(1,icell) * n_grains(k) * M_grain(k) * volume(icell)
+             dust_mass(icell) = dust_mass(icell) + dust_density_o_n_grains(1,icell) * n_grains(k) * M_grain(k) * volume(icell)
           enddo
        enddo
        dust_mass(:) = dust_mass(:) * AU3_to_cm3
        f = 1./disk_zone(1)%gas_to_dust * sum(gas_mass)/sum(dust_mass)
-       dust_density(:,:) = dust_density(:,:) * f
+       dust_density_o_n_grains(:,:) = dust_density_o_n_grains(:,:) * f
        dust_mass(:) = dust_mass(:) * f
     endif ! ndusttypes == 0
 
@@ -816,7 +820,7 @@ contains
   subroutine delete_masked_particles()
 
     use Voronoi_grid
-    use density, only : gas_density, gas_mass, dust_density, dust_mass
+    use density, only : gas_density, gas_mass, dust_density_o_n_grains, dust_mass
 
     integer :: icell, k
 
@@ -827,7 +831,7 @@ contains
           gas_mass(icell)       = 0.
           gas_density(icell)     = 0.
           dust_mass(icell)           = 0.
-          dust_density(:,icell) = 0.
+          dust_density_o_n_grains(:,icell) = 0.
        endif
     enddo
 
@@ -842,7 +846,7 @@ contains
   subroutine delete_Hill_sphere()
 
     use Voronoi_grid
-    use density, only : gas_density, gas_mass, dust_density, dust_mass
+    use density, only : gas_density, gas_mass, dust_density_o_n_grains, dust_mass
 
     integer :: istar, icell, n_delete
     real(kind=dp) :: d2, r_Hill2, r_hill, dx, dy, dz
@@ -874,7 +878,7 @@ contains
              gas_mass(icell)    = 0.
              gas_density(icell) = 0.
              dust_mass(icell) = 0.
-             dust_density(:,icell) = 0.
+             dust_density_o_n_grains(:,icell) = 0.
              n_delete = n_delete + 1
           endif
        enddo cell_loop

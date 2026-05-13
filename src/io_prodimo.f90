@@ -825,9 +825,9 @@ contains
              do l= grain_RE_LTE_start, grain_RE_LTE_end
                 p_l = merge(l, grain(l)%zone, lvariable_dust)
                 opacity(ri,zj,1,lambda) = opacity(ri,zj,1,lambda) + C_ext(l,lambda) * &
-                     dust_density(p_l,icell) * n_grains(l) * factor
+                     dust_density_o_n_grains(p_l,icell) * n_grains(l) * factor
                 opacity(ri,zj,2,lambda) = opacity(ri,zj,2,lambda) + C_abs(l,lambda) * &
-                     dust_density(p_l,icell) * n_grains(l) * factor
+                     dust_density_o_n_grains(p_l,icell) * n_grains(l) * factor
              enddo ! l
           enddo ! lambda
        enddo ! ri
@@ -856,24 +856,27 @@ contains
           ! Total number of grain. da is already in n_grains
           icell = cell_map(ri,zj,1)
           if (lvariable_dust) then
-             N = sum(dust_density(:,icell) * n_grains(:),mask=mask_not_PAH)
+             N = sum(dust_density_o_n_grains(:,icell) * n_grains(:),mask=mask_not_PAH)
              N_grains_out(ri,zj,0) = N
              if (N > 0) then
-                N_grains_out(ri,zj,1) = sum(dust_density(:,icell) * n_grains(:) * r_grain(:),mask=mask_not_PAH) / N
-                N_grains_out(ri,zj,2) = sum(dust_density(:,icell) * n_grains(:) * r_grain(:)**2,mask=mask_not_PAH) / N
-                N_grains_out(ri,zj,3) = sum(dust_density(:,icell) * n_grains(:) * r_grain(:)**3,mask=mask_not_PAH) / N
+                N_grains_out(ri,zj,1) = sum(dust_density_o_n_grains(:,icell) * n_grains(:) * r_grain(:),mask=mask_not_PAH) / N
+                N_grains_out(ri,zj,2) = sum(dust_density_o_n_grains(:,icell) * n_grains(:) * r_grain(:)**2,mask=mask_not_PAH) / N
+                N_grains_out(ri,zj,3) = sum(dust_density_o_n_grains(:,icell) * n_grains(:) * r_grain(:)**3,mask=mask_not_PAH) / N
              else
                 N_grains_out(ri,zj,1) = 0.0
                 N_grains_out(ri,zj,2) = 0.0
                 N_grains_out(ri,zj,3) = 0.0
              endif
           else
-             N = sum(dust_density(grain(:)%zone,icell) * n_grains(:),mask=mask_not_PAH)
+             N = sum(dust_density_o_n_grains(grain(:)%zone,icell) * n_grains(:),mask=mask_not_PAH)
              N_grains_out(ri,zj,0) = N
              if (N > 0) then
-                N_grains_out(ri,zj,1) = sum(dust_density(grain(:)%zone,icell) * n_grains(:) * r_grain(:),mask=mask_not_PAH) / N
-                N_grains_out(ri,zj,2) = sum(dust_density(grain(:)%zone,icell) * n_grains(:) * r_grain(:)**2,mask=mask_not_PAH) / N
-                N_grains_out(ri,zj,3) = sum(dust_density(grain(:)%zone,icell) * n_grains(:) * r_grain(:)**3,mask=mask_not_PAH) / N
+                N_grains_out(ri,zj,1) = sum(dust_density_o_n_grains(grain(:)%zone,icell) * &
+                     n_grains(:) * r_grain(:),mask=mask_not_PAH) / N
+                N_grains_out(ri,zj,2) = sum(dust_density_o_n_grains(grain(:)%zone,icell) * &
+                     n_grains(:) * r_grain(:)**2,mask=mask_not_PAH) / N
+                N_grains_out(ri,zj,3) = sum(dust_density_o_n_grains(grain(:)%zone,icell) * &
+                     n_grains(:) * r_grain(:)**3,mask=mask_not_PAH) / N
              else
                 N_grains_out(ri,zj,1) = 0.0
                 N_grains_out(ri,zj,2) = 0.0
@@ -965,10 +968,10 @@ contains
           do zj=1,nz
              icell = cell_map(ri,zj,k)
              if (lvariable_dust) then
-                dens(ri,zj) = sum(dust_density(iPAH_start:iPAH_end, icell) * n_grains(iPAH_start:iPAH_end) &
+                dens(ri,zj) = sum(dust_density_o_n_grains(iPAH_start:iPAH_end, icell) * n_grains(iPAH_start:iPAH_end) &
                      * M_grain(iPAH_start:iPAH_end)) ! M_grain en g
              else
-                dens(ri,zj) = sum(dust_density(grain(iPAH_start:iPAH_end)%zone, icell) * n_grains(iPAH_start:iPAH_end) &
+                dens(ri,zj) = sum(dust_density_o_n_grains(grain(iPAH_start:iPAH_end)%zone, icell) * n_grains(iPAH_start:iPAH_end) &
                      * M_grain(iPAH_start:iPAH_end)) ! M_grain en g
              endif
           enddo
@@ -999,8 +1002,10 @@ contains
              do lambda=1,n_lambda
                  do l= iPAH_start, iPAH_end
                     p_l = merge(l, grain(l)%zone, lvariable_dust)
-                    opacity(ri,zj,1,lambda) = opacity(ri,zj,1,lambda) + C_ext(l,lambda) * dust_density(p_l,icell) * n_grains(l)
-                    opacity(ri,zj,2,lambda) = opacity(ri,zj,2,lambda) + C_abs(l,lambda) * dust_density(p_l,icell) * n_grains(l)
+                    opacity(ri,zj,1,lambda) = opacity(ri,zj,1,lambda) + &
+                         C_ext(l,lambda) * dust_density_o_n_grains(p_l,icell) * n_grains(l)
+                    opacity(ri,zj,2,lambda) = opacity(ri,zj,2,lambda) + &
+                         C_abs(l,lambda) * dust_density_o_n_grains(p_l,icell) * n_grains(l)
                  enddo ! l
              enddo ! lambda
           enddo ! ri
@@ -1033,8 +1038,8 @@ contains
                  else
                     Ttmp = Tdust_1grain(l,icell)
                  endif
-                 TPAH_eq(ri,zj,1) = TPAH_eq(ri,zj,1) + Ttmp**4 * dust_density(p_l,icell) * n_grains(l)
-                 norm = norm + dust_density(p_l,icell) * n_grains(l)
+                 TPAH_eq(ri,zj,1) = TPAH_eq(ri,zj,1) + Ttmp**4 * dust_density_o_n_grains(p_l,icell) * n_grains(l)
+                 norm = norm + dust_density_o_n_grains(p_l,icell) * n_grains(l)
               enddo ! l
              TPAH_eq(ri,zj,1) = (TPAH_eq(ri,zj,1)/norm)**0.25
           enddo ! ri
