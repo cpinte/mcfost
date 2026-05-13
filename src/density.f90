@@ -1746,7 +1746,7 @@ subroutine read_density_file()
               enddo ! i
            endif
         else
-           dust_density_o_n_grains(k,cell_map(i,j,phik)) = 0.0_dp
+           dust_density_o_n_grains(k,:) = 0.0_dp
         endif
      enddo
   else ! All grains follow the gas

@@ -51,13 +51,13 @@ contains
 
        call read_from_hdf5(ndusttypes,'ndusttypes',hdf5_group_id,got,ierr)
        if (.not. got) then
+          ndustsmall = 0
+          ndustlarge = 0
+          ndusttypes = 0
           call read_from_hdf5(ndustsmall,'ndustsmall',hdf5_group_id,got,ierr)
+          if (got)  ndusttypes = ndustsmall
           call read_from_hdf5(ndustlarge,'ndustlarge',hdf5_group_id,got,ierr)
-          if (got) then
-             ndusttypes = ndustsmall + ndustlarge
-          else
-             ndusttypes = 0
-          endif
+          if (got) ndusttypes = ndusttypes + ndustlarge
        endif
 
        ! Check for mass_per_H for ldust_moments
