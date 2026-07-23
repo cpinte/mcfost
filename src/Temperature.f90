@@ -1,7 +1,7 @@
 module Temperature
 
   use mcfost_env
-  use parametres
+  use parameters
 
   implicit none
   save
@@ -26,7 +26,7 @@ contains
     integer :: t
 
     tab_Temp=0.0
-    ! Echantillonage temperature
+    ! Temperature sampling
     !delta_T=(T_max)**(1.0/(n_T-1))
     delta_T=exp((1.0_dp/(real(n_T,kind=dp)))*log(T_max/T_min))
     tab_Temp(1)=T_min*sqrt(delta_T)

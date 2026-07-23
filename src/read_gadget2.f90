@@ -5,8 +5,8 @@
 !******************************************************************************
 module read_gadget2
 
-  use parametres
-  use constantes
+  use parameters
+  use constants
   use utils
   use messages
   use mcfost_env, only : sp
@@ -72,14 +72,14 @@ contains
     integer, intent(out) :: ndusttypes,n_SPH,ierr
 
     integer(HID_T) :: file_id, header_id, group_id
-    integer :: npart(6), n_sinks, alloc_status, i, n_etoiles_old
+    integer :: npart(6), n_sinks, alloc_status, i, n_stars_old
     real(dp) :: mass_table(6), unit_length_cgs, unit_mass_cgs, unit_vel_cgs
     real(dp) :: ulength_au, usolarmass, uvelocity, x0, y0, z0
     real(dp), allocatable :: coords(:,:), vels(:,:), sink_coords(:,:), sink_vels(:,:)
     real(dp), allocatable :: sink_mass(:)
     real(sp), allocatable :: hsml_sp(:), mass_sp(:)
     logical :: got, recentred
-    type(star_type), allocatable :: etoile_old(:)
+    type(star_type), allocatable :: star_old(:)
 
     ierr = 0
     ndusttypes = 0
@@ -205,34 +205,34 @@ contains
        write(*,*) '  Recentring on first sink at code coords: ', real(x0), real(y0), real(z0)
 
        ! Update stellar positions / masses, preserving para-file T, radius, spectrum
-       n_etoiles_old = n_etoiles
-       n_etoiles = n_sinks
-       if (n_etoiles /= n_etoiles_old) then
-          write(*,*) '  Updating number of stars from', n_etoiles_old, 'to', n_etoiles
-          if (n_etoiles_old > 0) then
-             allocate(etoile_old(n_etoiles_old))
-             etoile_old(:) = etoile(:)
-             deallocate(etoile)
-             allocate(etoile(n_etoiles))
-             do i = 1, min(n_etoiles,n_etoiles_old)
-                etoile(i) = etoile_old(i)
+       n_stars_old = n_stars
+       n_stars = n_sinks
+       if (n_stars /= n_stars_old) then
+          write(*,*) '  Updating number of stars from', n_stars_old, 'to', n_stars
+          if (n_stars_old > 0) then
+             allocate(star_old(n_stars_old))
+             star_old(:) = star(:)
+             deallocate(star)
+             allocate(star(n_stars))
+             do i = 1, min(n_stars,n_stars_old)
+                star(i) = star_old(i)
              enddo
-             deallocate(etoile_old)
+             deallocate(star_old)
           else
-             if (allocated(etoile)) deallocate(etoile)
-             allocate(etoile(n_etoiles))
+             if (allocated(star)) deallocate(star)
+             allocate(star(n_stars))
           endif
        endif
 
-       do i = 1, n_etoiles
-          etoile(i)%x = sink_coords(1,i) * ulength_au
-          etoile(i)%y = sink_coords(2,i) * ulength_au
-          etoile(i)%z = sink_coords(3,i) * ulength_au
-          etoile(i)%vx = sink_vels(1,i) * uvelocity
-          etoile(i)%vy = sink_vels(2,i) * uvelocity
-          etoile(i)%vz = sink_vels(3,i) * uvelocity
-          etoile(i)%M = sink_mass(i) * usolarmass
-          write(*,*) '  Sink', i, 'mass =', real(etoile(i)%M), 'Msun'
+       do i = 1, n_stars
+          star(i)%x = sink_coords(1,i) * ulength_au
+          star(i)%y = sink_coords(2,i) * ulength_au
+          star(i)%z = sink_coords(3,i) * ulength_au
+          star(i)%vx = sink_vels(1,i) * uvelocity
+          star(i)%vy = sink_vels(2,i) * uvelocity
+          star(i)%vz = sink_vels(3,i) * uvelocity
+          star(i)%M = sink_mass(i) * usolarmass
+          write(*,*) '  Sink', i, 'mass =', real(star(i)%M), 'Msun'
        enddo
 
        deallocate(sink_coords,sink_vels,sink_mass)
@@ -458,19 +458,19 @@ contains
     write(*,*) "Found", n_stars, "stars in the Gadget-2 file"
     if (n_stars > 0) then
        write(*,*) "Updating the stellar properties"
-       n_etoiles = n_stars
-       if (allocated(etoile)) deallocate(etoile)
-       allocate(etoile(n_stars))
 
-       do i = 1, n_stars
-          etoile(i)%x = pos(1,n_SPH + i) * ulength_au
-          etoile(i)%y = pos(2,n_SPH + i) * ulength_au
-          etoile(i)%z = pos(3,n_SPH + i) * ulength_au
-          etoile(i)%vx = vel(1,n_SPH + i) * uvelocity
-          etoile(i)%vy = vel(2,n_SPH + i) * uvelocity
-          etoile(i)%vz = vel(3,n_SPH + i) * uvelocity
-          etoile(i)%M = mass_stars(i) * usolarmass
-          write(*,*) i, etoile(i)%M
+       if (allocated(star)) deallocate(star)
+       allocate(star(n_stars))
+
+       do i=1,n_stars
+          star(i)%x = pos(1,n_SPH + i) * ulength_au
+          star(i)%y = pos(2,n_SPH + i) * ulength_au
+          star(i)%z = pos(3,n_SPH + i) * ulength_au
+          star(i)%vx = vel(1,n_SPH + i) * uvelocity
+          star(i)%vy = vel(2,n_SPH + i) * uvelocity
+          star(i)%vz = vel(3,n_SPH + i) * uvelocity
+          star(i)%M =  mass_stars(i) * usolarmass
+          write(*,*) i, star(i)%M
        enddo
     endif
 

@@ -5,7 +5,7 @@
 ! elements and their abundance and their LTE or NLTE populations.
 !
 !
-! If ne_intial is 1 then first guess is computed using
+! If ne_initial is 1 then first guess is computed using
 ! the value stored in ne as first guess.
 ! This allows to iterate the electron density through the NLTE scheme.
 !
@@ -21,11 +21,11 @@ module elecdensity
 
    use atom_type, only : atoms, AtomType, hydrogen
    use elements_type
-   use constantes
+   use constants
    use messages, only : Error, Warning
    use input, only : nb_proc
    use mcfost_env, only : dp
-   use parametres, only : n_cells
+   use parameters, only : n_cells
    use utils, only : progress_bar, is_nan_infinity, interp_dp
    use grid, only : T, ne, nHtot, icompute_atomRT
    use fits_utils
@@ -49,9 +49,9 @@ module elecdensity
    contains
 
 
-   function ne_Hionisation0 (temp, N, U0, U1)
+   function ne_Hionization0 (temp, N, U0, U1)
    ! ----------------------------------------------------------------------!
-   ! Application of eq. 4.35 of Hubeny & Mihalas to ionisation
+   ! Application of eq. 4.35 of Hubeny & Mihalas to ionization
    ! of H.
    ! Njl = Nj1l * ne * phi_jl
    ! ne(H) = NH-1 / (NH * phi_-1l) chi = ionpot0
@@ -62,22 +62,22 @@ module elecdensity
    real(kind=dp), intent(in) :: temp, N
    real(kind=dp), intent(in) :: U0, U1
    real(kind=dp) :: phiH
-   real(kind=dp) :: ne_Hionisation0
+   real(kind=dp) :: ne_Hionization0
    phiH = phi_jl(temp, U0, U1, elems(1)%ionpot(1))
 
    !if no free e-, Nt = NH + NH+ with NH+=ne
    if (phiH>0) then
-      ne_Hionisation0 = (sqrt(N*phiH*4. + 1)-1)/(2.*phiH) !without H minus
+      ne_Hionization0 = (sqrt(N*phiH*4. + 1)-1)/(2.*phiH) !without H minus
    else
-      ne_Hionisation0 = 0.0
+      ne_Hionization0 = 0.0
    endif
 
    return
-   end function ne_Hionisation0
+   end function ne_Hionization0
 
-   function ne_Hionisation (temp, N, U0, U1)
+   function ne_Hionization (temp, N, U0, U1)
     ! ----------------------------------------------------------------------!
-    ! Application of eq. 4.35 of Hubeny & Mihalas to ionisation
+    ! Application of eq. 4.35 of Hubeny & Mihalas to ionization
     ! of H.
     ! Njl = Nj1l * ne * phi_jl
     ! ne(H) = NH-1 / (NH * phi_-1l) chi = ionpot0
@@ -88,7 +88,7 @@ module elecdensity
     real(kind=dp), intent(in) :: temp, N
     real(kind=dp), intent(in) :: U0, U1
     real(kind=dp) :: phiH
-    real(kind=dp) :: ne_Hionisation
+    real(kind=dp) :: ne_Hionization
 
     phiH = phi_jl(temp, U0, U1, Elems(1)%ionpot(1))
 
@@ -96,17 +96,17 @@ module elecdensity
     !ne = (sqrt(nHtot(k)*phiH*4. + 1)-1)/(2.*phiH) !without H minus
     !if free e-, Nt=Nhot + NH+ + ne
     if (phiH>0) then
-      ne_Hionisation = (sqrt(N*phiH + 1)-1)/(phiH)
+      ne_Hionization = (sqrt(N*phiH + 1)-1)/(phiH)
     else
-      ne_Hionisation = 0.0
+      ne_Hionization = 0.0
     endif
 
     return
-   end function ne_Hionisation
+   end function ne_Hionization
 
    function ne_Metal(temp, N, U0, U1, chi, A)
     ! ----------------------------------------------------------------------!
-    ! Application of eq. 4.35 of Hubeny & Mihalas to ionisation
+    ! Application of eq. 4.35 of Hubeny & Mihalas to ionization
     ! of a single metal.
     ! ----------------------------------------------------------------------!
 
@@ -172,23 +172,23 @@ module elecdensity
     return
   end subroutine show_electron_given_per_elem
 
-  subroutine calc_ionisation_frac(elem, k, ne, fjk, dfjk, n0)
+  subroutine calc_ionization_frac(elem, k, ne, fjk, dfjk, n0)
     !return j * Nj / Ntot and N0/Ntot
 
     ! ------------------------------------------------------------------------!
     ! fractional population f_j(ne,T)=N_j/N for element Elem
     ! and its partial derivative with ne. If Elem is an element with
-    ! detailed model and if NLTE populations for it exist, there are used
+    ! detailed model and if NLTE populations for it exist, they are used
     ! instead of LTE.
     !
-    ! ::new:: n0 is population of the lowest ionisation stage (like HI)
-    ! Should in principle be a list for the calculation of ionisation from negative ions.
+    ! ::new:: n0 is population of the lowest ionization stage (like HI)
+    ! Should in principle be a list for the calculation of ionization from negative ions.
     ! currently only H-
     !
     ! to test: If detailed_model is not applied only to active atoms
     ! it means that some atoms will contribute their LTE values, therefore
     ! they have to be updated. Is it okey or not ?
-    ! OR it better to finder a consistant solution with LTE atoms (elements or not)
+    ! OR it better to find a consistent solution with LTE atoms (elements or not)
     ! ------------------------------------------------------------------------!
 
     real(kind=dp), intent(in) :: ne
@@ -284,7 +284,7 @@ module elecdensity
 
        n0 = fjk(1)
 
-       !0 for neutrals => j==1 (elements which do not have a detailed model are ordered by neutral to ionised
+       !0 for neutrals => j==1 (elements which do not have a detailed model are ordered by neutral to ionized
        !and fjk is Nj / Ntot
        do j=1,elem%Nstage
           fjk(j) = (j-1) * fjk(j)
@@ -299,7 +299,7 @@ module elecdensity
     endif
 
     return
-  end subroutine calc_ionisation_frac
+  end subroutine calc_ionization_frac
 
   subroutine solve_ne_loc(k,ne_init)
    !solve for electronic density locally (one point).
@@ -307,7 +307,7 @@ module elecdensity
    real(kind=dp), intent(in) :: ne_init
    real(kind=dp) :: delta, ne_old, akj, sum, dne
    real(kind=dp):: PhiHmin, n0
-   real(kind=dp), dimension(max_ionisation_stage) :: fjk, dfjk
+   real(kind=dp), dimension(max_ionization_stage) :: fjk, dfjk
    !!real(kind=dp), dimension(-N_negative_ions:N_MAX_ELEMENT) :: max_fjk, min_fjk !Negative ions from -N_neg to 0 (H-), then from 1 to Nelem positive ions
    integer :: n, niter, j
 
@@ -329,7 +329,7 @@ module elecdensity
             !do n=1, N_MAX_ELEMENT
 
          !times stage !!
-         call calc_ionisation_frac(elems(n), k, ne_old, fjk, dfjk, n0)
+         call calc_ionization_frac(elems(n), k, ne_old, fjk, dfjk, n0)
 
 
          if (n.eq.1)  then ! H minus for H
@@ -354,12 +354,12 @@ module elecdensity
 
             !neutrals do not contribute
             !j-1 = 0 for neutrals
-            !j-1 = 1 for singly ionised ions.
+            !j-1 = 1 for singly ionized ions.
 
             !avoiding neutrals
             !fjk are Nj / Not with Nj the total population in stage j evaluated at LTE
             ! 				do j=2, elem%Nstage
-            ! 					akj = elem%Abund*(j-1) !because j starts at 0 for neutrals, 1 for singly ionised etc
+            ! 					akj = elem%Abund*(j-1) !because j starts at 0 for neutrals, 1 for singly ionized etc
             ! 					!positive contribution to the electron density
             ! 					delta = delta -akj*fjk(j)
             ! 					sum = sum + akj*dfjk(j)
@@ -368,7 +368,7 @@ module elecdensity
          akj = elems(n)%Abund
             !new the term j-1 already included in fjk and dfjk
          do j=1, elems(n)%Nstage !start at 1 but fjk and dfjk are 0 if stage 1 = neutral
-               !this allows a better match with detailed models that can have ionised level for j=1 (like Ca II)
+               !this allows a better match with detailed models that can have ionized level for j=1 (like Ca II)
                !positive contribution to the electron density
             delta = delta -akj*fjk(j)
             sum = sum + akj*dfjk(j)
@@ -440,13 +440,13 @@ module elecdensity
     ! used to compute the electron density. Otherwise, LTE is used.
     !
     ! When ne_initial_solution is set to HIONISA, uses
-    ! sole hydgrogen ionisation to estimate the initial ne density.
+    ! sole hydrogen ionization to estimate the initial ne density.
     ! If set to NPROTON or NEMODEL, protons number or density
     ! read from the model are used. Note that NPROTON supposes
     ! that NLTE populations are present for hydrogen, since
     ! nprot = hydrogen%n(Nlevel,:).
     !
-    ! Also returns epsilon, the change in electron density from the intial guess
+    ! Also returns epsilon, the change in electron density from the initial guess
     ! to the converged values. THIS IS NOT the convergence threshold used inside
     ! the electron loop.
     ! Epsilon is used to check for the convergence of the electron density,
@@ -508,9 +508,9 @@ module elecdensity
           ne0 = Hydrogen%n(Hydrogen%Nlevel,k)!np(k)
        else if (initial == 1) then
           ne0 = ne(k)
-       else !"H_IONISATION" or unkown
+       else !"H_ionization" or unkown
 
-          !Initial solution ionisation of H
+          !Initial solution ionization of H
           Uk = get_pf(elems(1), 1, T(k))
           Ukp1 = get_pf(elems(1), 2, T(k))
 
@@ -519,7 +519,7 @@ module elecdensity
              write(*,*) Uk, Ukp1
              stop
           end if
-          ne0 = ne_Hionisation (T(k),nHtot(k), Uk, Ukp1)
+          ne0 = ne_Hionization (T(k),nHtot(k), Uk, Ukp1)
 
 
           !if Abund << 1. and chiM << chiH then
@@ -560,7 +560,7 @@ module elecdensity
        write(*,'("   >>>  Diff to previous solution=",(1ES13.5E3)," at cell ",(1I7))') epsilon, ik_max
        write(*,*) " T = ", real(T(ik_max))," nH = ", real(nHtot(ik_max))
        write(*,*) " "
-       write(*,'("Ionisation fraction of HII ",(1ES13.5E3),", ",(1ES13.5E3))') real(max_f_HII), real(min_f_HII)
+       write(*,'("ionization fraction of HII ",(1ES13.5E3),", ",(1ES13.5E3))') real(max_f_HII), real(min_f_HII)
       !  write(*,'("nH/ne "(1ES13.5E3, 1ES13.5E3))') maxval(nHtot/ne,mask=ne>0), minval(nHtot/ne,mask=ne>0)
       ! call show_electron_given_per_elem(0, 0, max_fjk)
        write(*,*) " ---------------------------------------------------- "
@@ -597,11 +597,11 @@ module elecdensity
 
    !check if data file already exist, can be the case if initial solutions is OLD_POPULATIONS
    cmd = "ls "//trim(ne_filename)
-   call appel_syst(cmd, sys_status)
+   call system_call(cmd, sys_status)
    if (sys_status == 0) then !means the file exist
 
       cmd = "mv "//trim(ne_filename)//" "//"ne_old.fits.gz"
-      call appel_syst(cmd, sys_status)
+      call system_call(cmd, sys_status)
       if (sys_status /= 0) then
          call error("Error in copying old ne!")
       endif
@@ -666,7 +666,7 @@ module elecdensity
 
    !check if data file already exist, otherwise lead and return .false.
    cmd = "ls "//trim(ne_filename)
-   call appel_syst(cmd, sys_status)
+   call system_call(cmd, sys_status)
    if (sys_status == 0) then !means the file exist
       write(*,*) " Reading old ne.fits.gz file"
       lelectron_read = .true.

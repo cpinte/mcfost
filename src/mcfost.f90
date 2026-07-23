@@ -1,16 +1,16 @@
 program BIGCRUNCH
   !***********************************************************
-  ! Code de transfert radiatif Monte-Carlo : MCFOST
+  ! Monte-Carlo radiative transfer code: MCFOST
   !***********************************************************
-  ! Transfert dans la poussiere : lumiere diffusee et emission
-  ! thermique et dans le gaz : raies moleculaires et atomiques
-  ! Code parallèle OpenMP
+  ! Dust transfer: scattered light and thermal emission
+  ! and gas transfer: molecular and atomic lines
+  ! Parallelized with OpenMP
   !
   ! F. Menard, G. Duchene, C. Pinte et B. Tessore
   ! Grenoble, Exeter, Grenoble, Santiago
   !
   !***********************************************************
-  use parametres
+  use parameters
   use init_mcfost
   use dust_transfer
   use mol_transfer
@@ -22,7 +22,7 @@ program BIGCRUNCH
   integer :: itime
   real :: time, cpu_time_begin, cpu_time_end
 
-  ! debut de l'execution
+  ! Beginning of execution
   call system_clock(time_begin,count_rate=time_tick,count_max=time_max)
   call cpu_time(cpu_time_begin)
 
@@ -32,15 +32,15 @@ program BIGCRUNCH
   ! Here it comes ...
   !*************************************************************************
 
-  ! Transfert radiatif dans le continu
+  ! Radiative transfer in the continuum
   ldust_transfer = .true.
-  !To do -> extract from ldust_transfer everything whuch defines the grid
+  !To do -> extract from ldust_transfer everything which defines the grid
   !-> possibility to set ldust_transfer to .false. and go to the full gas RT.
   if (ldust_transfer) then
-     call transfert_poussiere()
+     call dust_transfer_sub()
   endif
 
-  ! Emission moleculaire ...
+  ! Molecular emission ...
   !to do merge with lgas_transfer
   if (lemission_mol) then
      call mol_line_transfer()
@@ -57,7 +57,7 @@ program BIGCRUNCH
 !    call gas_trans_transfer()
 !   endif
 
-  ! Temps d'execution
+  ! Execution time
   call system_clock(time_end)
   if (time_end < time_begin) then
      time=(time_end + (1.0 * time_max)- time_begin)/real(time_tick)

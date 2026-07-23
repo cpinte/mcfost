@@ -3,7 +3,7 @@ module io_atom
    use atom_type
    use elements_type
    !use zeeman, only              : Lande_eff, ZeemanMultiplet
-   use constantes
+   use constants
    use uplow
    use abo, only             : get_Barklem_cross_data
    use collision_atom, only      : read_collisions
@@ -17,7 +17,7 @@ module io_atom
 
 
    character(len=*), parameter :: path_to_atoms = "/Atoms/"
-   real(kind=dp), parameter :: C1 = deux_pi * (electron_charge/EPSILON_0) * (electron_charge/mel / C_light)
+   real(kind=dp), parameter :: C1 = two_pi * (electron_charge/EPSILON_0) * (electron_charge/mel / C_light)
    logical :: lany_init4 = .false.
 
    contains
@@ -25,7 +25,7 @@ module io_atom
    subroutine read_model_atom(atomunit, atom)
    !
    ! read independent atomic model
-   ! Iinitialize the atom values
+   ! Initialize the atom values
    !
       integer, intent(in) :: atomunit
       type (AtomType), intent(inout), target :: atom
@@ -89,7 +89,7 @@ module io_atom
       allocate(atom%E(atom%Nlevel))
       !atomic level statistical weight
       allocate(atom%g(atom%Nlevel))
-      !atomic level ionisation stage (i.e., 0 for neutral, 1 for singly ionised ...)
+      !atomic level ionization stage (i.e., 0 for neutral, 1 for singly ionized ...)
       allocate(atom%stage(atom%Nlevel))
       !atomic level id w/ other levels, RELATIVE TO that model.
       !index id starts at 0 for first level of the model.
@@ -152,13 +152,13 @@ module io_atom
       !Starting from now, i is the index of the lower level
       !it cannot be used as a loop index :-)
 
-      !read bounb-bound (line) transitions
+      !read bound-bound (line) transitions
       allocate(atom%lines(atom%Nline))
       do kr=1,atom%Nline
 
          ! atom%tab_trans(kr) = kr
-         atom%lines(kr)%lcontrib = .true. !init, all transitions contributes to opacity
-                                          !in images, lines can be removed by setting lcontrib to .false. (expect if overlap)
+         atom%lines(kr)%lcontrib = .true. !init, all transitions contribute to opacity
+                                          !in images, lines can be removed by setting lcontrib to .false. (except if overlap)
 
          atom%lines(kr)%atom => atom
          atom%lines(kr)%polarizable = .false.
@@ -187,7 +187,7 @@ module io_atom
          atom%j_trans(kr) = atom%lines(kr)%j
 
          !because levels correspond to different transitions,
-         !we need to test if the level has already been indentified
+         !we need to test if the level has already been identified
          if (.not.parse_labs(atom%lines(kr)%i)) then
             call parse_label(atom%label(atom%lines(kr)%i),&
                atom%g(atom%lines(kr)%i),&
@@ -249,7 +249,7 @@ module io_atom
                write(*,*) "Line profile shape", shapechar, " unknown, using voigt."
                atom%lines(kr)%Voigt = .true.
          end select
-         !Not use yet. Should be use to increase for some line the extent. But I'm not sure
+         !Not used yet. Should be used to increase for some line the extent. But I'm not sure
          !i don't like the parametric solution.
          if (atom%lines(kr)%Voigt) then
             if (atom%lines(kr)%qwing < 1.0) then
@@ -433,13 +433,13 @@ module io_atom
                call error("Initial solution unknown!")
             end select
       else !not active = PASSIVE
-         ! Only intial = 0 (LTE) or 1 (from file) !
+         ! Only initial = 0 (LTE) or 1 (from file) !
          select case (atom%initial)
             case (0) !pure passive without nlte pops from previous run.
                ! atom%NLTEpops = .false.  !-> default values
                ! atom%set_ltepops = .true. !-> default values
                !%n is an alias for %nstar in that case. No need to allocate.
-               atom%n => atom%nstar ! initialised to nstar values
+               atom%n => atom%nstar ! initialized to nstar values
             case (1) !non-LTE mode using previous populations.
                ! Compute images and so on without updating non-LTE pops.
                allocate(atom%n(atom%Nlevel,n_cells))
@@ -486,7 +486,7 @@ module io_atom
          if (nmet==1 .and. IDread/="H ") then
             write(*,*) "first atom is ", IDread
             write(*,*) "First atomic model read has to be Hydrogen"
-            write(*,*) "Exting..."
+            write(*,*) "Exiting..."
             stop
          end if
          close(unit+nmet)
@@ -524,7 +524,7 @@ module io_atom
          enddo check_atoms
       endif
 
-      ! Alias to the most importent one
+      ! Alias to the most important one
       !always exits !!
       Hydrogen=>Atoms(1)%p
       if (.not.associated(Hydrogen, Atoms(1)%p)) CALL Error(" Hydrogen alias not associated to atomic model!")
@@ -554,7 +554,7 @@ module io_atom
          if (Elems(Atoms(nmet)%p%periodic_table)%Nstage < maxval(Atoms(nmet)%p%stage) + 1) then
             write(*,*) Atoms(nmet)%p%id, maxval(Atoms(nmet)%p%stage) + 1
             write(*,*) "Ns pf = ", Elems(Atoms(nmet)%p%periodic_table)%Nstage
-            call error("Model has more ionisation stages than the one in the partition function!")
+            call error("Model has more ionization stages than the one in the partition function!")
          endif
 
          if (Atoms(nmet)%p%periodic_table==2)  then
@@ -670,11 +670,11 @@ module io_atom
    else
       !check if data file already exist, can be the case if initial solutions is OLD_POPULATIONS
       cmd = "ls "//popsF!trim(atom%ID)//".fits.gz"
-      call appel_syst(cmd, sys_status)
+      call system_call(cmd, sys_status)
       if (sys_status == 0) then !means the file exist
 
          cmd = "mv "//trim(atom%ID)//".fits.gz"//" "//trim(atom%ID)//"_oldpop.fits.gz"
-         call appel_syst(cmd, sys_status)
+         call system_call(cmd, sys_status)
          if (sys_status /= 0) then
             call error("Error in copying old pops!")
          endif
@@ -832,7 +832,7 @@ module io_atom
       naxis = 2
       call ftgknj(unit, 'NAXIS', 1, naxis, naxis2, naxis_found, status)
       if (status > 0) then
-         write(*,*) "error reading number of axis (naxis)"
+         write(*,*) "error reading Number of axes (naxis)"
          call print_error(status)
          stop
       endif
@@ -872,12 +872,12 @@ module io_atom
          naxis = 3!4
       end if
 
-      !Number of axis
+      !Number of axes
       call ftgknj(unit, 'NAXIS', 1, naxis, naxis2, naxis_found, status)
       !naxis2 = (Nlevel,nrad, naz, nphi) = (Naxis1,Naxis2,Naxis3,Naxis4)
       !naxis4 is 0 if not l3D
       if (status > 0) then
-         write(*,*) "error reading number of axis (naxis)"
+         write(*,*) "error reading Number of axes (naxis)"
          call print_error(status)
          stop
       endif
@@ -918,7 +918,7 @@ module io_atom
 
       nelements = nelements * naxis_found
 
-      !phi axis ?
+      !phi axes ?
       if (l3D) then
          call ftgkyj(unit, "NAXIS4", naxis_found, some_comments, status)
          if (status > 0) then

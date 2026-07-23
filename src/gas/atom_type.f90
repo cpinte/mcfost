@@ -1,7 +1,7 @@
 module atom_type
 
    use mcfost_env, only : dp
-   use constantes, only   : mel, AMU_KG, E_RYDBERG, vtherm
+   use constants, only   : mel, AMU_KG, E_RYDBERG, vtherm
    use messages, only : error
 
    implicit none
@@ -23,7 +23,7 @@ module atom_type
       integer :: i, j
       integer :: Nb, Nr, Nlambda !global
       integer :: Nbc, Nrc, Nlambdac !cont
-      real(kind=dp) :: lambda0, isotope_Frac, alpha0, lambdamin, lambdamax !continuum maximum frequency > frequency photoionisation
+      real(kind=dp) :: lambda0, isotope_Frac, alpha0, lambdamin, lambdamax !continuum maximum frequency > frequency photoionization
       real(kind=dp), allocatable, dimension(:)  :: alpha, twohnu3_c2
       real(kind=dp), allocatable, dimension(:)  :: lambda_file, alpha_file
       real(kind=dp), allocatable, dimension(:)  :: Rij, Rji, Cij, Cji
@@ -68,9 +68,9 @@ module atom_type
       integer :: n_speed_rt
       ! integer, allocatable, dimension(:) :: tab_trans -> not useful anymore (?)
       integer, allocatable, dimension(:) :: i_trans, j_trans !return the index of a transition from 1 to atom%Ntr
-      integer, allocatable, dimension(:,:) :: ij_to_trans !from i and j return the index of a transiton
+      integer, allocatable, dimension(:,:) :: ij_to_trans !from i and j return the index of a transition
       !Compatibility with RH, stored the collision in character format!
-      character(len=Nmax_line_per_collision), allocatable, dimension(:) :: collision_lines !to keep all remaning lines in atomic file
+      character(len=Nmax_line_per_collision), allocatable, dimension(:) :: collision_lines !to keep all remaining lines in atomic file
       real(kind=dp), allocatable :: col_mat(:,:,:) !Collision matrix C(i,j) = Col j->i (Cji)
       real(kind=dp)                :: cswitch, Abund
       real(kind=dp) :: vth_char ! typical Doppler width the gaussian lines.
@@ -78,7 +78,7 @@ module atom_type
       integer                      :: periodic_table, activeindex !order of the active atom in the
       character(len=ATOM_LABEL_WIDTH), allocatable, dimension(:)  :: label
       integer                :: Nlevel, Nline, Ncont, Ntr, Ntr_line, Nstage
-      ! BY CONVENTION, stage=0 for neutrals, 1 for singly ionised
+      ! BY CONVENTION, stage=0 for neutrals, 1 for singly ionized
       integer, allocatable, dimension(:)  :: stage, Lorbit
       real(kind=dp) :: Rydberg
       real(kind=dp), allocatable, dimension(:) :: g, E
@@ -194,7 +194,7 @@ module atom_type
       !effective (hydrogenic) quantum number n*
       !Ei is the energy of the level for which we compute n*
       !and Ej is the energy of the next continuum.
-      !In case of a line beware, Ej is not E(line%j) but E(next_Contiuum(line%i))
+      !In case of a line beware, Ej is not E(line%j) but E(next_Continuum(line%i))
       real(kind=dp) :: n_eff
       real(kind=dp), intent(in) :: Erydb, Ej, Ei
       integer, intent(in) :: Z
@@ -218,9 +218,9 @@ module atom_type
       end do
 
       if (atom%stage(find_continuum) == atom%stage(l)+1) then
-         return !continuum level reach
+         return !continuum level reached
       else
-         write(*,*) "Coundn't find continuum level for level ", l0, find_continuum, atom%Nlevel
+         write(*,*) "Couldn't find continuum level for level ", l0, find_continuum, atom%Nlevel
          find_continuum = 0
          write(*,*) atom%ID, atom%stage(l), l0
          return
@@ -490,7 +490,7 @@ module atom_type
 
 
    subroutine adjust_cswitch_atoms ()
-      !for all active atoms, decreases the cswitch value from cswitch_down_scaling_factor
+      !for all active atoms, decrease the cswitch value from cswitch_down_scaling_factor
       integer :: n
       logical :: print_message
       real(kind=dp) :: new_cs

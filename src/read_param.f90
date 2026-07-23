@@ -1,10 +1,10 @@
 module read_params
 
-  use parametres
+  use parameters
   use grains
   use molecular_emission
   use wavelengths
-  use constantes
+  use constants
   use sha
   use messages
   use atom_type
@@ -21,15 +21,15 @@ contains
 
     integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
     integer :: nat, ntr
-    real(kind=dp) :: somme, V_somme
+    real(kind=dp) :: total_sum, V_somme
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
     character(len=100) :: line_buffer
 
-    real :: fnbre_photons_eq_th, fnbre_photons_lambda, fnbre_photons_image
+    real :: fn_photons_eq_th, fn_photons_lambda, fn_photons_image
 
-    ! Lecture du fichier de parametres
+    ! Reading the parameter file
     open(unit=1, file=para, status='old', iostat=ios)
     if (ios/=0) call error("cannot open "//trim(para))
 
@@ -38,12 +38,12 @@ contains
     ! Version 2.21 and 3.0 are the same
     if (abs(para_version - 2.21) < 1.e-4) para_version = 3.0
 
-    ! Petit test pour le ray-tracing
+    ! Small test for ray-tracing
     if (lscatt_ray_tracing .and. (abs(para_version) < 2.0901)) then
        call error("Parameter version >= 2.10 required for ray-tracing.")
     endif
 
-    ! Petit test pour cavite
+    ! Small test for cavity
     if (lcavity .and. (abs(para_version) < 3.0)) then
        call error("Parameter version >= 3.0 required for option -lcavity.", &
             msg2="Use cavity section is parameter file for earlier version.")
@@ -139,14 +139,14 @@ contains
     ! Number of photon packages
     ! -------------------------
     read(1,*) line_buffer
-    read(1,*) fnbre_photons_eq_th ;
-    read(1,*) fnbre_photons_lambda ;
-    read(1,*) fnbre_photons_image
-    nbre_photons_loop = 128 ;
-    nbre_photons_eq_th = max(fnbre_photons_eq_th / nbre_photons_loop,1.)
-    nbre_photons_lambda = max(fnbre_photons_lambda / nbre_photons_loop,1.)
-    nbre_photons_image = max(fnbre_photons_image / nbre_photons_loop,1.)
-    nbre_photons_tot=real(nbre_photons_loop)*real(nbre_photons_eq_th)
+    read(1,*) fn_photons_eq_th ;
+    read(1,*) fn_photons_lambda ;
+    read(1,*) fn_photons_image
+    n_photons_loop = 128 ;
+    n_photons_eq_th = max(fn_photons_eq_th / n_photons_loop,1.)
+    n_photons_lambda = max(fn_photons_lambda / n_photons_loop,1.)
+    n_photons_image = max(fn_photons_image / n_photons_loop,1.)
+    n_photons_total=real(n_photons_loop)*real(n_photons_eq_th)
 
     tau_seuil  = 1.0e31
     wl_seuil = 0.81
@@ -242,7 +242,7 @@ contains
     ! ---------------
     read(1,*) line_buffer
     read(1,*) n_zones
-    ! Allocation des variables pour disque a une zone
+    ! Variable allocation for 1-zone disk
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error disk parameters')
     disk_zone%exp_beta=0.0; disk_zone%surf=0.0; disk_zone%sclht=0.0; disk_zone%diskmass=0.0; disk_zone%rref=0.0
@@ -287,7 +287,7 @@ contains
     n_pop=0
     do j=1, n_zones
        read(1,*) n_especes(j)
-       somme=0.0
+       total_sum=0.0
        do i=1, n_especes(j)
           n_pop = n_pop+1
           !read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
@@ -312,7 +312,7 @@ contains
              write(*,*) "Exiting"
              call exit(1)
           endif
-          ! renormalisation des fraction en volume
+          ! Renormalization of volume fractions
           do k=1, dust_pop_tmp(n_pop)%n_components
              dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) &
                   / V_somme
@@ -322,7 +322,7 @@ contains
           if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
           if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
           if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
-          somme = somme + dust_pop_tmp(n_pop)%frac_mass
+          total_sum = total_sum + dust_pop_tmp(n_pop)%frac_mass
           dust_pop_tmp(n_pop)%zone = j
 
           ! Checking which type of opacity file it is
@@ -351,21 +351,21 @@ contains
           endif
        enddo
 
-       ! renormalisation des fraction en masse
+       ! Renormalization of mass fractions
        do i=1,n_especes(j)
-          dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
-          dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
+          dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/total_sum
+          dust_pop_tmp(n_pop-n_especes(j)+i)%mass =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
        enddo
     enddo !n_zones
 
-    ! variables triees
+    ! sorted variables
     allocate(dust_pop(n_pop), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error n_pop tmp')
     !dust_pop%is_PAH = .false.
     !dust_pop%is_opacity_file = .false.
     !dust_pop%is_Misselt_opacity_file = .false.
 
-    ! Classement des populations de grains : LTE puis nLTE puis nRE
+    ! Classification of grain populations: LTE then nLTE then nRE
     ind_pop = 0
     grain_RE_LTE_start = 1
     grain_RE_LTE_end = 0
@@ -442,7 +442,7 @@ contains
     ! ---------------------
     read(1,*) line_buffer
     read(1,*) lpop, lprecise_pop, lmol_LTE
-    largeur_profile = 15.
+    profile_width = 15.
     read(1,*) vitesse_turb, v_turb_unit
     if (trim(v_turb_unit) == "cs") then
        lvturb_in_cs = .true.
@@ -450,7 +450,7 @@ contains
        lvturb_in_cs = .false.
        if (v_turb_unit(1:1) /= "m") then
           if (v_turb_unit(1:2) == "km") then
-             vitesse_turb = vitesse_turb * km_to_m ! Conversion en m.s-1
+             vitesse_turb = vitesse_turb * km_to_m ! Conversion to m.s-1
           else
              call error("Turbulence velocity unit not recognised")
           endif
@@ -463,10 +463,10 @@ contains
        read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
        read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
        read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
-       read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
+       read(1,*) mol(imol)%index_trans_ray_tracing(1:mol(imol)%nTrans_raytracing)
        read(1,*) mol(imol)%vmin_center_rt, mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-       mol(imol)%vmin_center_rt = (mol(imol)%vmin_center_rt - v_syst) * km_to_m ! Conversion en m.s-1
-       mol(imol)%vmax_center_rt = (mol(imol)%vmax_center_rt - v_syst) * km_to_m ! Conversion en m.s-1
+       mol(imol)%vmin_center_rt = (mol(imol)%vmin_center_rt - v_syst) * km_to_m ! Conversion to m.s-1
+       mol(imol)%vmax_center_rt = (mol(imol)%vmax_center_rt - v_syst) * km_to_m ! Conversion to m.s-1
        mol(imol)%l_sym_ima = .false.
        if (l_sym_ima) then ! we check for PA later as this can be changed by command line
           ! Molecular maps are only symmetrical if velocity range is symmetrical around vsyst
@@ -514,41 +514,41 @@ contains
     ! Star properties
     ! ---------------
     read(1,*) line_buffer
-    read(1,*,iostat=ios) n_etoiles
+    read(1,*,iostat=ios) n_stars
     if (ios/=0) then
        call error('you are using a 2-zone disk parameter file', &
             msg2='You must use the [-2zone] option to calculate a 2-zone disk')
     endif
-    allocate(etoile(n_etoiles), stat=alloc_status)
-    if (alloc_status > 0) call error('Allocation error etoile')
+    allocate(star(n_stars), stat=alloc_status)
+    if (alloc_status > 0) call error('Allocation error star')
 
-    if (n_etoiles > 1) then
+    if (n_stars > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
        l_sym_ima=.false.
        l_sym_centrale=.false.
        l_sym_axiale=.false.
     endif
 
-    do i=1,n_etoiles
-       read(1,*) etoile(i)%T, etoile(i)%r, etoile(i)%M, etoile(i)%x, etoile(i)%y, etoile(i)%z, etoile(i)%find_spectrum
-       if (.not.etoile(i)%find_spectrum) then
-          read(1,*) etoile(i)%spectre
+    do i=1,n_stars
+       read(1,*) star(i)%T, star(i)%r, star(i)%M, star(i)%x, star(i)%y, star(i)%z, star(i)%find_spectrum
+       if (.not.star(i)%find_spectrum) then
+          read(1,*) star(i)%spectrum
        else
           read(1,*) line_buffer
        endif
-       etoile(i)%lb_body = .false.
+       star(i)%lb_body = .false.
 
-       ! Passage rayon en AU
-       etoile(i)%r = etoile(i)%r * Rsun_to_AU
-       read(1,*) etoile(i)%fUV, etoile(i)%slope_UV
-       etoile(i)%slope_UV = etoile(i)%slope_UV - 2.0  ! Fnu -> F_lambda
+       ! Convert radius to AU
+       star(i)%r = star(i)%r * Rsun_to_AU
+       read(1,*) star(i)%fUV, star(i)%slope_UV
+       star(i)%slope_UV = star(i)%slope_UV - 2.0  ! Fnu -> F_lambda
     enddo
-    etoile(:)%vx = 0.0 ; etoile(:)%vy = 0.0 ; etoile(:)%vz = 0.0
-    etoile(:)%force_Mdot = .false.
-    etoile(:)%Mdot = 0.0
+    star(:)%vx = 0.0 ; star(:)%vy = 0.0 ; star(:)%vz = 0.0
+    star(:)%force_Mdot = .false.
+    star(:)%Mdot = 0.0
     close(unit=1)
 
-    nbre_photons_lim = nbre_photons_lim*real(N_thet)*real(N_phi)*real(nbre_photons_lambda)
+    n_photons_lim = n_photons_lim*real(N_thet)*real(N_phi)*real(n_photons_lambda)
 
     return
 
@@ -563,15 +563,15 @@ contains
     character(len=*), intent(in) :: para
 
     integer :: i, j, k, alloc_status, ios, ind_pop, imol, status, nat, ntr
-    real(kind=dp) :: somme, V_somme
+    real(kind=dp) :: total_sum, V_somme
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
     character(len=100) :: line_buffer
 
-    real :: fnbre_photons_eq_th, fnbre_photons_lambda, fnbre_photons_image
+    real :: fn_photons_eq_th, fn_photons_lambda, fn_photons_image
 
-    ! Lecture du fichier de parametres
+    ! Reading the parameter file
     open(unit=1, file=para, status='old', iostat=ios)
     if (ios/=0) call error("cannot open "//trim(para))
 
@@ -581,14 +581,14 @@ contains
     ! Number of photon packages
     ! -------------------------
     read(1,*) line_buffer
-    read(1,*) fnbre_photons_eq_th ;
-    read(1,*) fnbre_photons_lambda ;
-    read(1,*) fnbre_photons_image
-    nbre_photons_loop = 128 ;
-    nbre_photons_eq_th = max(fnbre_photons_eq_th / nbre_photons_loop,1.)
-    nbre_photons_lambda = max(fnbre_photons_lambda / nbre_photons_loop,1.)
-    nbre_photons_image = max(fnbre_photons_image / nbre_photons_loop,1.)
-    nbre_photons_tot=real(nbre_photons_loop)*real(nbre_photons_eq_th)
+    read(1,*) fn_photons_eq_th ;
+    read(1,*) fn_photons_lambda ;
+    read(1,*) fn_photons_image
+    n_photons_loop = 128 ;
+    n_photons_eq_th = max(fn_photons_eq_th / n_photons_loop,1.)
+    n_photons_lambda = max(fn_photons_lambda / n_photons_loop,1.)
+    n_photons_image = max(fn_photons_image / n_photons_loop,1.)
+    n_photons_total=real(n_photons_loop)*real(n_photons_eq_th)
 
     tau_seuil  = 1.0e31
     wl_seuil = 0.81
@@ -682,7 +682,7 @@ contains
     ! ---------------
     read(1,*) line_buffer
     read(1,*) n_zones
-    ! Allocation des variables pour disque a une zone
+    ! Variable allocation for 1-zone disk
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error disk parameters')
     disk_zone%exp_beta=0.0; disk_zone%surf=0.0; disk_zone%sclht=0.0; disk_zone%diskmass=0.0; disk_zone%rref=0.0
@@ -727,7 +727,7 @@ contains
     n_pop=0
     do j=1, n_zones
        read(1,*) n_especes(j)
-       somme=0.0
+       total_sum=0.0
        do i=1, n_especes(j)
           n_pop = n_pop+1
           !read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
@@ -752,7 +752,7 @@ contains
              write(*,*) "Exiting"
              call exit(1)
           endif
-          ! renormalisation des fraction en volume
+          ! Renormalization of volume fractions
           do k=1, dust_pop_tmp(n_pop)%n_components
              dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) &
                   / V_somme
@@ -762,7 +762,7 @@ contains
           if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
           if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
           if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
-          somme = somme + dust_pop_tmp(n_pop)%frac_mass
+          total_sum = total_sum + dust_pop_tmp(n_pop)%frac_mass
           dust_pop_tmp(n_pop)%zone = j
 
           ! Checking which type of opacity file it is
@@ -791,21 +791,21 @@ contains
           endif
        enddo
 
-       ! renormalisation des fraction en masse
+       ! Renormalization of mass fractions
        do i=1,n_especes(j)
-          dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
-          dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
+          dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/total_sum
+          dust_pop_tmp(n_pop-n_especes(j)+i)%mass =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
        enddo
     enddo !n_zones
 
-    ! variables triees
+    ! sorted variables
     allocate(dust_pop(n_pop), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error n_pop tmp')
     !dust_pop%is_PAH = .false.
     !dust_pop%is_opacity_file = .false.
     !dust_pop%is_Misselt_opacity_file = .false.
 
-    ! Classement des populations de grains : LTE puis nLTE puis nRE
+    ! Classification of grain populations: LTE then nLTE then nRE
     ind_pop = 0
     grain_RE_LTE_start = 1
     grain_RE_LTE_end = 0
@@ -881,21 +881,21 @@ contains
     ! Molecular RT settings
     ! ---------------------
     read(1,*) line_buffer
-    read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
+    read(1,*) lpop, lprecise_pop, lmol_LTE, profile_width
     read(1,*) vitesse_turb
-    vitesse_turb = vitesse_turb * km_to_m ! Conversion en m.s-1
+    vitesse_turb = vitesse_turb * km_to_m ! Conversion to m.s-1
     read(1,*) n_molecules
     allocate(mol(n_molecules))
     do imol=1,n_molecules
        read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
        read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion en m.s-1
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion to m.s-1
        mol(imol)%vmin_center_rt = -mol(imol)%vmax_center_rt
        mol(imol)%l_sym_ima = l_sym_ima
        mol(imol)%n_speed_rt = 2*mol(imol)%n_speed_rt+1 ! change of format from v4.1
        read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
        read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
-       read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
+       read(1,*) mol(imol)%index_trans_ray_tracing(1:mol(imol)%nTrans_raytracing)
        mol(imol)%n_speed_center_rt = mol(imol)%n_speed_rt
        mol(imol)%n_extraV_rt = 0 ; mol(imol)%extra_deltaV_rt = 0.0
     enddo
@@ -935,42 +935,42 @@ contains
     ! Star properties
     ! ---------------
     read(1,*) line_buffer
-    read(1,*,iostat=ios) n_etoiles
+    read(1,*,iostat=ios) n_stars
     if (ios/=0) then
        call error('you are using a 2-zone disk parameter file', &
             msg2='You must use the [-2zone] option to calculate a 2-zone disk')
     endif
-    allocate(etoile(n_etoiles), stat=alloc_status)
-    if (alloc_status > 0) call error('Allocation error etoile')
+    allocate(star(n_stars), stat=alloc_status)
+    if (alloc_status > 0) call error('Allocation error star')
 
-    if (n_etoiles > 1) then
+    if (n_stars > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
        l_sym_ima=.false.
        l_sym_centrale=.false.
        l_sym_axiale=.false.
     endif
 
-    do i=1,n_etoiles
-       read(1,*) etoile(i)%T, etoile(i)%r, etoile(i)%M, etoile(i)%x, etoile(i)%y, etoile(i)%z, etoile(i)%find_spectrum
-       if (.not.etoile(i)%find_spectrum) then
-          read(1,*) etoile(i)%spectre
+    do i=1,n_stars
+       read(1,*) star(i)%T, star(i)%r, star(i)%M, star(i)%x, star(i)%y, star(i)%z, star(i)%find_spectrum
+       if (.not.star(i)%find_spectrum) then
+          read(1,*) star(i)%spectrum
        else
           read(1,*) line_buffer
        endif
-       etoile(i)%lb_body = .false.
+       star(i)%lb_body = .false.
 
-       ! Passage rayon en AU
-       etoile(i)%r = etoile(i)%r * Rsun_to_AU
-       read(1,*) etoile(i)%fUV, etoile(i)%slope_UV
-       etoile(i)%slope_UV = etoile(i)%slope_UV - 2.0  ! Fnu -> F_lambda
+       ! Convert radius to AU
+       star(i)%r = star(i)%r * Rsun_to_AU
+       read(1,*) star(i)%fUV, star(i)%slope_UV
+       star(i)%slope_UV = star(i)%slope_UV - 2.0  ! Fnu -> F_lambda
     enddo
-    etoile(:)%vx = 0.0 ; etoile(:)%vy = 0.0 ; etoile(:)%vz = 0.0
-    etoile(:)%force_Mdot = .false.
-    etoile(:)%Mdot = 0.0
+    star(:)%vx = 0.0 ; star(:)%vy = 0.0 ; star(:)%vz = 0.0
+    star(:)%force_Mdot = .false.
+    star(:)%Mdot = 0.0
 
     close(unit=1)
 
-    nbre_photons_lim = nbre_photons_lim*real(N_thet)*real(N_phi)*real(nbre_photons_lambda)
+    n_photons_lim = n_photons_lim*real(N_thet)*real(N_phi)*real(n_photons_lambda)
 
     return
 
@@ -985,15 +985,15 @@ contains
    character(len=*), intent(in) :: para
 
    integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
-   real(kind=dp) :: somme, V_somme
+   real(kind=dp) :: total_sum, V_somme
 
    type(dust_pop_type), dimension(100) :: dust_pop_tmp
    integer, dimension(100) :: n_especes
    character(len=100) :: line_buffer
 
-   real :: fnbre_photons_eq_th, fnbre_photons_lambda, fnbre_photons_image
+   real :: fn_photons_eq_th, fn_photons_lambda, fn_photons_image
 
-   ! Lecture du fichier de parametres
+   ! Reading the parameter file
    open(unit=1, file=para, status='old', iostat=ios)
    if (ios/=0) call error("cannot open "//trim(para))
 
@@ -1009,14 +1009,14 @@ contains
    ! Number of photon packages
    ! -------------------------
    read(1,*) line_buffer
-   read(1,*) fnbre_photons_eq_th ;
-   read(1,*) fnbre_photons_lambda ;
-   read(1,*) fnbre_photons_image
-   nbre_photons_loop = 128 ;
-   nbre_photons_eq_th = max(fnbre_photons_eq_th / nbre_photons_loop,1.)
-   nbre_photons_lambda = max(fnbre_photons_lambda / nbre_photons_loop,1.)
-   nbre_photons_image = max(fnbre_photons_image / nbre_photons_loop,1.)
-   nbre_photons_tot=real(nbre_photons_loop)*real(nbre_photons_eq_th)
+   read(1,*) fn_photons_eq_th ;
+   read(1,*) fn_photons_lambda ;
+   read(1,*) fn_photons_image
+   n_photons_loop = 128 ;
+   n_photons_eq_th = max(fn_photons_eq_th / n_photons_loop,1.)
+   n_photons_lambda = max(fn_photons_lambda / n_photons_loop,1.)
+   n_photons_image = max(fn_photons_image / n_photons_loop,1.)
+   n_photons_total=real(n_photons_loop)*real(n_photons_eq_th)
 
    tau_seuil  = 1.0e31
    wl_seuil = 0.81
@@ -1110,7 +1110,7 @@ contains
    ! ---------------
    read(1,*) line_buffer
    read(1,*) n_zones
-   ! Allocation des variables pour disque a une zone
+   ! Variable allocation for 1-zone disk
    allocate(disk_zone(n_zones), stat=alloc_status)
    if (alloc_status > 0) call error('Allocation error disk parameters')
    disk_zone%exp_beta=0.0; disk_zone%surf=0.0; disk_zone%sclht=0.0; disk_zone%diskmass=0.0; disk_zone%rref=0.0
@@ -1155,7 +1155,7 @@ contains
    n_pop=0
    do j=1, n_zones
       read(1,*) n_especes(j)
-      somme=0.0
+      total_sum=0.0
       do i=1, n_especes(j)
          n_pop = n_pop+1
          !read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
@@ -1180,7 +1180,7 @@ contains
             write(*,*) "Exiting"
             call exit(1)
          endif
-         ! renormalisation des fraction en volume
+         ! Renormalization of volume fractions
          do k=1, dust_pop_tmp(n_pop)%n_components
             dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) &
                  / V_somme
@@ -1190,7 +1190,7 @@ contains
          if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
          if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
          if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
-         somme = somme + dust_pop_tmp(n_pop)%frac_mass
+         total_sum = total_sum + dust_pop_tmp(n_pop)%frac_mass
          dust_pop_tmp(n_pop)%zone = j
 
          ! Checking which type of opacity file it is
@@ -1219,21 +1219,21 @@ contains
          endif
       enddo
 
-      ! renormalisation des fraction en masse
+      ! Renormalization of mass fractions
       do i=1,n_especes(j)
-         dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
-         dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
+         dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/total_sum
+         dust_pop_tmp(n_pop-n_especes(j)+i)%mass =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
       enddo
    enddo !n_zones
 
-   ! variables triees
+   ! sorted variables
    allocate(dust_pop(n_pop), stat=alloc_status)
    if (alloc_status > 0) call error('Allocation error n_pop tmp')
    !dust_pop%is_PAH = .false.
    !dust_pop%is_opacity_file = .false.
    !dust_pop%is_Misselt_opacity_file = .false.
 
-   ! Classement des populations de grains : LTE puis nLTE puis nRE
+   ! Classification of grain populations: LTE then nLTE then nRE
    ind_pop = 0
    grain_RE_LTE_start = 1
    grain_RE_LTE_end = 0
@@ -1314,21 +1314,21 @@ contains
    ! Molecular RT settings
    ! ---------------------
    read(1,*) line_buffer
-   read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
+   read(1,*) lpop, lprecise_pop, lmol_LTE, profile_width
    read(1,*) vitesse_turb
-   vitesse_turb = vitesse_turb * km_to_m ! Conversion en m.s-1
+   vitesse_turb = vitesse_turb * km_to_m ! Conversion to m.s-1
    read(1,*) n_molecules
    allocate(mol(n_molecules))
    do imol=1,n_molecules
       read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
       read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-      mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion en m.s-1
+      mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion to m.s-1
       mol(imol)%vmin_center_rt = -mol(imol)%vmax_center_rt
       mol(imol)%l_sym_ima = l_sym_ima
       mol(imol)%n_speed_rt = 2*mol(imol)%n_speed_rt+1 ! change of format from v4.1
       read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
       read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
-      read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
+      read(1,*) mol(imol)%index_trans_ray_tracing(1:mol(imol)%nTrans_raytracing)
       mol(imol)%n_speed_center_rt = mol(imol)%n_speed_rt
       mol(imol)%n_extraV_rt = 0 ; mol(imol)%extra_deltaV_rt = 0.0
    enddo
@@ -1337,42 +1337,42 @@ contains
    ! Star properties
    ! ---------------
    read(1,*) line_buffer
-   read(1,*,iostat=ios) n_etoiles
+   read(1,*,iostat=ios) n_stars
    if (ios/=0) then
       call error('you are using a 2-zone disk parameter file', &
            msg2='You must use the [-2zone] option to calculate a 2-zone disk')
    endif
-   allocate(etoile(n_etoiles), stat=alloc_status)
-   if (alloc_status > 0) call error('Allocation error etoile')
+   allocate(star(n_stars), stat=alloc_status)
+   if (alloc_status > 0) call error('Allocation error star')
 
-   if (n_etoiles > 1) then
+   if (n_stars > 1) then
       write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
       l_sym_ima=.false.
       l_sym_centrale=.false.
       l_sym_axiale=.false.
    endif
 
-   do i=1,n_etoiles
-      read(1,*) etoile(i)%T, etoile(i)%r, etoile(i)%M, etoile(i)%x, etoile(i)%y, etoile(i)%z, etoile(i)%find_spectrum
-      if (.not.etoile(i)%find_spectrum) then
-         read(1,*) etoile(i)%spectre
+   do i=1,n_stars
+      read(1,*) star(i)%T, star(i)%r, star(i)%M, star(i)%x, star(i)%y, star(i)%z, star(i)%find_spectrum
+      if (.not.star(i)%find_spectrum) then
+         read(1,*) star(i)%spectrum
       else
          read(1,*) line_buffer
       endif
-      etoile(i)%lb_body = .false.
+      star(i)%lb_body = .false.
 
-      ! Passage rayon en AU
-      etoile(i)%r = etoile(i)%r * Rsun_to_AU
-      read(1,*) etoile(i)%fUV, etoile(i)%slope_UV
-      etoile(i)%slope_UV = etoile(i)%slope_UV - 2.0  ! Fnu -> F_lambda
+      ! Convert radius to AU
+      star(i)%r = star(i)%r * Rsun_to_AU
+      read(1,*) star(i)%fUV, star(i)%slope_UV
+      star(i)%slope_UV = star(i)%slope_UV - 2.0  ! Fnu -> F_lambda
    enddo
-   etoile(:)%vx = 0.0 ; etoile(:)%vy = 0.0 ; etoile(:)%vz = 0.0
-   etoile(:)%force_Mdot = .false.
-   etoile(:)%Mdot = 0.0
+   star(:)%vx = 0.0 ; star(:)%vy = 0.0 ; star(:)%vz = 0.0
+   star(:)%force_Mdot = .false.
+   star(:)%Mdot = 0.0
 
    close(unit=1)
 
-   nbre_photons_lim = nbre_photons_lim*real(N_thet)*real(N_phi)*real(nbre_photons_lambda)
+   n_photons_lim = n_photons_lim*real(N_thet)*real(N_phi)*real(n_photons_lambda)
 
    return
 
@@ -1386,15 +1386,15 @@ contains
     character(len=*), intent(in) :: para
 
     integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
-    real(kind=dp) :: somme, V_somme
+    real(kind=dp) :: total_sum, V_somme
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
     character(len=100) :: line_buffer
 
-    real :: fnbre_photons_eq_th, fnbre_photons_lambda, fnbre_photons_image
+    real :: fn_photons_eq_th, fn_photons_lambda, fn_photons_image
 
-    ! Lecture du fichier de parametres
+    ! Reading the parameter file
     open(unit=1, file=para, status='old')
 
     read(1,*) para_version
@@ -1403,14 +1403,14 @@ contains
     ! Number of photon packages
     ! -------------------------
     read(1,*) line_buffer
-    read(1,*) fnbre_photons_eq_th ;
-    read(1,*) fnbre_photons_lambda ;
-    read(1,*) fnbre_photons_image
-    nbre_photons_loop = 128 ;
-    nbre_photons_eq_th = max(fnbre_photons_eq_th / nbre_photons_loop,1.)
-    nbre_photons_lambda = max(fnbre_photons_lambda / nbre_photons_loop,1.)
-    nbre_photons_image = max(fnbre_photons_image / nbre_photons_loop,1.)
-    nbre_photons_tot=real(nbre_photons_loop)*real(nbre_photons_eq_th)
+    read(1,*) fn_photons_eq_th ;
+    read(1,*) fn_photons_lambda ;
+    read(1,*) fn_photons_image
+    n_photons_loop = 128 ;
+    n_photons_eq_th = max(fn_photons_eq_th / n_photons_loop,1.)
+    n_photons_lambda = max(fn_photons_lambda / n_photons_loop,1.)
+    n_photons_image = max(fn_photons_image / n_photons_loop,1.)
+    n_photons_total=real(n_photons_loop)*real(n_photons_eq_th)
 
     tau_seuil  = 1.0e31
     wl_seuil = 0.81
@@ -1505,7 +1505,7 @@ contains
     ! ---------------
     read(1,*) line_buffer
     read(1,*) n_zones
-    ! Allocation des variables pour disque a une zone
+    ! Variable allocation for 1-zone disk
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error disk parameters')
     disk_zone%exp_beta=0.0; disk_zone%surf=0.0; disk_zone%sclht=0.0; disk_zone%diskmass=0.0; disk_zone%rref=0.0
@@ -1558,7 +1558,7 @@ contains
     n_pop=0
     do j=1, n_zones
        read(1,*) n_especes(j)
-       somme=0.0
+       total_sum=0.0
        do i=1, n_especes(j)
           n_pop = n_pop+1
           !read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
@@ -1583,7 +1583,7 @@ contains
              write(*,*) "Exiting"
              call exit(1)
           endif
-          ! renormalisation des fraction en volume
+          ! Renormalization of volume fractions
           do k=1, dust_pop_tmp(n_pop)%n_components
              dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) &
                   / V_somme
@@ -1593,7 +1593,7 @@ contains
           if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
           if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
           if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
-          somme = somme + dust_pop_tmp(n_pop)%frac_mass
+          total_sum = total_sum + dust_pop_tmp(n_pop)%frac_mass
           dust_pop_tmp(n_pop)%zone = j
 
           ! Checking which type of opacity file it is
@@ -1613,21 +1613,21 @@ contains
 
        enddo
 
-       ! renormalisation des fraction en masse
+       ! Renormalization of mass fractions
        do i=1,n_especes(j)
-          dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
-          dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
+          dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/total_sum
+          dust_pop_tmp(n_pop-n_especes(j)+i)%mass =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
        enddo
     enddo !n_zones
 
-    ! variables triees
+    ! sorted variables
     allocate(dust_pop(n_pop), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error n_pop tmp')
     !dust_pop%is_PAH = .false.
     !dust_pop%is_opacity_file = .false.
     !dust_pop%is_Misselt_opacity_file = .false.
 
-    ! Classement des populations de grains : LTE puis nLTE puis nRE
+    ! Classification of grain populations: LTE then nLTE then nRE
     ind_pop = 0
     grain_RE_LTE_start = 1
     grain_RE_LTE_end = 0
@@ -1703,21 +1703,21 @@ contains
     ! Molecular RT settings
     ! ---------------------
     read(1,*) line_buffer
-    read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
+    read(1,*) lpop, lprecise_pop, lmol_LTE, profile_width
     read(1,*) vitesse_turb
-    vitesse_turb = vitesse_turb * km_to_m ! Conversion en m.s-1
+    vitesse_turb = vitesse_turb * km_to_m ! Conversion to m.s-1
     read(1,*) n_molecules
     allocate(mol(n_molecules))
     do imol=1,n_molecules
        read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
        read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion en m.s-1
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion to m.s-1
        mol(imol)%vmin_center_rt = -mol(imol)%vmax_center_rt
        mol(imol)%l_sym_ima = l_sym_ima
        mol(imol)%n_speed_rt = 2*mol(imol)%n_speed_rt+1 ! change of format from v4.1
        read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
        read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
-       read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
+       read(1,*) mol(imol)%index_trans_ray_tracing(1:mol(imol)%nTrans_raytracing)
        mol(imol)%n_speed_center_rt = mol(imol)%n_speed_rt
        mol(imol)%n_extraV_rt = 0 ; mol(imol)%extra_deltaV_rt = 0.0
     enddo
@@ -1726,42 +1726,42 @@ contains
     ! Star properties
     ! ---------------
     read(1,*) line_buffer
-    read(1,*,iostat=ios) n_etoiles
+    read(1,*,iostat=ios) n_stars
     if (ios/=0) then
        call error('you are using a 2-zone disk parameter file', &
             msg2='You must use the [-2zone] option to calculate a 2-zone disk')
     endif
-    allocate(etoile(n_etoiles), stat=alloc_status)
-    if (alloc_status > 0) call error('Allocation error etoile')
+    allocate(star(n_stars), stat=alloc_status)
+    if (alloc_status > 0) call error('Allocation error star')
 
-    if (n_etoiles > 1) then
+    if (n_stars > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
        l_sym_ima=.false.
        l_sym_centrale=.false.
        l_sym_axiale=.false.
     endif
 
-    do i=1,n_etoiles
-       read(1,*) etoile(i)%T, etoile(i)%r, etoile(i)%M, etoile(i)%x, etoile(i)%y, etoile(i)%z, etoile(i)%find_spectrum
-       if (.not.etoile(i)%find_spectrum) then
-          read(1,*) etoile(i)%spectre
+    do i=1,n_stars
+       read(1,*) star(i)%T, star(i)%r, star(i)%M, star(i)%x, star(i)%y, star(i)%z, star(i)%find_spectrum
+       if (.not.star(i)%find_spectrum) then
+          read(1,*) star(i)%spectrum
        else
           read(1,*) line_buffer
        endif
-       etoile(i)%lb_body = .false.
+       star(i)%lb_body = .false.
 
-       ! Passage rayon en AU
-       etoile(i)%r = etoile(i)%r * Rsun_to_AU
-       read(1,*) etoile(i)%fUV, etoile(i)%slope_UV
-       etoile(i)%slope_UV = etoile(i)%slope_UV - 2.0  ! Fnu -> F_lambda
+       ! Convert radius to AU
+       star(i)%r = star(i)%r * Rsun_to_AU
+       read(1,*) star(i)%fUV, star(i)%slope_UV
+       star(i)%slope_UV = star(i)%slope_UV - 2.0  ! Fnu -> F_lambda
     enddo
-    etoile(:)%vx = 0.0 ; etoile(:)%vy = 0.0 ; etoile(:)%vz = 0.0
-    etoile(:)%force_Mdot = .false.
-    etoile(:)%Mdot = 0.0
+    star(:)%vx = 0.0 ; star(:)%vy = 0.0 ; star(:)%vz = 0.0
+    star(:)%force_Mdot = .false.
+    star(:)%Mdot = 0.0
 
     close(unit=1)
 
-    nbre_photons_lim = nbre_photons_lim*real(N_thet)*real(N_phi)*real(nbre_photons_lambda)
+    n_photons_lim = n_photons_lim*real(N_thet)*real(N_phi)*real(n_photons_lambda)
 
     return
 
@@ -1776,15 +1776,15 @@ contains
     character(len=*), intent(in) :: para
 
     integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
-    real(kind=dp) :: somme, V_somme
+    real(kind=dp) :: total_sum, V_somme
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
     character(len=100) :: line_buffer
 
-    real :: fnbre_photons_eq_th, fnbre_photons_lambda, fnbre_photons_image
+    real :: fn_photons_eq_th, fn_photons_lambda, fn_photons_image
 
-    ! Lecture du fichier de parametres
+    ! Reading the parameter file
     open(unit=1, file=para, status='old')
 
     read(1,*) para_version
@@ -1793,14 +1793,14 @@ contains
     ! Number of photon packages
     ! -------------------------
     read(1,*) line_buffer
-    read(1,*) fnbre_photons_eq_th ;
-    read(1,*) fnbre_photons_lambda ;
-    read(1,*) fnbre_photons_image
-    nbre_photons_loop = 128 ;
-    nbre_photons_eq_th = max(fnbre_photons_eq_th / nbre_photons_loop,1.)
-    nbre_photons_lambda = max(fnbre_photons_lambda / nbre_photons_loop,1.)
-    nbre_photons_image = max(fnbre_photons_image / nbre_photons_loop,1.)
-    nbre_photons_tot=real(nbre_photons_loop)*real(nbre_photons_eq_th)
+    read(1,*) fn_photons_eq_th ;
+    read(1,*) fn_photons_lambda ;
+    read(1,*) fn_photons_image
+    n_photons_loop = 128 ;
+    n_photons_eq_th = max(fn_photons_eq_th / n_photons_loop,1.)
+    n_photons_lambda = max(fn_photons_lambda / n_photons_loop,1.)
+    n_photons_image = max(fn_photons_image / n_photons_loop,1.)
+    n_photons_total=real(n_photons_loop)*real(n_photons_eq_th)
 
     tau_seuil  = 1.0e31
     wl_seuil = 0.81
@@ -1889,7 +1889,7 @@ contains
     ! ---------------
     read(1,*) line_buffer
     read(1,*) n_zones
-    ! Allocation des variables pour disque a une zone
+    ! Variable allocation for 1-zone disk
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error disk parameters')
     disk_zone%exp_beta=0.0; disk_zone%surf=0.0; disk_zone%sclht=0.0; disk_zone%diskmass=0.0; disk_zone%rref=0.0
@@ -1942,7 +1942,7 @@ contains
     n_pop=0
     do j=1, n_zones
        read(1,*) n_especes(j)
-       somme=0.0
+       total_sum=0.0
        do i=1, n_especes(j)
           n_pop = n_pop+1
           !read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
@@ -1967,7 +1967,7 @@ contains
              write(*,*) "Exiting"
              call exit(1)
           endif
-          ! renormalisation des fraction en volume
+          ! Renormalization of volume fractions
           do k=1, dust_pop_tmp(n_pop)%n_components
              dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) &
                   / V_somme
@@ -1977,25 +1977,25 @@ contains
           if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
           if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
           if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
-          somme = somme + dust_pop_tmp(n_pop)%frac_mass
+          total_sum = total_sum + dust_pop_tmp(n_pop)%frac_mass
           dust_pop_tmp(n_pop)%zone = j
        enddo
 
-       ! renormalisation des fraction en masse
+       ! Renormalization of mass fractions
        do i=1,n_especes(j)
-          dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
-          dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
+          dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/total_sum
+          dust_pop_tmp(n_pop-n_especes(j)+i)%mass =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
        enddo
     enddo !n_zones
 
-    ! variables triees
+    ! sorted variables
     allocate(dust_pop(n_pop), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error n_pop tmp')
     dust_pop%is_PAH = .false.
     dust_pop%is_opacity_file = .false.
     dust_pop%is_Misselt_opacity_file = .false.
 
-    ! Classement des populations de grains : LTE puis nLTE puis nRE
+    ! Classification of grain populations: LTE then nLTE then nRE
     ind_pop = 0
     grain_RE_LTE_start = 1
     grain_RE_LTE_end = 0
@@ -2072,21 +2072,21 @@ contains
     ! Molecular RT settings
     ! ---------------------
     read(1,*) line_buffer
-    read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
+    read(1,*) lpop, lprecise_pop, lmol_LTE, profile_width
     read(1,*) vitesse_turb
-    vitesse_turb = vitesse_turb * km_to_m ! Conversion en m.s-1
+    vitesse_turb = vitesse_turb * km_to_m ! Conversion to m.s-1
     read(1,*) n_molecules
     allocate(mol(n_molecules))
     do imol=1,n_molecules
        read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
        read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion en m.s-1
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion to m.s-1
        mol(imol)%vmin_center_rt = -mol(imol)%vmax_center_rt
        mol(imol)%l_sym_ima = l_sym_ima
        mol(imol)%n_speed_rt = 2*mol(imol)%n_speed_rt+1 ! change of format from v4.1
        read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
        read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
-       read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
+       read(1,*) mol(imol)%index_trans_ray_tracing(1:mol(imol)%nTrans_raytracing)
        mol(imol)%n_speed_center_rt = mol(imol)%n_speed_rt
        mol(imol)%n_extraV_rt = 0 ; mol(imol)%extra_deltaV_rt = 0.0
     enddo
@@ -2095,41 +2095,41 @@ contains
     ! Star properties
     ! ---------------
     read(1,*) line_buffer
-    read(1,*,iostat=ios) n_etoiles
+    read(1,*,iostat=ios) n_stars
     if (ios/=0) call error("you are using a 2-zone disk parameter file", &
          msg2='You must use the [-2zone] option to calculate a 2-zone disk')
-    allocate(etoile(n_etoiles), stat=alloc_status)
-    if (alloc_status > 0) call error('Allocation error etoile')
+    allocate(star(n_stars), stat=alloc_status)
+    if (alloc_status > 0) call error('Allocation error star')
 
-    if (n_etoiles > 1) then
+    if (n_stars > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
        l_sym_ima=.false.
        l_sym_centrale=.false.
        l_sym_axiale=.false.
     endif
 
-    do i=1,n_etoiles
-       read(1,*) etoile(i)%T, etoile(i)%r, etoile(i)%M, etoile(i)%x, etoile(i)%y, etoile(i)%z, etoile(i)%find_spectrum
-       if (.not.etoile(i)%find_spectrum) then
-          read(1,*) etoile(i)%spectre
+    do i=1,n_stars
+       read(1,*) star(i)%T, star(i)%r, star(i)%M, star(i)%x, star(i)%y, star(i)%z, star(i)%find_spectrum
+       if (.not.star(i)%find_spectrum) then
+          read(1,*) star(i)%spectrum
        else
           read(1,*) line_buffer
        endif
-       etoile(i)%lb_body = .false.
+       star(i)%lb_body = .false.
 
-       ! Passage rayon en AU
-       etoile(i)%r = etoile(i)%r * Rsun_to_AU
+       ! Convert radius to AU
+       star(i)%r = star(i)%r * Rsun_to_AU
 
-       read(1,*) etoile(i)%fUV, etoile(i)%slope_UV
-       etoile(i)%slope_UV = etoile(i)%slope_UV - 2.0  ! Fnu -> F_lambda
+       read(1,*) star(i)%fUV, star(i)%slope_UV
+       star(i)%slope_UV = star(i)%slope_UV - 2.0  ! Fnu -> F_lambda
     enddo
-    etoile(:)%vx = 0.0 ; etoile(:)%vy = 0.0 ; etoile(:)%vz = 0.0
-    etoile(:)%force_Mdot = .false.
-    etoile(:)%Mdot = 0.0
+    star(:)%vx = 0.0 ; star(:)%vy = 0.0 ; star(:)%vz = 0.0
+    star(:)%force_Mdot = .false.
+    star(:)%Mdot = 0.0
 
     close(unit=1)
 
-    nbre_photons_lim = nbre_photons_lim*real(N_thet)*real(N_phi)*real(nbre_photons_lambda)
+    n_photons_lim = n_photons_lim*real(N_thet)*real(N_phi)*real(n_photons_lambda)
 
     return
 
@@ -2144,15 +2144,15 @@ contains
     character(len=*), intent(in) :: para
 
     integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
-    real(kind=dp) :: somme, V_somme
+    real(kind=dp) :: total_sum, V_somme
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
     character(len=100) :: line_buffer
 
-    real :: fnbre_photons_eq_th, fnbre_photons_lambda, fnbre_photons_image
+    real :: fn_photons_eq_th, fn_photons_lambda, fn_photons_image
 
-    ! Lecture du fichier de parametres
+    ! Reading the parameter file
     open(unit=1, file=para, status='old')
 
     read(1,*) para_version
@@ -2161,14 +2161,14 @@ contains
     ! Number of photon packages
     ! -------------------------
     read(1,*) line_buffer
-    read(1,*) fnbre_photons_eq_th ;
-    read(1,*) fnbre_photons_lambda ;
-    read(1,*) fnbre_photons_image
-    nbre_photons_loop = 128 ;
-    nbre_photons_eq_th = max(fnbre_photons_eq_th / nbre_photons_loop,1.)
-    nbre_photons_lambda = max(fnbre_photons_lambda / nbre_photons_loop,1.)
-    nbre_photons_image = max(fnbre_photons_image / nbre_photons_loop,1.)
-    nbre_photons_tot=real(nbre_photons_loop)*real(nbre_photons_eq_th)
+    read(1,*) fn_photons_eq_th ;
+    read(1,*) fn_photons_lambda ;
+    read(1,*) fn_photons_image
+    n_photons_loop = 128 ;
+    n_photons_eq_th = max(fn_photons_eq_th / n_photons_loop,1.)
+    n_photons_lambda = max(fn_photons_lambda / n_photons_loop,1.)
+    n_photons_image = max(fn_photons_image / n_photons_loop,1.)
+    n_photons_total=real(n_photons_loop)*real(n_photons_eq_th)
 
     tau_seuil  = 1.0e31
     wl_seuil = 0.81
@@ -2256,7 +2256,7 @@ contains
     ! ---------------
     read(1,*) line_buffer
     read(1,*) n_zones
-    ! Allocation des variables pour disque a une zone
+    ! Variable allocation for 1-zone disk
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error disk parameters')
     disk_zone%exp_beta=0.0; disk_zone%surf=0.0; disk_zone%sclht=0.0; disk_zone%diskmass=0.0; disk_zone%rref=0.0
@@ -2304,7 +2304,7 @@ contains
     n_pop=0
     do j=1, n_zones
        read(1,*) n_especes(j)
-       somme=0.0
+       total_sum=0.0
        do i=1, n_especes(j)
           n_pop = n_pop+1
           !read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
@@ -2329,7 +2329,7 @@ contains
              write(*,*) "Exiting"
              call exit(1)
           endif
-          ! renormalisation des fraction en volume
+          ! Renormalization of volume fractions
           do k=1, dust_pop_tmp(n_pop)%n_components
              dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) &
                   / V_somme
@@ -2339,26 +2339,26 @@ contains
           if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
           if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
           if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
-          somme = somme + dust_pop_tmp(n_pop)%frac_mass
+          total_sum = total_sum + dust_pop_tmp(n_pop)%frac_mass
           dust_pop_tmp(n_pop)%zone = j
        enddo
 
-       ! renormalisation des fraction en masse
+       ! Renormalization of mass fractions
        do i=1,n_especes(j)
-          dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
-          dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
+          dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/total_sum
+          dust_pop_tmp(n_pop-n_especes(j)+i)%mass =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
        enddo
     enddo !n_zones
 
     if (lRE_LTE.and.lRE_nLTE) call error("cannot mix grains in LTE and nLTE")
 
-    ! variables triees
+    ! sorted variables
     allocate(dust_pop(n_pop), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error n_pop tmp')
     dust_pop%is_PAH = .false.
     dust_pop%is_opacity_file = .false.
 
-    ! Classement des populations de grains : LTE puis nLTE puis nRE
+    ! Classification of grain populations: LTE then nLTE then nRE
     ind_pop = 0
     grain_RE_LTE_start = 1
     grain_RE_LTE_end = 0
@@ -2424,21 +2424,21 @@ contains
     ! Molecular RT settings
     ! ---------------------
     read(1,*) line_buffer
-    read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
+    read(1,*) lpop, lprecise_pop, lmol_LTE, profile_width
     read(1,*) vitesse_turb
-    vitesse_turb = vitesse_turb * km_to_m ! Conversion en m.s-1
+    vitesse_turb = vitesse_turb * km_to_m ! Conversion to m.s-1
     read(1,*) n_molecules
     allocate(mol(n_molecules))
     do imol=1,n_molecules
        read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
        read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion en m.s-1
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion to m.s-1
        mol(imol)%vmin_center_rt = -mol(imol)%vmax_center_rt
        mol(imol)%l_sym_ima = l_sym_ima
        mol(imol)%n_speed_rt = 2*mol(imol)%n_speed_rt+1 ! change of format from v4.1
        read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
        read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
-       read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
+       read(1,*) mol(imol)%index_trans_ray_tracing(1:mol(imol)%nTrans_raytracing)
        mol(imol)%n_speed_center_rt = mol(imol)%n_speed_rt
        mol(imol)%n_extraV_rt = 0 ; mol(imol)%extra_deltaV_rt = 0.0
     enddo
@@ -2447,43 +2447,43 @@ contains
     ! Star properties
     ! ---------------
     read(1,*) line_buffer
-    read(1,*,iostat=ios) n_etoiles
+    read(1,*,iostat=ios) n_stars
     if (ios/=0) then
        call error('you are using a 2-zone disk parameter file', &
             msg2='You must use the [-2zone] option to calculate a 2-zone disk')
     endif
-    allocate(etoile(n_etoiles), stat=alloc_status)
-    if (alloc_status > 0) call error('Allocation error etoile')
+    allocate(star(n_stars), stat=alloc_status)
+    if (alloc_status > 0) call error('Allocation error star')
 
-    if (n_etoiles > 1) then
+    if (n_stars > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
        l_sym_ima=.false.
        l_sym_centrale=.false.
        l_sym_axiale=.false.
     endif
 
-    do i=1,n_etoiles
-       read(1,*) etoile(i)%T, etoile(i)%r, etoile(i)%M, etoile(i)%x, etoile(i)%y, etoile(i)%z, etoile(i)%find_spectrum
-       if (.not.etoile(i)%find_spectrum) then
-          read(1,*) etoile(i)%spectre
+    do i=1,n_stars
+       read(1,*) star(i)%T, star(i)%r, star(i)%M, star(i)%x, star(i)%y, star(i)%z, star(i)%find_spectrum
+       if (.not.star(i)%find_spectrum) then
+          read(1,*) star(i)%spectrum
        else
           read(1,*) line_buffer
        endif
-       etoile(i)%lb_body = .false.
+       star(i)%lb_body = .false.
 
-       ! Passage rayon en AU
-       etoile(i)%r = etoile(i)%r * Rsun_to_AU
+       ! Convert radius to AU
+       star(i)%r = star(i)%r * Rsun_to_AU
 
-       read(1,*) etoile(i)%fUV, etoile(i)%slope_UV
-       etoile(i)%slope_UV = etoile(i)%slope_UV - 2.0  ! Fnu -> F_lambda
+       read(1,*) star(i)%fUV, star(i)%slope_UV
+       star(i)%slope_UV = star(i)%slope_UV - 2.0  ! Fnu -> F_lambda
     enddo
-    etoile(:)%vx = 0.0 ; etoile(:)%vy = 0.0 ; etoile(:)%vz = 0.0
-    etoile(:)%force_Mdot = .false.
-    etoile(:)%Mdot = 0.0
+    star(:)%vx = 0.0 ; star(:)%vy = 0.0 ; star(:)%vz = 0.0
+    star(:)%force_Mdot = .false.
+    star(:)%Mdot = 0.0
 
     close(unit=1)
 
-    nbre_photons_lim = nbre_photons_lim*real(N_thet)*real(N_phi)*real(nbre_photons_lambda)
+    n_photons_lim = n_photons_lim*real(N_thet)*real(N_phi)*real(n_photons_lambda)
 
     return
 
@@ -2498,15 +2498,15 @@ contains
     character(len=*), intent(in) :: para
 
     integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
-    real(kind=dp) :: somme, V_somme
+    real(kind=dp) :: total_sum, V_somme
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
     character(len=100) :: line_buffer
 
-    real :: fnbre_photons_eq_th, fnbre_photons_lambda, fnbre_photons_image
+    real :: fn_photons_eq_th, fn_photons_lambda, fn_photons_image
 
-    ! Lecture du fichier de parametres
+    ! Reading the parameter file
     open(unit=1, file=para, status='old')
 
     read(1,*) para_version
@@ -2515,14 +2515,14 @@ contains
     ! Number of photon packages
     ! -------------------------
     read(1,*) line_buffer
-    read(1,*) fnbre_photons_eq_th ;
-    read(1,*) fnbre_photons_lambda ;
-    read(1,*) fnbre_photons_image
-    nbre_photons_loop = 128 ;
-    nbre_photons_eq_th = max(fnbre_photons_eq_th / nbre_photons_loop,1.)
-    nbre_photons_lambda = max(fnbre_photons_lambda / nbre_photons_loop,1.)
-    nbre_photons_image = max(fnbre_photons_image / nbre_photons_loop,1.)
-    nbre_photons_tot=real(nbre_photons_loop)*real(nbre_photons_eq_th)
+    read(1,*) fn_photons_eq_th ;
+    read(1,*) fn_photons_lambda ;
+    read(1,*) fn_photons_image
+    n_photons_loop = 128 ;
+    n_photons_eq_th = max(fn_photons_eq_th / n_photons_loop,1.)
+    n_photons_lambda = max(fn_photons_lambda / n_photons_loop,1.)
+    n_photons_image = max(fn_photons_image / n_photons_loop,1.)
+    n_photons_total=real(n_photons_loop)*real(n_photons_eq_th)
 
     tau_seuil  = 1.0e31
     wl_seuil = 0.81
@@ -2607,7 +2607,7 @@ contains
     ! ---------------
     read(1,*) line_buffer
     read(1,*) n_zones
-    ! Allocation des variables pour disque a une zone
+    ! Variable allocation for 1-zone disk
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error disk parameters')
     disk_zone%exp_beta=0.0; disk_zone%surf=0.0; disk_zone%sclht=0.0; disk_zone%diskmass=0.0; disk_zone%rref=0.0
@@ -2656,7 +2656,7 @@ contains
     n_pop=0
     do j=1, n_zones
        read(1,*) n_especes(j)
-       somme=0.0
+       total_sum=0.0
        do i=1, n_especes(j)
           n_pop = n_pop+1
           !read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
@@ -2681,7 +2681,7 @@ contains
              write(*,*) "Exiting"
              call exit(1)
           endif
-          ! renormalisation des fraction en volume
+          ! Renormalization of volume fractions
           do k=1, dust_pop_tmp(n_pop)%n_components
              dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) &
                   / V_somme
@@ -2691,26 +2691,26 @@ contains
           if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
           if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
           if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
-          somme = somme + dust_pop_tmp(n_pop)%frac_mass
+          total_sum = total_sum + dust_pop_tmp(n_pop)%frac_mass
           dust_pop_tmp(n_pop)%zone = j
        enddo
 
-       ! renormalisation des fraction en masse
+       ! Renormalization of mass fractions
        do i=1,n_especes(j)
-          dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
-          dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
+          dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/total_sum
+          dust_pop_tmp(n_pop-n_especes(j)+i)%mass =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
        enddo
     enddo !n_zones
 
     if (lRE_LTE.and.lRE_nLTE) call error("cannot mix grains in LTE and nLTE")
 
-    ! variables triees
+    ! sorted variables
     allocate(dust_pop(n_pop), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error n_pop tmp')
     dust_pop%is_PAH = .false.
     dust_pop%is_opacity_file = .false.
 
-    ! Classement des populations de grains : LTE puis nLTE puis nRE
+    ! Classification of grain populations: LTE then nLTE then nRE
     ind_pop = 0
     grain_RE_LTE_start = 1
     grain_RE_LTE_end = 0
@@ -2776,21 +2776,21 @@ contains
     ! Molecular RT settings
     ! ---------------------
     read(1,*) line_buffer
-    read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
+    read(1,*) lpop, lprecise_pop, lmol_LTE, profile_width
     read(1,*) vitesse_turb
-    vitesse_turb = vitesse_turb * km_to_m ! Conversion en m.s-1
+    vitesse_turb = vitesse_turb * km_to_m ! Conversion to m.s-1
     read(1,*) n_molecules
     allocate(mol(n_molecules))
     do imol=1,n_molecules
        read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
        read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion en m.s-1
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion to m.s-1
        mol(imol)%vmin_center_rt = -mol(imol)%vmax_center_rt
        mol(imol)%l_sym_ima = l_sym_ima
        mol(imol)%n_speed_rt = 2*mol(imol)%n_speed_rt+1 ! change of format from v4.1
        read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
        read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
-       read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
+       read(1,*) mol(imol)%index_trans_ray_tracing(1:mol(imol)%nTrans_raytracing)
        mol(imol)%n_speed_center_rt = mol(imol)%n_speed_rt
        mol(imol)%n_extraV_rt = 0 ; mol(imol)%extra_deltaV_rt = 0.0
     enddo
@@ -2799,43 +2799,43 @@ contains
     ! Star properties
     ! ---------------
     read(1,*) line_buffer
-    read(1,*,iostat=ios) n_etoiles
+    read(1,*,iostat=ios) n_stars
     if (ios/=0) then
        call error('you are using a 2-zone disk parameter file', &
             msg2='You must use the [-2zone] option to calculate a 2-zone disk')
     endif
-    allocate(etoile(n_etoiles), stat=alloc_status)
-    if (alloc_status > 0) call error('Allocation error etoile')
+    allocate(star(n_stars), stat=alloc_status)
+    if (alloc_status > 0) call error('Allocation error star')
 
-    if (n_etoiles > 1) then
+    if (n_stars > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
        l_sym_ima=.false.
        l_sym_centrale=.false.
        l_sym_axiale=.false.
     endif
 
-    do i=1,n_etoiles
-       read(1,*) etoile(i)%T, etoile(i)%r, etoile(i)%M, etoile(i)%x, etoile(i)%y, etoile(i)%z, etoile(i)%find_spectrum
-       if (.not.etoile(i)%find_spectrum) then
-          read(1,*) etoile(i)%spectre
+    do i=1,n_stars
+       read(1,*) star(i)%T, star(i)%r, star(i)%M, star(i)%x, star(i)%y, star(i)%z, star(i)%find_spectrum
+       if (.not.star(i)%find_spectrum) then
+          read(1,*) star(i)%spectrum
        else
           read(1,*) line_buffer
        endif
-       etoile(i)%lb_body = .false.
+       star(i)%lb_body = .false.
 
-       ! Passage rayon en AU
-       etoile(i)%r = etoile(i)%r * Rsun_to_AU
+       ! Convert radius to AU
+       star(i)%r = star(i)%r * Rsun_to_AU
 
-       read(1,*) etoile(i)%fUV, etoile(i)%slope_UV
-       etoile(i)%slope_UV = etoile(i)%slope_UV - 2.0  ! Fnu -> F_lambda
+       read(1,*) star(i)%fUV, star(i)%slope_UV
+       star(i)%slope_UV = star(i)%slope_UV - 2.0  ! Fnu -> F_lambda
     enddo
-    etoile(:)%vx = 0.0 ; etoile(:)%vy = 0.0 ; etoile(:)%vz = 0.0
-    etoile(:)%force_Mdot = .false.
-    etoile(:)%Mdot = 0.0
+    star(:)%vx = 0.0 ; star(:)%vy = 0.0 ; star(:)%vz = 0.0
+    star(:)%force_Mdot = .false.
+    star(:)%Mdot = 0.0
 
     close(unit=1)
 
-    nbre_photons_lim = nbre_photons_lim*real(N_thet)*real(N_phi)*real(nbre_photons_lambda)
+    n_photons_lim = n_photons_lim*real(N_thet)*real(N_phi)*real(n_photons_lambda)
 
     return
 
@@ -2850,15 +2850,15 @@ contains
     character(len=*), intent(in) :: para
 
     integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
-    real(kind=dp) :: somme, V_somme
+    real(kind=dp) :: total_sum, V_somme
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
     character(len=100) :: line_buffer
 
-    real :: fnbre_photons_eq_th, fnbre_photons_lambda, fnbre_photons_image
+    real :: fn_photons_eq_th, fn_photons_lambda, fn_photons_image
 
-    ! Lecture du fichier de parametres
+    ! Reading the parameter file
     open(unit=1, file=para, status='old')
 
     read(1,*) para_version
@@ -2869,14 +2869,14 @@ contains
     ! Number of photon packages
     ! -------------------------
     read(1,*) line_buffer
-    read(1,*) fnbre_photons_eq_th ;
-    read(1,*) fnbre_photons_lambda ;
-    read(1,*) fnbre_photons_image
-    nbre_photons_loop = 128 ;
-    nbre_photons_eq_th = max(fnbre_photons_eq_th / nbre_photons_loop,1.)
-    nbre_photons_lambda = max(fnbre_photons_lambda / nbre_photons_loop,1.)
-    nbre_photons_image = max(fnbre_photons_image / nbre_photons_loop,1.)
-    nbre_photons_tot=real(nbre_photons_loop)*real(nbre_photons_eq_th)
+    read(1,*) fn_photons_eq_th ;
+    read(1,*) fn_photons_lambda ;
+    read(1,*) fn_photons_image
+    n_photons_loop = 128 ;
+    n_photons_eq_th = max(fn_photons_eq_th / n_photons_loop,1.)
+    n_photons_lambda = max(fn_photons_lambda / n_photons_loop,1.)
+    n_photons_image = max(fn_photons_image / n_photons_loop,1.)
+    n_photons_total=real(n_photons_loop)*real(n_photons_eq_th)
 
     tau_seuil  = 1.0e31
     wl_seuil = 0.81
@@ -2961,7 +2961,7 @@ contains
     ! ---------------
     read(1,*) line_buffer
     read(1,*) n_zones
-    ! Allocation des variables pour disque a une zone
+    ! Variable allocation for 1-zone disk
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error disk parameters')
     disk_zone%exp_beta=0.0; disk_zone%surf=0.0; disk_zone%sclht=0.0; disk_zone%diskmass=0.0; disk_zone%rref=0.0
@@ -3011,7 +3011,7 @@ contains
     n_pop=0
     do j=1, n_zones
        read(1,*) n_especes(j)
-       somme=0.0
+       total_sum=0.0
        do i=1, n_especes(j)
           n_pop = n_pop+1
           !read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
@@ -3036,7 +3036,7 @@ contains
              write(*,*) "Exiting"
              call exit(1)
           endif
-          ! renormalisation des fraction en volume
+          ! Renormalization of volume fractions
           do k=1, dust_pop_tmp(n_pop)%n_components
              dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) &
                   / V_somme
@@ -3046,27 +3046,27 @@ contains
           if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
           if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
           if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
-          somme = somme + dust_pop_tmp(n_pop)%frac_mass
+          total_sum = total_sum + dust_pop_tmp(n_pop)%frac_mass
           dust_pop_tmp(n_pop)%zone = j
        enddo
 
-       ! renormalisation des fraction en masse
+       ! Renormalization of mass fractions
        do i=1,n_especes(j)
-          dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
-          dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
+          dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/total_sum
+          dust_pop_tmp(n_pop-n_especes(j)+i)%mass =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
        enddo
     enddo !n_zones
 
     if (lRE_LTE.and.lRE_nLTE) call error("cannot mix grains in LTE and nLTE")
 
-    ! variables triees
+    ! sorted variables
     allocate(dust_pop(n_pop), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error n_pop tmp')
     dust_pop%is_PAH = .false.
     dust_pop%is_opacity_file = .false.
 
 
-    ! Classement des populations de grains : LTE puis nLTE puis nRE
+    ! Classification of grain populations: LTE then nLTE then nRE
     ind_pop = 0
     grain_RE_LTE_start = 1
     grain_RE_LTE_end = 0
@@ -3132,21 +3132,21 @@ contains
     ! Molecular RT settings
     ! ---------------------
     read(1,*) line_buffer
-    read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
+    read(1,*) lpop, lprecise_pop, lmol_LTE, profile_width
     read(1,*) vitesse_turb
-    vitesse_turb = vitesse_turb * km_to_m ! Conversion en m.s-1
+    vitesse_turb = vitesse_turb * km_to_m ! Conversion to m.s-1
     read(1,*) n_molecules
     allocate(mol(n_molecules))
     do imol=1,n_molecules
        read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
        read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion en m.s-1
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion to m.s-1
        mol(imol)%vmin_center_rt = -mol(imol)%vmax_center_rt
        mol(imol)%l_sym_ima = l_sym_ima
        mol(imol)%n_speed_rt = 2*mol(imol)%n_speed_rt+1 ! change of format from v4.1
        read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
        read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
-       read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
+       read(1,*) mol(imol)%index_trans_ray_tracing(1:mol(imol)%nTrans_raytracing)
        mol(imol)%n_speed_center_rt = mol(imol)%n_speed_rt
        mol(imol)%n_extraV_rt = 0 ; mol(imol)%extra_deltaV_rt = 0.0
     enddo
@@ -3155,43 +3155,43 @@ contains
     ! Star properties
     ! ---------------
     read(1,*) line_buffer
-    read(1,*,iostat=ios) n_etoiles
+    read(1,*,iostat=ios) n_stars
     if (ios/=0) then
        call error('you are using a 2-zone disk parameter file', &
             msg2='You must use the [-2zone] option to calculate a 2-zone disk')
     endif
-    allocate(etoile(n_etoiles), stat=alloc_status)
-    if (alloc_status > 0) call error('Allocation error etoile')
+    allocate(star(n_stars), stat=alloc_status)
+    if (alloc_status > 0) call error('Allocation error star')
 
-    if (n_etoiles > 1) then
+    if (n_stars > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
        l_sym_ima=.false.
        l_sym_centrale=.false.
        l_sym_axiale=.false.
     endif
 
-    do i=1,n_etoiles
-       read(1,*) etoile(i)%T, etoile(i)%r, etoile(i)%M, etoile(i)%x, etoile(i)%y, etoile(i)%z, etoile(i)%find_spectrum
-       if (.not.etoile(i)%find_spectrum) then
-          read(1,*) etoile(i)%spectre
+    do i=1,n_stars
+       read(1,*) star(i)%T, star(i)%r, star(i)%M, star(i)%x, star(i)%y, star(i)%z, star(i)%find_spectrum
+       if (.not.star(i)%find_spectrum) then
+          read(1,*) star(i)%spectrum
        else
           read(1,*) line_buffer
        endif
-       etoile(i)%lb_body = .false.
+       star(i)%lb_body = .false.
 
-       ! Passage rayon en AU
-       etoile(i)%r = etoile(i)%r * Rsun_to_AU
+       ! Convert radius to AU
+       star(i)%r = star(i)%r * Rsun_to_AU
 
-       read(1,*) etoile(i)%fUV, etoile(i)%slope_UV
-       etoile(i)%slope_UV = etoile(i)%slope_UV - 2.0  ! Fnu -> F_lambda
+       read(1,*) star(i)%fUV, star(i)%slope_UV
+       star(i)%slope_UV = star(i)%slope_UV - 2.0  ! Fnu -> F_lambda
     enddo
-    etoile(:)%vx = 0.0 ; etoile(:)%vy = 0.0 ; etoile(:)%vz = 0.0
-    etoile(:)%force_Mdot = .false.
-    etoile(:)%Mdot = 0.0
+    star(:)%vx = 0.0 ; star(:)%vy = 0.0 ; star(:)%vz = 0.0
+    star(:)%force_Mdot = .false.
+    star(:)%Mdot = 0.0
 
     close(unit=1)
 
-    nbre_photons_lim = nbre_photons_lim*real(N_thet)*real(N_phi)*real(nbre_photons_lambda)
+    n_photons_lim = n_photons_lim*real(N_thet)*real(N_phi)*real(n_photons_lambda)
 
     return
 
@@ -3206,15 +3206,15 @@ contains
     character(len=*), intent(in) :: para
 
     integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
-    real(kind=dp) :: somme, V_somme
+    real(kind=dp) :: total_sum, V_somme
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
     character(len=100) :: line_buffer
 
-    real :: fnbre_photons_eq_th, fnbre_photons_lambda, fnbre_photons_image
+    real :: fn_photons_eq_th, fn_photons_lambda, fn_photons_image
 
-    ! Lecture du fichier de parametres
+    ! Reading the parameter file
     open(unit=1, file=para, status='old')
 
     read(1,*) para_version
@@ -3225,14 +3225,14 @@ contains
     ! Number of photon packages
     ! -------------------------
     read(1,*) line_buffer
-    read(1,*) fnbre_photons_eq_th ;
-    read(1,*) fnbre_photons_lambda ;
-    read(1,*) fnbre_photons_image
-    nbre_photons_loop = 128 ;
-    nbre_photons_eq_th = max(fnbre_photons_eq_th / nbre_photons_loop,1.)
-    nbre_photons_lambda = max(fnbre_photons_lambda / nbre_photons_loop,1.)
-    nbre_photons_image = max(fnbre_photons_image / nbre_photons_loop,1.)
-    nbre_photons_tot=real(nbre_photons_loop)*real(nbre_photons_eq_th)
+    read(1,*) fn_photons_eq_th ;
+    read(1,*) fn_photons_lambda ;
+    read(1,*) fn_photons_image
+    n_photons_loop = 128 ;
+    n_photons_eq_th = max(fn_photons_eq_th / n_photons_loop,1.)
+    n_photons_lambda = max(fn_photons_lambda / n_photons_loop,1.)
+    n_photons_image = max(fn_photons_image / n_photons_loop,1.)
+    n_photons_total=real(n_photons_loop)*real(n_photons_eq_th)
 
     tau_seuil  = 1.0e31
     wl_seuil = 0.81
@@ -3313,7 +3313,7 @@ contains
     ! ---------------
     read(1,*) line_buffer
     read(1,*) n_zones
-    ! Allocation des variables pour disque a une zone
+    ! Variable allocation for 1-zone disk
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error disk parameters')
     disk_zone%exp_beta=0.0; disk_zone%surf=0.0; disk_zone%sclht=0.0; disk_zone%diskmass=0.0; disk_zone%rref=0.0
@@ -3363,7 +3363,7 @@ contains
     n_pop=0
     do j=1, n_zones
        read(1,*) n_especes(j)
-       somme=0.0
+       total_sum=0.0
        do i=1, n_especes(j)
           n_pop = n_pop+1
           !read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
@@ -3384,7 +3384,7 @@ contains
              write(*,*) "Exiting"
              call exit(1)
           endif
-          ! renormalisation des fraction en volume
+          ! Renormalization of volume fractions
           do k=1, dust_pop_tmp(n_pop)%n_components
              dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) / V_somme
           enddo
@@ -3393,26 +3393,26 @@ contains
           if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
           if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
           if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
-          somme = somme + dust_pop_tmp(n_pop)%frac_mass
+          total_sum = total_sum + dust_pop_tmp(n_pop)%frac_mass
           dust_pop_tmp(n_pop)%zone = j
        enddo
 
-       ! renormalisation des fraction en masse
+       ! Renormalization of mass fractions
        do i=1,n_especes(j)
-          dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
-          dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
+          dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/total_sum
+          dust_pop_tmp(n_pop-n_especes(j)+i)%mass =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
        enddo
     enddo !n_zones
 
     if (lRE_LTE.and.lRE_nLTE) call error("cannot mix grains in LTE and nLTE")
 
-    ! variables triees
+    ! sorted variables
     allocate(dust_pop(n_pop), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error n_pop tmp')
     dust_pop%is_PAH = .false.
     dust_pop%is_opacity_file = .false.
 
-    ! Classement des populations de grains : LTE puis nLTE puis nRE
+    ! Classification of grain populations: LTE then nLTE then nRE
     ind_pop = 0
     grain_RE_LTE_start = 1
     grain_RE_LTE_end = 0
@@ -3478,21 +3478,21 @@ contains
     ! Molecular RT settings
     ! ---------------------
     read(1,*) line_buffer
-    read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
+    read(1,*) lpop, lprecise_pop, lmol_LTE, profile_width
     read(1,*) vitesse_turb
-    vitesse_turb = vitesse_turb * km_to_m ! Conversion en m.s-1
+    vitesse_turb = vitesse_turb * km_to_m ! Conversion to m.s-1
     read(1,*) n_molecules
     allocate(mol(n_molecules))
     do imol=1,n_molecules
        read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
        read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion en m.s-1
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion to m.s-1
        mol(imol)%vmin_center_rt = -mol(imol)%vmax_center_rt
        mol(imol)%l_sym_ima = l_sym_ima
        mol(imol)%n_speed_rt = 2*mol(imol)%n_speed_rt+1 ! change of format from v4.1
        read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
        read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
-       read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
+       read(1,*) mol(imol)%index_trans_ray_tracing(1:mol(imol)%nTrans_raytracing)
        mol(imol)%n_speed_center_rt = mol(imol)%n_speed_rt
        mol(imol)%n_extraV_rt = 0 ; mol(imol)%extra_deltaV_rt = 0.0
     enddo
@@ -3501,43 +3501,43 @@ contains
     ! Star properties
     ! ---------------
     read(1,*) line_buffer
-    read(1,*,iostat=ios) n_etoiles
+    read(1,*,iostat=ios) n_stars
     if (ios/=0) then
        call error('you are using a 2-zone disk parameter file', &
             msg2='You must use the [-2zone] option to calculate a 2-zone disk')
     endif
-    allocate(etoile(n_etoiles), stat=alloc_status)
-    if (alloc_status > 0) call error('Allocation error etoile')
+    allocate(star(n_stars), stat=alloc_status)
+    if (alloc_status > 0) call error('Allocation error star')
 
-    if (n_etoiles > 1) then
+    if (n_stars > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
        l_sym_ima=.false.
        l_sym_centrale=.false.
        l_sym_axiale=.false.
     endif
 
-    do i=1,n_etoiles
-       read(1,*) etoile(i)%T, etoile(i)%r, etoile(i)%M, etoile(i)%x, etoile(i)%y, etoile(i)%z, etoile(i)%find_spectrum
-       if (.not.etoile(i)%find_spectrum) then
-          read(1,*) etoile(i)%spectre
+    do i=1,n_stars
+       read(1,*) star(i)%T, star(i)%r, star(i)%M, star(i)%x, star(i)%y, star(i)%z, star(i)%find_spectrum
+       if (.not.star(i)%find_spectrum) then
+          read(1,*) star(i)%spectrum
        else
           read(1,*) line_buffer
        endif
-       etoile(i)%lb_body = .false.
+       star(i)%lb_body = .false.
 
-       ! Passage rayon en AU
-       etoile(i)%r = etoile(i)%r * Rsun_to_AU
+       ! Convert radius to AU
+       star(i)%r = star(i)%r * Rsun_to_AU
 
-       read(1,*) etoile(i)%fUV, etoile(i)%slope_UV
-       etoile(i)%slope_UV = etoile(i)%slope_UV - 2.0  ! Fnu -> F_lambda
+       read(1,*) star(i)%fUV, star(i)%slope_UV
+       star(i)%slope_UV = star(i)%slope_UV - 2.0  ! Fnu -> F_lambda
     enddo
-    etoile(:)%vx = 0.0 ; etoile(:)%vy = 0.0 ; etoile(:)%vz = 0.0
-    etoile(:)%force_Mdot = .false.
-    etoile(:)%Mdot = 0.0
+    star(:)%vx = 0.0 ; star(:)%vy = 0.0 ; star(:)%vz = 0.0
+    star(:)%force_Mdot = .false.
+    star(:)%Mdot = 0.0
 
     close(unit=1)
 
-    nbre_photons_lim = nbre_photons_lim*real(N_thet)*real(N_phi)*real(nbre_photons_lambda)
+    n_photons_lim = n_photons_lim*real(N_thet)*real(N_phi)*real(n_photons_lambda)
 
     return
 
@@ -3553,14 +3553,14 @@ end subroutine read_para215
     character(len=*), intent(in) :: para
 
     integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
-    real(kind=dp) :: size_neb_tmp, somme, V_somme
+    real(kind=dp) :: size_neb_tmp, total_sum, V_somme
     real :: gas_dust
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
     character(len=100) :: line_buffer
 
-    ! Lecture du fichier de parametres
+    ! Reading the parameter file
     open(unit=1, file=para, status='old')
 
     read(1,*) para_version
@@ -3571,9 +3571,9 @@ end subroutine read_para215
     ! Number of photon packages
     ! -------------------------
     read(1,*) line_buffer
-    read(1,*) nbre_photons_loop ;  read(1,*) nbre_photons_eq_th ; read(1,*) nbre_photons_lambda ;
-    read(1,*) nbre_photons_image
-    nbre_photons_tot=real(nbre_photons_loop)*real(nbre_photons_eq_th)
+    read(1,*) n_photons_loop ;  read(1,*) n_photons_eq_th ; read(1,*) n_photons_lambda ;
+    read(1,*) n_photons_image
+    n_photons_total=real(n_photons_loop)*real(n_photons_eq_th)
     tau_seuil  = 1.0e31
     wl_seuil = 0.81
 
@@ -3650,7 +3650,7 @@ end subroutine read_para215
     ! ---------------
     read(1,*) line_buffer
     read(1,*) n_zones
-    ! Allocation des variables pour disque a une zone
+    ! Variable allocation for 1-zone disk
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error disk parameters')
     disk_zone%exp_beta=0.0; disk_zone%surf=0.0; disk_zone%sclht=0.0; disk_zone%diskmass=0.0; disk_zone%rref=0.0
@@ -3707,7 +3707,7 @@ end subroutine read_para215
     n_pop=0
     do j=1, n_zones
        read(1,*) n_especes(j)
-       somme=0.0
+       total_sum=0.0
        do i=1, n_especes(j)
           n_pop = n_pop+1
           !read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
@@ -3728,7 +3728,7 @@ end subroutine read_para215
              write(*,*) "Exiting"
              call exit(1)
           endif
-          ! renormalisation des fraction en volume
+          ! Renormalization of volume fractions
           do k=1, dust_pop_tmp(n_pop)%n_components
              dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) / V_somme
           enddo
@@ -3737,26 +3737,26 @@ end subroutine read_para215
           if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
           if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
           if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
-          somme = somme + dust_pop_tmp(n_pop)%frac_mass
+          total_sum = total_sum + dust_pop_tmp(n_pop)%frac_mass
           dust_pop_tmp(n_pop)%zone = j
        enddo
 
-       ! renormalisation des fraction en masse
+       ! Renormalization of mass fractions
        do i=1,n_especes(j)
-          dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
-          dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
+          dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/total_sum
+          dust_pop_tmp(n_pop-n_especes(j)+i)%mass =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
        enddo
     enddo !n_zones
 
     if (lRE_LTE.and.lRE_nLTE) call error("cannot mix grains in LTE and nLTE")
 
-    ! variables triees
+    ! sorted variables
     allocate(dust_pop(n_pop), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error n_pop tmp')
     dust_pop%is_PAH = .false.
     dust_pop%is_opacity_file = .false.
 
-    ! Classement des populations de grains : LTE puis nLTE puis nRE
+    ! Classification of grain populations: LTE then nLTE then nRE
     ind_pop = 0
     grain_RE_LTE_start = 1
     grain_RE_LTE_end = 0
@@ -3822,21 +3822,21 @@ end subroutine read_para215
     ! Molecular RT settings
     ! ---------------------
     read(1,*) line_buffer
-    read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
+    read(1,*) lpop, lprecise_pop, lmol_LTE, profile_width
     read(1,*) vitesse_turb
-    vitesse_turb = vitesse_turb * km_to_m ! Conversion en m.s-1
+    vitesse_turb = vitesse_turb * km_to_m ! Conversion to m.s-1
     read(1,*) n_molecules
     allocate(mol(n_molecules))
     do imol=1,n_molecules
        read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
        read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion en m.s-1
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion to m.s-1
        mol(imol)%vmin_center_rt = -mol(imol)%vmax_center_rt
        mol(imol)%l_sym_ima = l_sym_ima
        mol(imol)%n_speed_rt = 2*mol(imol)%n_speed_rt+1 ! change of format from v4.1
        read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
        read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
-       read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
+       read(1,*) mol(imol)%index_trans_ray_tracing(1:mol(imol)%nTrans_raytracing)
        mol(imol)%n_speed_center_rt = mol(imol)%n_speed_rt
        mol(imol)%n_extraV_rt = 0 ; mol(imol)%extra_deltaV_rt = 0.0
     enddo
@@ -3845,43 +3845,43 @@ end subroutine read_para215
     ! Star properties
     ! ---------------
     read(1,*) line_buffer
-    read(1,*,iostat=ios) n_etoiles
+    read(1,*,iostat=ios) n_stars
     if (ios/=0) then
        call error('you are using a 2-zone disk parameter file', &
             msg2='You must use the [-2zone] option to calculate a 2-zone disk')
     endif
-    allocate(etoile(n_etoiles), stat=alloc_status)
-    if (alloc_status > 0) call error('Allocation error etoile')
+    allocate(star(n_stars), stat=alloc_status)
+    if (alloc_status > 0) call error('Allocation error star')
 
-    if (n_etoiles > 1) then
+    if (n_stars > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
        l_sym_ima=.false.
        l_sym_centrale=.false.
        l_sym_axiale=.false.
     endif
 
-    do i=1,n_etoiles
-       read(1,*) etoile(i)%T, etoile(i)%r, etoile(i)%M, etoile(i)%x, etoile(i)%y, etoile(i)%z, etoile(i)%find_spectrum
-       if (.not.etoile(i)%find_spectrum) then
-          read(1,*) etoile(i)%spectre
+    do i=1,n_stars
+       read(1,*) star(i)%T, star(i)%r, star(i)%M, star(i)%x, star(i)%y, star(i)%z, star(i)%find_spectrum
+       if (.not.star(i)%find_spectrum) then
+          read(1,*) star(i)%spectrum
        else
           read(1,*) line_buffer
        endif
-       etoile(i)%lb_body = .false.
+       star(i)%lb_body = .false.
 
-       ! Passage rayon en AU
-       etoile(i)%r = etoile(i)%r * Rsun_to_AU
+       ! Convert radius to AU
+       star(i)%r = star(i)%r * Rsun_to_AU
 
-       read(1,*) etoile(i)%fUV, etoile(i)%slope_UV
-       etoile(i)%slope_UV = etoile(i)%slope_UV - 2.0  ! Fnu -> F_lambda
+       read(1,*) star(i)%fUV, star(i)%slope_UV
+       star(i)%slope_UV = star(i)%slope_UV - 2.0  ! Fnu -> F_lambda
     enddo
-    etoile(:)%vx = 0.0 ; etoile(:)%vy = 0.0 ; etoile(:)%vz = 0.0
-    etoile(:)%force_Mdot = .false.
-    etoile(:)%Mdot = 0.0
+    star(:)%vx = 0.0 ; star(:)%vy = 0.0 ; star(:)%vz = 0.0
+    star(:)%force_Mdot = .false.
+    star(:)%Mdot = 0.0
 
     close(unit=1)
 
-    nbre_photons_lim = nbre_photons_lim*real(N_thet)*real(N_phi)*real(nbre_photons_lambda)
+    n_photons_lim = n_photons_lim*real(N_thet)*real(N_phi)*real(n_photons_lambda)
 
 
     return
@@ -3898,14 +3898,14 @@ end subroutine read_para215
     character(len=*), intent(in) :: para
 
     integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
-    real(kind=dp) :: size_neb_tmp, somme, V_somme
+    real(kind=dp) :: size_neb_tmp, total_sum, V_somme
     real :: gas_dust
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
     character(len=100) :: line_buffer
 
-    ! Lecture du fichier de parametres
+    ! Reading the parameter file
     open(unit=1, file=para, status='old')
 
     read(1,*) para_version
@@ -3916,9 +3916,9 @@ end subroutine read_para215
     ! Number of photon packages
     ! -------------------------
     read(1,*) line_buffer
-    read(1,*) nbre_photons_loop ;  read(1,*) nbre_photons_eq_th ; read(1,*) nbre_photons_lambda ;
-    read(1,*) nbre_photons_image
-    nbre_photons_tot=real(nbre_photons_loop)*real(nbre_photons_eq_th)
+    read(1,*) n_photons_loop ;  read(1,*) n_photons_eq_th ; read(1,*) n_photons_lambda ;
+    read(1,*) n_photons_image
+    n_photons_total=real(n_photons_loop)*real(n_photons_eq_th)
     tau_seuil  = 1.0e31
     wl_seuil = 0.81
 
@@ -3993,7 +3993,7 @@ end subroutine read_para215
     ! ---------------
     read(1,*) line_buffer
     read(1,*) n_zones
-    ! Allocation des variables pour disque a une zone
+    ! Variable allocation for 1-zone disk
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error disk parameters')
     disk_zone%exp_beta=0.0; disk_zone%surf=0.0; disk_zone%sclht=0.0; disk_zone%diskmass=0.0; disk_zone%rref=0.0
@@ -4049,7 +4049,7 @@ end subroutine read_para215
     n_pop=0
     do j=1, n_zones
        read(1,*) n_especes(j)
-       somme=0.0
+       total_sum=0.0
        do i=1, n_especes(j)
           n_pop = n_pop+1
           !read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
@@ -4070,7 +4070,7 @@ end subroutine read_para215
              write(*,*) "Exiting"
              call exit(1)
           endif
-          ! renormalisation des fraction en volume
+          ! Renormalization of volume fractions
           do k=1, dust_pop_tmp(n_pop)%n_components
              dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) / V_somme
           enddo
@@ -4079,26 +4079,26 @@ end subroutine read_para215
           if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
           if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
           if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
-          somme = somme + dust_pop_tmp(n_pop)%frac_mass
+          total_sum = total_sum + dust_pop_tmp(n_pop)%frac_mass
           dust_pop_tmp(n_pop)%zone = j
        enddo
 
-       ! renormalisation des fraction en masse
+       ! Renormalization of mass fractions
        do i=1,n_especes(j)
-          dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
-          dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
+          dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/total_sum
+          dust_pop_tmp(n_pop-n_especes(j)+i)%mass =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
        enddo
     enddo !n_zones
 
     if (lRE_LTE.and.lRE_nLTE) call error("cannot mix grains in LTE and nLTE")
 
-    ! variables triees
+    ! sorted variables
     allocate(dust_pop(n_pop), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error n_pop tmp')
     dust_pop%is_PAH = .false.
     dust_pop%is_opacity_file = .false.
 
-    ! Classement des populations de grains : LTE puis nLTE puis nRE
+    ! Classification of grain populations: LTE then nLTE then nRE
     ind_pop = 0
     grain_RE_LTE_start = 1
     grain_RE_LTE_end = 0
@@ -4164,21 +4164,21 @@ end subroutine read_para215
     ! Molecular RT settings
     ! ---------------------
     read(1,*) line_buffer
-    read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
+    read(1,*) lpop, lprecise_pop, lmol_LTE, profile_width
     read(1,*) vitesse_turb
-    vitesse_turb = vitesse_turb * km_to_m ! Conversion en m.s-1
+    vitesse_turb = vitesse_turb * km_to_m ! Conversion to m.s-1
     read(1,*) n_molecules
     allocate(mol(n_molecules))
     do imol=1,n_molecules
        read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
        read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion en m.s-1
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion to m.s-1
        mol(imol)%vmin_center_rt = -mol(imol)%vmax_center_rt
        mol(imol)%l_sym_ima = l_sym_ima
        mol(imol)%n_speed_rt = 2*mol(imol)%n_speed_rt+1 ! change of format from v4.1
        read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
        read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
-       read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
+       read(1,*) mol(imol)%index_trans_ray_tracing(1:mol(imol)%nTrans_raytracing)
        mol(imol)%n_speed_center_rt = mol(imol)%n_speed_rt
        mol(imol)%n_extraV_rt = 0 ; mol(imol)%extra_deltaV_rt = 0.0
     enddo
@@ -4187,43 +4187,43 @@ end subroutine read_para215
     ! Star properties
     ! ---------------
     read(1,*) line_buffer
-    read(1,*,iostat=ios) n_etoiles
+    read(1,*,iostat=ios) n_stars
     if (ios/=0) then
        call error('you are using a 2-zone disk parameter file', &
             msg2='You must use the [-2zone] option to calculate a 2-zone disk')
     endif
-    allocate(etoile(n_etoiles), stat=alloc_status)
-    if (alloc_status > 0) call error('Allocation error etoile')
+    allocate(star(n_stars), stat=alloc_status)
+    if (alloc_status > 0) call error('Allocation error star')
 
-    if (n_etoiles > 1) then
+    if (n_stars > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
        l_sym_ima=.false.
        l_sym_centrale=.false.
        l_sym_axiale=.false.
     endif
 
-    do i=1,n_etoiles
-       read(1,*) etoile(i)%T, etoile(i)%r, etoile(i)%M, etoile(i)%x, etoile(i)%y, etoile(i)%z, etoile(i)%find_spectrum
-       if (.not.etoile(i)%find_spectrum) then
-          read(1,*) etoile(i)%spectre
+    do i=1,n_stars
+       read(1,*) star(i)%T, star(i)%r, star(i)%M, star(i)%x, star(i)%y, star(i)%z, star(i)%find_spectrum
+       if (.not.star(i)%find_spectrum) then
+          read(1,*) star(i)%spectrum
        else
           read(1,*) line_buffer
        endif
-       etoile(i)%lb_body = .false.
+       star(i)%lb_body = .false.
 
-       ! Passage rayon en AU
-       etoile(i)%r = etoile(i)%r * Rsun_to_AU
+       ! Convert radius to AU
+       star(i)%r = star(i)%r * Rsun_to_AU
 
-       read(1,*) etoile(i)%fUV, etoile(i)%slope_UV
-       etoile(i)%slope_UV = etoile(i)%slope_UV - 2.0  ! Fnu -> F_lambda
+       read(1,*) star(i)%fUV, star(i)%slope_UV
+       star(i)%slope_UV = star(i)%slope_UV - 2.0  ! Fnu -> F_lambda
     enddo
-    etoile(:)%vx = 0.0 ; etoile(:)%vy = 0.0 ; etoile(:)%vz = 0.0
-    etoile(:)%force_Mdot = .false.
-    etoile(:)%Mdot = 0.0
+    star(:)%vx = 0.0 ; star(:)%vy = 0.0 ; star(:)%vz = 0.0
+    star(:)%force_Mdot = .false.
+    star(:)%Mdot = 0.0
 
     close(unit=1)
 
-    nbre_photons_lim = nbre_photons_lim*real(N_thet)*real(N_phi)*real(nbre_photons_lambda)
+    n_photons_lim = n_photons_lim*real(N_thet)*real(N_phi)*real(n_photons_lambda)
 
     return
 
@@ -4238,14 +4238,14 @@ end subroutine read_para215
     character(len=*), intent(in) :: para
 
     integer :: i, j, alloc_status, ios, ind_pop, imol, status
-    real(kind=dp) :: size_neb_tmp, somme
+    real(kind=dp) :: size_neb_tmp, total_sum
     real :: gas_dust
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
     character(len=100) :: line_buffer
 
-    ! Lecture du fichier de parametres
+    ! Reading the parameter file
     open(unit=1, file=para, status='old')
 
     read(1,*) para_version
@@ -4256,9 +4256,9 @@ end subroutine read_para215
     ! Number of photon packages
     ! -------------------------
     read(1,*) line_buffer
-    read(1,*) nbre_photons_loop ;  read(1,*) nbre_photons_eq_th ; read(1,*) nbre_photons_lambda ;
-    read(1,*) nbre_photons_image
-    nbre_photons_tot=real(nbre_photons_loop)*real(nbre_photons_eq_th)
+    read(1,*) n_photons_loop ;  read(1,*) n_photons_eq_th ; read(1,*) n_photons_lambda ;
+    read(1,*) n_photons_image
+    n_photons_total=real(n_photons_loop)*real(n_photons_eq_th)
     tau_seuil  = 1.0e31
     wl_seuil = 0.81
 
@@ -4333,7 +4333,7 @@ end subroutine read_para215
     ! ---------------
     read(1,*) line_buffer
     read(1,*) n_zones
-    ! Allocation des variables pour disque a une zone
+    ! Variable allocation for 1-zone disk
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error disk parameters')
     disk_zone%exp_beta=0.0; disk_zone%surf=0.0; disk_zone%sclht=0.0; disk_zone%diskmass=0.0; disk_zone%rref=0.0
@@ -4389,7 +4389,7 @@ end subroutine read_para215
     n_pop=0
     do j=1, n_zones
        read(1,*) n_especes(j)
-       somme=0.0
+       total_sum=0.0
        do i=1, n_especes(j)
           n_pop = n_pop+1
           dust_pop_tmp(n_pop)%n_components = 1 ; dust_pop_tmp(n_pop)%component_volume_fraction(1) = 1.0
@@ -4399,27 +4399,27 @@ end subroutine read_para215
           if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
           if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
           if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
-          somme = somme + dust_pop_tmp(n_pop)%frac_mass
+          total_sum = total_sum + dust_pop_tmp(n_pop)%frac_mass
           dust_pop_tmp(n_pop)%zone = j
        enddo
 
-       ! renormalisation des fraction en masse
+       ! Renormalization of mass fractions
        do i=1,n_especes(j)
-          dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
-          dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
+          dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/total_sum
+          dust_pop_tmp(n_pop-n_especes(j)+i)%mass =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
        enddo
 
     enddo !n_zones
 
     if (lRE_LTE.and.lRE_nLTE) call error("cannot mix grains in LTE and nLTE")
 
-    ! variables triees
+    ! sorted variables
     allocate(dust_pop(n_pop), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error n_pop tmp')
     dust_pop%is_PAH = .false.
     dust_pop%is_opacity_file = .false.
 
-    ! Classement des populations de grains : LTE puis nLTE puis nRE
+    ! Classification of grain populations: LTE then nLTE then nRE
     ind_pop = 0
     grain_RE_LTE_start = 1
     grain_RE_LTE_end = 0
@@ -4485,21 +4485,21 @@ end subroutine read_para215
     ! Molecular RT settings
     ! ---------------------
     read(1,*) line_buffer
-    read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
+    read(1,*) lpop, lprecise_pop, lmol_LTE, profile_width
     read(1,*) vitesse_turb
-    vitesse_turb = vitesse_turb * km_to_m ! Conversion en m.s-1
+    vitesse_turb = vitesse_turb * km_to_m ! Conversion to m.s-1
     read(1,*) n_molecules
     allocate(mol(n_molecules))
     do imol=1,n_molecules
        read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
        read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion en m.s-1
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion to m.s-1
        mol(imol)%vmin_center_rt = -mol(imol)%vmax_center_rt
        mol(imol)%l_sym_ima = l_sym_ima
        mol(imol)%n_speed_rt = 2*mol(imol)%n_speed_rt+1 ! change of format from v4.1
        read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
        read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
-       read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
+       read(1,*) mol(imol)%index_trans_ray_tracing(1:mol(imol)%nTrans_raytracing)
        mol(imol)%n_speed_center_rt = mol(imol)%n_speed_rt
        mol(imol)%n_extraV_rt = 0 ; mol(imol)%extra_deltaV_rt = 0.0
     enddo
@@ -4508,43 +4508,43 @@ end subroutine read_para215
     ! Star properties
     ! ---------------
     read(1,*) line_buffer
-    read(1,*,iostat=ios) n_etoiles
+    read(1,*,iostat=ios) n_stars
     if (ios/=0) then
        call error('you are using a 2-zone disk parameter file', &
             msg2='You must use the [-2zone] option to calculate a 2-zone disk')
     endif
-    allocate(etoile(n_etoiles), stat=alloc_status)
-    if (alloc_status > 0) call error('Allocation error etoile')
+    allocate(star(n_stars), stat=alloc_status)
+    if (alloc_status > 0) call error('Allocation error star')
 
-    if (n_etoiles > 1) then
+    if (n_stars > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
        l_sym_ima=.false.
        l_sym_centrale=.false.
        l_sym_axiale=.false.
     endif
 
-    do i=1,n_etoiles
-       read(1,*) etoile(i)%T, etoile(i)%r, etoile(i)%M, etoile(i)%x, etoile(i)%y, etoile(i)%z, etoile(i)%find_spectrum
-       if (.not.etoile(i)%find_spectrum) then
-          read(1,*) etoile(i)%spectre
+    do i=1,n_stars
+       read(1,*) star(i)%T, star(i)%r, star(i)%M, star(i)%x, star(i)%y, star(i)%z, star(i)%find_spectrum
+       if (.not.star(i)%find_spectrum) then
+          read(1,*) star(i)%spectrum
        else
           read(1,*) line_buffer
        endif
-       etoile(i)%lb_body = .false.
+       star(i)%lb_body = .false.
 
-       ! Passage rayon en AU
-       etoile(i)%r = etoile(i)%r * Rsun_to_AU
+       ! Convert radius to AU
+       star(i)%r = star(i)%r * Rsun_to_AU
 
-       read(1,*) etoile(i)%fUV, etoile(i)%slope_UV
-       etoile(i)%slope_UV = etoile(i)%slope_UV - 2.0  ! Fnu -> F_lambda
+       read(1,*) star(i)%fUV, star(i)%slope_UV
+       star(i)%slope_UV = star(i)%slope_UV - 2.0  ! Fnu -> F_lambda
     enddo
-    etoile(:)%vx = 0.0 ; etoile(:)%vy = 0.0 ; etoile(:)%vz = 0.0
-    etoile(:)%force_Mdot = .false.
-    etoile(:)%Mdot = 0.0
+    star(:)%vx = 0.0 ; star(:)%vy = 0.0 ; star(:)%vz = 0.0
+    star(:)%force_Mdot = .false.
+    star(:)%Mdot = 0.0
 
     close(unit=1)
 
-    nbre_photons_lim = nbre_photons_lim*real(N_thet)*real(N_phi)*real(nbre_photons_lambda)
+    n_photons_lim = n_photons_lim*real(N_thet)*real(N_phi)*real(n_photons_lambda)
 
     return
 
@@ -4560,7 +4560,7 @@ end subroutine read_para215
 
     integer :: i, j, alloc_status, ios, ind_pop, status, imol
 
-    real(kind=dp) :: size_neb_tmp, somme
+    real(kind=dp) :: size_neb_tmp, total_sum
     real :: gas_dust
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
@@ -4568,7 +4568,7 @@ end subroutine read_para215
 
     character(len=100) :: line_buffer
 
-    ! Lecture du fichier de parametres
+    ! Reading the parameter file
     open(unit=1, file=para, status='old')
 
     read(1,*) para_version
@@ -4580,9 +4580,9 @@ end subroutine read_para215
     ! Number of photon packages
     ! -------------------------
     read(1,*) line_buffer
-    read(1,*) nbre_photons_loop ;  read(1,*) nbre_photons_eq_th ; read(1,*) nbre_photons_lambda ;
-    read(1,*) nbre_photons_image
-    nbre_photons_tot=real(nbre_photons_loop)*real(nbre_photons_eq_th)
+    read(1,*) n_photons_loop ;  read(1,*) n_photons_eq_th ; read(1,*) n_photons_lambda ;
+    read(1,*) n_photons_image
+    n_photons_total=real(n_photons_loop)*real(n_photons_eq_th)
     tau_seuil  = 1.0e31
     wl_seuil = 0.81
 
@@ -4663,7 +4663,7 @@ end subroutine read_para215
     ! ---------------
     read(1,*) line_buffer
     read(1,*) n_zones
-    ! Allocation des variables pour disque a une zone
+    ! Variable allocation for 1-zone disk
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error disk parameters')
     disk_zone%exp_beta=0.0; disk_zone%surf=0.0; disk_zone%sclht=0.0; disk_zone%diskmass=0.0; disk_zone%rref=0.0
@@ -4718,7 +4718,7 @@ end subroutine read_para215
     n_pop=0
     do j=1, n_zones
        read(1,*) n_especes(j)
-       somme=0.0
+       total_sum=0.0
        do i=1, n_especes(j)
           n_pop = n_pop+1
           read(1,*) dust_pop_tmp(n_pop)%indices(1), dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
@@ -4727,7 +4727,7 @@ end subroutine read_para215
           if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
           if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
           if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
-          somme = somme + dust_pop_tmp(n_pop)%frac_mass
+          total_sum = total_sum + dust_pop_tmp(n_pop)%frac_mass
           dust_pop_tmp(n_pop)%zone = j
 
           dust_pop_tmp(n_pop)%n_components = 1
@@ -4738,22 +4738,22 @@ end subroutine read_para215
           dust_pop_tmp(n_pop)%is_DustEM_opacity_file = .false.
        enddo
 
-       ! renormalisation des fraction en masse
+       ! Renormalization of mass fractions
        do i=1,n_especes(j)
-          dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
-          dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
+          dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/total_sum
+          dust_pop_tmp(n_pop-n_especes(j)+i)%mass =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
        enddo
 
     enddo !n_zones
 
     if (lRE_LTE.and.lRE_nLTE) call error("cannot mix grains in LTE and nLTE")
 
-    ! variables triees
+    ! sorted variables
     allocate(dust_pop(n_pop), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error n_pop tmp')
     dust_pop%is_PAH = .false.
 
-    ! Classement des populations de grains : LTE puis nLTE puis nRE
+    ! Classification of grain populations: LTE then nLTE then nRE
     ind_pop = 0
     grain_RE_LTE_start = 1
     grain_RE_LTE_end = 0
@@ -4819,21 +4819,21 @@ end subroutine read_para215
     ! Molecular RT settings
     ! ---------------------
     read(1,*) line_buffer
-    read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
+    read(1,*) lpop, lprecise_pop, lmol_LTE, profile_width
     read(1,*) vitesse_turb
-    vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
+    vitesse_turb = vitesse_turb * 1.e3 ! Conversion to m.s-1
     read(1,*) n_molecules
     allocate(mol(n_molecules))
     do imol=1,n_molecules
        read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
        read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * 1.e3 ! Conversion en m.s-1
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * 1.e3 ! Conversion to m.s-1
        mol(imol)%vmin_center_rt = -mol(imol)%vmax_center_rt
        mol(imol)%l_sym_ima = l_sym_ima
        mol(imol)%n_speed_rt = 2*mol(imol)%n_speed_rt+1 ! change of format from v4.1
        read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
        read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
-       read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
+       read(1,*) mol(imol)%index_trans_ray_tracing(1:mol(imol)%nTrans_raytracing)
        mol(imol)%n_speed_center_rt = mol(imol)%n_speed_rt
        mol(imol)%n_extraV_rt = 0 ; mol(imol)%extra_deltaV_rt = 0.0
     enddo
@@ -4842,41 +4842,41 @@ end subroutine read_para215
     ! Star properties
     ! ---------------
     read(1,*) line_buffer
-    read(1,*,iostat=ios) n_etoiles
+    read(1,*,iostat=ios) n_stars
     if (ios/=0) then
        call error("you are using a 2-zone disk parameter file", &
             msg2='You must use the [-2zone] option to calculate a 2-zone disk')
     endif
-    allocate(etoile(n_etoiles), stat=alloc_status)
-    if (alloc_status > 0) call error('Allocation error etoile')
+    allocate(star(n_stars), stat=alloc_status)
+    if (alloc_status > 0) call error('Allocation error star')
 
-    if (n_etoiles > 1) then
+    if (n_stars > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
        l_sym_ima=.false.
        l_sym_centrale=.false.
        l_sym_axiale=.false.
     endif
 
-    do i=1,n_etoiles
-       read(1,*) etoile(i)%T, etoile(i)%r, etoile(i)%M, etoile(i)%x, etoile(i)%y, etoile(i)%z, etoile(i)%find_spectrum, &
-            etoile(i)%fUV
-       if (.not.etoile(i)%find_spectrum) then
-          read(1,*) etoile(i)%spectre
+    do i=1,n_stars
+       read(1,*) star(i)%T, star(i)%r, star(i)%M, star(i)%x, star(i)%y, star(i)%z, star(i)%find_spectrum, &
+            star(i)%fUV
+       if (.not.star(i)%find_spectrum) then
+          read(1,*) star(i)%spectrum
        else
           read(1,*) line_buffer
        endif
-       etoile(i)%lb_body = .false.
+       star(i)%lb_body = .false.
 
-       ! Passage rayon en AU
-       etoile(i)%r = etoile(i)%r * Rsun_to_AU
+       ! Convert radius to AU
+       star(i)%r = star(i)%r * Rsun_to_AU
     enddo
-    etoile(:)%vx = 0.0 ; etoile(:)%vy = 0.0 ; etoile(:)%vz = 0.0
-    etoile(:)%force_Mdot = .false.
-    etoile(:)%Mdot = 0.0
+    star(:)%vx = 0.0 ; star(:)%vy = 0.0 ; star(:)%vz = 0.0
+    star(:)%force_Mdot = .false.
+    star(:)%Mdot = 0.0
 
     close(unit=1)
 
-    nbre_photons_lim = nbre_photons_lim*real(N_thet)*real(N_phi)*real(nbre_photons_lambda)
+    n_photons_lim = n_photons_lim*real(N_thet)*real(N_phi)*real(n_photons_lambda)
 
     return
 

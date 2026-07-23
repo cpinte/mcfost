@@ -1,28 +1,27 @@
-module constantes
+module constants
 
-  use parametres
+  use parameters
 
   implicit none
   save
 
-  ! Quelques reels utiles
   real(kind=dp), parameter :: pi = 3.141592653589793238462643383279502884197_dp
-  real(kind=dp), parameter :: deux_pi = 2.0_dp * pi
-  real(kind=dp), parameter :: un_sur_deux_pi = 1.0_dp/deux_pi
-  real(kind=dp), parameter :: quatre_pi = 4.0_dp * pi
-  real(kind=dp), parameter :: quatre_tiers_pi = 4.0_dp/3.0_dp * pi
-  real(kind=dp), parameter :: pi_sur_deux = 0.5_dp * pi
-  real(kind=dp), parameter :: un_tiers = 1.0_dp / 3.0_dp
+  real(kind=dp), parameter :: two_pi = 2.0_dp * pi
+  real(kind=dp), parameter :: inv_two_pi = 1.0_dp/two_pi
+  real(kind=dp), parameter :: four_pi = 4.0_dp * pi
+  real(kind=dp), parameter :: four_thirds_pi = 4.0_dp/3.0_dp * pi
+  real(kind=dp), parameter :: half_pi = 0.5_dp * pi
+  real(kind=dp), parameter :: one_third = 1.0_dp / 3.0_dp
 
   real(kind=dp), parameter :: sqrtpi=sqrt(pi)!1.77245385090551
   ! --- 1/(2sqrt(2)), needed for anisotropy of radiation ---
   real(kind=dp), parameter ::  twosqrttwo = 0.35355339059327
 
-  ! Constantes en SI
+  ! SI constants
   real(kind=dp), parameter :: hp = 6.626070040e-34_dp  ! Planck (J.s) CODATA 2014
   real(kind=dp), parameter :: kb = 1.38064852e-23_dp   ! Boltzmann (J.K^-1) CODATA 2014
-  real(kind=dp), parameter :: c_light = 299792458._dp  ! vitesse lumiere (m.s^-1) CODATA 2014
-  real, parameter :: cst_th=c_light*hp/kb  ! pour calcul de (h c)/(lambda k T)
+  real(kind=dp), parameter :: c_light = 299792458._dp  ! speed of light (m.s^-1) CODATA 2014
+  real, parameter :: thermal_const=c_light*hp/kb  ! pour Calculation of (h c)/(lambda k T)
   real, parameter :: sigma = 5.670367e-8     ! Stefan (en W/(m^2.K^4)) CODATA 2014
   real, parameter :: Ggrav = 6.67428e-11   ! (m^3.s^-2.kg^-1) e-8 en cgs, CODATA 2016, value recommended by IAU 2015 B3
   real(kind=dp), parameter :: electron_charge = 1.6021766208e-19_dp  ! Coulombs CODATA 2014
@@ -42,15 +41,15 @@ module constantes
   real(kind=dp), parameter ::  E_Rydberg=2.1798741d-18 ! Ion. pot. Hydrogen [J]
   real(kind=dp), parameter ::  theta0 = 5.03974756d+3! log10(e) * eV/k [K^-1]
   real(kind=dp), parameter ::  abarh = 7.42d-41 ! polarizabilty of Hydrogen in [Fm^2]
-  real(kind=dp), parameter ::  pia0squarex2 = deux_pi * rBohr**2 ! constant for collision Cross-sections
+  real(kind=dp), parameter ::  pia0squarex2 = two_pi * rBohr**2 ! constant for collision Cross-sections
 
   !there is an error in LL04
-  real(kind=dp), parameter ::  Larmor = (electron_charge / (quatre_pi*mel)) !s^-1 / T
+  real(kind=dp), parameter ::  Larmor = (electron_charge / (four_pi*mel)) !s^-1 / T
   !LamB = nuL/nu0 * lambda0 = nuL/(c/lambda0) * lambda0 = nuL/c * lambda0**2
   !lamD = lambda0 * vbroad/c --> vB = lamB/lamD = nuL/c * lambda0**2 * c / lambda0 / vbroad
   !vB = nuL * lambda0 / vbroad in T^-1
 
-  ! Changements d'unites
+  ! Changements d'units
   ! Angles
   real(kind=dp), parameter :: deg_to_rad = pi/180.0_dp
   real(kind=dp), parameter :: rad_to_deg = 1.0/deg_to_rad
@@ -123,7 +122,7 @@ module constantes
 
   ! Mixed constants
   real(kind=dp), parameter :: kb_on_mH = kb/(amu*g_to_kg)  ! convert amu to kg
-  real(kind=dp), parameter :: sigma_e = 8.0*pi/3.0 * (electron_charge/(sqrt(quatre_pi*EPSILON_0) *&
+  real(kind=dp), parameter :: sigma_e = 8.0*pi/3.0 * (electron_charge/(sqrt(four_pi*EPSILON_0) *&
        (sqrt(mel)*c_light)))**4.d0 !Thomson cross-section
   ! Photoionisation Xsection of Hydrogen, at nu0, alpha0 = sigma0_H * g_bg(0) * neff / Z/Z
   ! Note an error in Hubeny Mihalas eq. 7.92. unit should be cm2 not cm^-2 !
@@ -138,11 +137,11 @@ module constantes
   !sigma0_H_ff = K0
   real(kind=dp), parameter :: amu_kg = amu * g_to_kg      ! atomic mass unit [kg]
   real(kind=dp), parameter    :: hc = HP * c_light
-  real(kind=dp), parameter    :: hc_fourPI = hc/quatre_pi
-  real(kind=dp), parameter    :: fourPI_hc = quatre_pi/hc
+  real(kind=dp), parameter    :: hc_fourPI = hc/four_pi
+  real(kind=dp), parameter    :: fourPI_hc = four_pi/hc
   real(kind=dp), parameter    :: twohc = (2.*HP * C_LIGHT) / (NM_TO_M)**(3d0)
-  real(kind=dp), parameter    :: hc_k = cst_th / NM_TO_M
-  real(kind=dp), parameter    :: fourPI_h = quatre_pi / HP
+  real(kind=dp), parameter    :: hc_k = thermal_const / NM_TO_M
+  real(kind=dp), parameter    :: fourPI_h = four_pi / HP
   real(kind=dp), parameter, private :: factor1D = 2.0, factor3D = 8.0/PI
   !previously: Vtherm = 2*KBOLTZMANN/AMU and v=sqrt(Vtherm * T / m + xit**2)
   real(kind=dp), parameter    :: Vtherm = kb/amu_kg * factor1D !m^2/s^2/K
@@ -159,4 +158,4 @@ module constantes
   integer, parameter :: huge_integer = huge(1)
   real , parameter :: max_int = real(huge_integer) * (1.0-1.0e-5)
 
-end module constantes
+end module constants

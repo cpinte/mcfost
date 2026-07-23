@@ -1,14 +1,14 @@
 module wavelengths
 
   use mcfost_env, only : dp, band
-  use parametres
+  use parameters
   use messages
 
   implicit none
 
   logical :: lmono0, lmono
 
-  ! Gamme de longueurs d'onde utilisees
+  ! Wavelength range in use
   real :: lambda_min, lambda_max
   integer :: n_lambda, n_lambda2
   real(kind=dp) :: delta_lambda
@@ -22,7 +22,7 @@ contains
 
 
 subroutine init_lambda()
-  ! Initialisation table de longueurs d'onde
+  ! Initialise the wavelength table
 
   integer :: i, alloc_status
 
@@ -39,7 +39,6 @@ subroutine init_lambda()
   tab_amu1_coating=0.0; tab_amu2_coating=0.0;
 
   if (lmono0) then
-     ! Lecture longueur d'onde
      read(band,*) tab_lambda(1)
      tab_delta_lambda(1) = 1.0
      tab_lambda_inf(1) = tab_lambda(1)
@@ -73,7 +72,7 @@ end subroutine init_lambda
 !**********************************************************************
 
 subroutine init_lambda2()
-  ! Initialisation table en lambda sed
+  ! Initialise the SED wavelength table
 
   implicit none
 

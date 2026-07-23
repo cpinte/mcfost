@@ -1,6 +1,6 @@
 module occupation_probability
 
-  use constantes
+  use constants
   use atom_type, only : atomic_orbital_sqradius, AtomicContinuum, hydrogen, helium
   use elements_type, only : elems
 
@@ -111,7 +111,7 @@ module occupation_probability
     m = 1.0/neff/neff - hp * c_light / nm_to_m / lambda / chi0 / Zsq !I'm not sure here, in Dam it is Z**2 * IonH
     !doesn't change for Hydrogen
     mp = 1.0 / sqrt(abs(m))
-   
+
     w1 = wocc_n(t, ne, neff, Zr, Zp, nH1)
     f_dissolve = 1.0_dp
 
@@ -119,7 +119,7 @@ module occupation_probability
       if ((lambda(la) > cont%lambda0).and.(m(la)>0.0)) then
          f_dissolve(la) = 1.0 - wocc_n(t, ne, mp(la), Zr, Zp, nh1) / w1
       endif
-    enddo 
+    enddo
 
 
     return

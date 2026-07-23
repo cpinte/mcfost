@@ -1,7 +1,7 @@
 module coated_sphere
 
-  use parametres
-  use constantes
+  use parameters
+  use constants
   use grains
   use utils, only : Gauss_Legendre_quadrature
   use messages
@@ -17,12 +17,12 @@ module coated_sphere
 
 contains
 
-  subroutine mueller_coated_sphere(lambda,taille_grain,wl,amu1,amu2,amu1_coat,amu2_coat,qext,qsca,gsca)
+  subroutine mueller_coated_sphere(lambda,igrain,wl,amu1,amu2,amu1_coat,amu2_coat,qext,qsca,gsca)
     !***************************************************************
-    ! calcule les elements de la matrice de diffusion a partir de
-    ! la sous-routine dmilay (coated grains)
+    ! Computes the scattering matrix elements using
+    ! the dmilay subroutine (coated grains)
     !
-    !        calcule aussi "g" = le parametre d'asymetrie
+    !        Also computes 'g' = the asymmetry parameter
     !
     ! C. Pinte 19 Mars 2008
     ! G. Duchene 22 Avril 2011
@@ -30,7 +30,7 @@ contains
 
     implicit none
 
-    integer, intent(in) :: lambda, taille_grain
+    integer, intent(in) :: lambda, igrain
     real, intent(in) :: amu1, amu2, amu1_coat, amu2_coat
     real, intent(in) :: wl
     real, intent(out) :: qext, qsca, gsca
@@ -40,7 +40,7 @@ contains
     complex, dimension(nang_scatt+1) :: S1,S2
 
     real :: rcore, rshell, wvno, gqsc
-    real :: vi1, vi2, norme, somme_prob, qbs, x, theta, dtheta
+    real :: vi1, vi2, norm, somme_prob, qbs, x, theta, dtheta
     complex :: refrel, refrel_coat
     real, dimension(0:nang_scatt) ::  S11,S12,S33,S34
 
@@ -52,31 +52,31 @@ contains
 
     if (modulo(nang_scatt,2)==1) call error("nang_scatt must be an EVEN number")
 
-    ! Si fonction de HG, on ne calcule pas la fonction de phase
+    ! If using the HG phase function, skip the phase function calculation
     if (aniso_method==2) then
        nang=1
     else
        nang= (nang_scatt+1) / 2 + 1
     endif
 
-    rcore=r_core(taille_grain)
-    rshell=r_grain(taille_grain)
+    rcore=r_core(igrain)
+    rshell=r_grain(igrain)
 
     wvno= 2.0 * pi / wl
     x = rshell * wvno
 
     call dMiLay(rcore,rshell,wvno,refrel_coat,refrel,nang, qext,qsca,qbs,gqsc,s1,s2)
-    gsca = gqsc / qsca ! dmilay return gsca * qsca
+    gsca = gqsc / qsca ! dmilay returns gsca * qsca
 
     if (lforce_HG) gsca = forced_g
 
 
-    ! Passage des valeurs dans les tableaux de mcfost
+    ! Store values in the mcfost arrays
     if (aniso_method==1) then
 
        !  QABS=QEXT-QSCA
-       ! Calcul des elements de la matrice de diffusion
-       ! indices decales de 1 par rapport a bhmie
+       ! Compute the scattering matrix elements
+       ! indices offset by 1 relative to bhmie
        do J=0,nang_scatt
           vi1 = cabs(S2(J+1))*cabs(S2(J+1))
           vi2 = cabs(S1(J+1))*cabs(S1(J+1))
@@ -86,39 +86,39 @@ contains
           s34(j)=aimag(S2(J+1)*conjg(S1(J+1)))
        enddo !j
 
-       ! Integration S11 pour tirer angle
+       ! Integrate S11 to draw the scattering angle
        if (scattering_method==1) then
-          prob_s11(lambda,taille_grain,0)=0.0
+          prob_s11(lambda,igrain,0)=0.0
           dtheta = pi/real(nang_scatt)
-          do j=2,nang_scatt ! probabilite de diffusion jusqu'a l'angle j, on saute j=0 car sin(theta) = 0
+          do j=2,nang_scatt ! scattering probability up to angle j, skip j=0 since sin(theta) = 0
              theta = real(j)*dtheta
-             prob_s11(lambda,taille_grain,j)=prob_s11(lambda,taille_grain,j-1)+s11(j)*sin(theta)*dtheta
+             prob_s11(lambda,igrain,j)=prob_s11(lambda,igrain,j-1)+s11(j)*sin(theta)*dtheta
           enddo
 
-          ! s11 est calculee telle que la normalisation soit: 0.5*x**2*qsca
-          ! il y a un soucis numerique quand x >> 1 car la resolution en angle n'est pas suffisante
-          ! On rate le pic de diffraction (en particulier entre 0 et 1)
+          ! s11 is computed such that the normalisation is: 0.5*x**2*qsca
+          ! There is a numerical issue when x >> 1 because the angular resolution is insufficient
+          ! The diffraction peak is missed (particularly between 0 and 1)
           somme_prob = 0.5*x**2*qsca
-          prob_s11(lambda,taille_grain,1:nang_scatt) = prob_s11(lambda,taille_grain,1:nang_scatt) + &
-               somme_prob - prob_s11(lambda,taille_grain,nang_scatt)
+          prob_s11(lambda,igrain,1:nang_scatt) = prob_s11(lambda,igrain,1:nang_scatt) + &
+               somme_prob - prob_s11(lambda,igrain,nang_scatt)
 
-          ! Normalisation de la proba cumulee a 1
-          prob_s11(lambda,taille_grain,:)=prob_s11(lambda,taille_grain,:)/somme_prob
+          ! Normalise the cumulative probability to 1
+          prob_s11(lambda,igrain,:)=prob_s11(lambda,igrain,:)/somme_prob
        endif ! scattering_method==1
 
        do j=0,nang_scatt
-          if (scattering_method==1) then ! Matrice de Mueller par grain
-             ! Normalisation pour diffusion selon fonction de phase (tab_s11=1.0 sert dans stokes)
-             norme=s11(j)
-          else ! Sinon normalisation a Qsca
-             ! La normalisation par default : 0.5*x**2*Qsca --> correction par 0.5*x**2
-             norme = 0.5 * x**2
+          if (scattering_method==1) then ! Mueller matrix per grain
+             ! Normalisation for scattering via phase function (tab_s11=1.0 used in Stokes)
+             norm=s11(j)
+          else ! Otherwise normalise to Qsca
+             ! Default normalisation: 0.5*x**2*Qsca --> correction by 0.5*x**2
+             norm = 0.5 * x**2
           endif
 
-          tab_s11(j,taille_grain,lambda) = s11(j) / norme
-          tab_s12(j,taille_grain,lambda) = s12(j) / norme
-          tab_s33(j,taille_grain,lambda) = s33(j) / norme
-          tab_s34(j,taille_grain,lambda) = s34(j) / norme
+          tab_s11(j,igrain,lambda) = s11(j) / norm
+          tab_s12(j,igrain,lambda) = s12(j) / norm
+          tab_s33(j,igrain,lambda) = s33(j) / norm
+          tab_s34(j,igrain,lambda) = s34(j) / norm
        enddo
 
     endif ! aniso_method ==1
@@ -129,34 +129,34 @@ contains
 
   ! **********************************************************************
 
-  subroutine mueller_DHS(lambda,taille_grain,wl,amu1,amu2,qext,qsca,gsca)
+  subroutine mueller_DHS(lambda,igrain,wl,amu1,amu2,qext,qsca,gsca)
     !***************************************************************
-    ! Adapte de la routine q_dhs de Michiel Min
+    ! Adapted from the q_dhs routine by Michiel Min
     !
     ! C. Pinte 30 janvier 2013
     !****************************************************************
 
     implicit none
 
-    integer, intent(in) :: lambda, taille_grain
+    integer, intent(in) :: lambda, igrain
     real, intent(in) :: amu1, amu2
     real, intent(in) :: wl
     real, intent(out) :: qext, qsca, gsca
 
     integer :: i,j, nang, ipop
 
-    real :: Qext_HS, Qsca_HS, Qabs_HS, gqsc_HS, gsca_HS ! pour 1 HS
+    real :: Qext_HS, Qsca_HS, Qabs_HS, gqsc_HS, gsca_HS ! for one hollow sphere
     complex, dimension(nang_scatt+1) :: s1,s2, s1_HS, s2_HS
 
     real :: a, rcore, rshell, wvno, factor, Cext, Csca
-    real :: vi1, vi2, norme, somme_prob, theta, dtheta, x
+    real :: vi1, vi2, norm, somme_prob, theta, dtheta, x
     complex :: refrel, refrel_coat
     real, dimension(0:nang_scatt) :: S11,S12,S33,S34
 
     integer :: N_vf
     real(kind=dp), dimension(:), allocatable :: f, wf
 
-    N_vf = min(max(20., deux_pi * r_grain(taille_grain)/tab_lambda(lambda)), 100.)
+    N_vf = min(max(20., two_pi * r_grain(igrain)/tab_lambda(lambda)), 100.)
     allocate(f(N_vf), wf(N_vf))
 
     refrel = cmplx(1.0,0.0) ! vide
@@ -165,37 +165,37 @@ contains
 
     if (modulo(nang_scatt,2)==1) call error("nang_scatt must be an EVEN number")
 
-    ! Si fonction de HG, on ne calcule pas la fonction de phase
+    ! If using the HG phase function, skip the phase function calculation
     if (aniso_method==2) then
        nang = 1
     else
        nang = (nang_scatt+1) / 2 + 1
     endif
 
-    a = r_grain(taille_grain)
+    a = r_grain(igrain)
 
     wvno= 2.0 * pi / wl
     x = wvno * a
 
-    ipop = grain(taille_grain)%pop
+    ipop = grain(igrain)%pop
 
-    ! Calcul des poids pour integration de Gauss-Legendre
+    ! Compute weights for Gauss-Legendre integration
     call Gauss_Legendre_quadrature(0.0_dp,real(dust_pop(ipop)%dhs_maxf,kind=dp),N_vf, f, wf) ; wf = wf/sum(wf)
-    ! todo : a ne faire que pour 1 taille de grain et 1 lambda, sauf si n_vf change
+    ! todo: only need to do this for 1 grain size and 1 wavelength, unless n_vf changes
 
     Cext=0 ; Csca=0 ; gsca=0 ; s1=0 ; s2=0
     do i=1,N_vf
-       rshell = a/((1.-f(i))**un_tiers)
-       rcore = rshell * f(i)**un_tiers
+       rshell = a/((1.-f(i))**one_third)
+       rcore = rshell * f(i)**one_third
 
        call dMilay(rcore,rshell,wvno,refrel_coat,refrel,nang, Qext_HS,Qsca_HS,Qabs_HS,gqsc_HS,s1_HS,s2_HS)
-       gsca_HS = gqsc_HS / qsca_HS ! dmilay return gsca * qsca
+       gsca_HS = gqsc_HS / qsca_HS ! dmilay returns gsca * qsca
 
        if(qext_HS < 0_dp) qext_HS = 0_dp
        if(qsca_HS < 0_dp) qsca_HS = 0_dp
 
        factor = pi*rshell**2 * wf(i)
-       Cext = Cext + factor * Qext_HS  ! pas sur que ce soit bon, verifier normalization qext, (rshell/lambda)**2 doit deja y etre
+       Cext = Cext + factor * Qext_HS  ! unsure if correct, check qext normalisation, (rshell/lambda)**2 should already be included
        Csca = Csca + factor * Qsca_HS
        gsca = gsca + factor * gqsc_HS ! gqsc_HS == gsca_HS * qsca_HS
 
@@ -210,12 +210,12 @@ contains
     qext = cext/factor
     qsca = csca/factor
 
-    ! Passage des valeurs dans les tableaux de mcfost
+    ! Store values in the mcfost arrays
     if (aniso_method==1) then
 
        ! QABS=QEXT-QSCA
-       ! Calcul des elements de la matrice de diffusion
-       ! indices decales de 1 par rapport a bhmie
+       ! Compute the scattering matrix elements
+       ! indices offset by 1 relative to bhmie
        do J=0,nang_scatt
           vi1 = cabs(s2(j+1))*cabs(s2(j+1))
           vi2 = cabs(s1(j+1))*cabs(s1(j+1))
@@ -225,36 +225,36 @@ contains
           s34(j)=aimag(s2(j+1)*conjg(s1(j+1)))
        enddo !j
 
-       prob_s11(lambda,taille_grain,0)=0.0
+       prob_s11(lambda,igrain,0)=0.0
        dtheta = pi/real(nang_scatt)
-       do j=2,nang_scatt ! probabilite de diffusion jusqu'a l'angle j, on saute j=0 car sin(theta) = 0
+       do j=2,nang_scatt ! scattering probability up to angle j, skip j=0 since sin(theta) = 0
           theta = real(j)*dtheta
-          prob_s11(lambda,taille_grain,j)=prob_s11(lambda,taille_grain,j-1)+s11(j)*sin(theta)*dtheta
+          prob_s11(lambda,igrain,j)=prob_s11(lambda,igrain,j-1)+s11(j)*sin(theta)*dtheta
        enddo
 
-       ! s11 est calculee telle que la normalisation soit: 0.5*x**2*qsca
-       ! il y a un soucis numerique quand x >> 1 car la resolution en angle n'est pas suffisante
-       ! On rate le pic de diffraction (en particulier entre 0 et 1)
+       ! s11 is computed such that the normalisation is: 0.5*x**2*qsca
+       ! There is a numerical issue when x >> 1 because the angular resolution is insufficient
+       ! The diffraction peak is missed (particularly between 0 and 1)
        somme_prob = 0.5*x**2*qsca
-       prob_s11(lambda,taille_grain,1:nang_scatt) = prob_s11(lambda,taille_grain,1:nang_scatt) + &
-            somme_prob - prob_s11(lambda,taille_grain,nang_scatt)
+       prob_s11(lambda,igrain,1:nang_scatt) = prob_s11(lambda,igrain,1:nang_scatt) + &
+            somme_prob - prob_s11(lambda,igrain,nang_scatt)
 
-       ! Normalisation de la proba cumulee a 1
-       prob_s11(lambda,taille_grain,:)=prob_s11(lambda,taille_grain,:)/somme_prob
+       ! Normalise the cumulative probability to 1
+       prob_s11(lambda,igrain,:)=prob_s11(lambda,igrain,:)/somme_prob
 
        do j=0,nang_scatt
-          if (scattering_method==1) then ! Matrice de Mueller par grain
-             ! Normalisation pour diffusion selon fonction de phase (tab_s11=1.0 sert dans stokes)
-             norme=s11(j)
-          else ! Sinon normalisation a Qsca
-             ! La normalisation par default : 0.5*x**2*Qsca --> correction par 0.5*x**2
-             norme = 0.5 * x**2
+          if (scattering_method==1) then ! Mueller matrix per grain
+             ! Normalisation for scattering via phase function (tab_s11=1.0 used in Stokes)
+             norm=s11(j)
+          else ! Otherwise normalise to Qsca
+             ! Default normalisation: 0.5*x**2*Qsca --> correction by 0.5*x**2
+             norm = 0.5 * x**2
           endif
 
-          tab_s11(j,taille_grain,lambda) = s11(j) / norme
-          tab_s12(j,taille_grain,lambda) = s12(j) / norme
-          tab_s33(j,taille_grain,lambda) = s33(j) / norme
-          tab_s34(j,taille_grain,lambda) = s34(j) / norme
+          tab_s11(j,igrain,lambda) = s11(j) / norm
+          tab_s12(j,igrain,lambda) = s12(j) / norm
+          tab_s33(j,igrain,lambda) = s33(j) / norm
+          tab_s34(j,igrain,lambda) = s34(j) / norm
        enddo
 
     endif ! aniso_method ==1

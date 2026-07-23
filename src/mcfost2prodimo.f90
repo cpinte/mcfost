@@ -1,6 +1,6 @@
 module mcfost2ProDiMo
 
-  use constantes, only : pi
+  use constants, only : pi
   use messages
 
   implicit none
@@ -352,7 +352,7 @@ program test
 
   type(mcfost_model) :: mcfost
 
-  real :: fact_lambda, delta_lambda, wl, delta_wl, B, Sum_J, Sum_B, cst_th, T, Sum
+  real :: fact_lambda, delta_lambda, wl, delta_wl, B, Sum_J, Sum_B, thermal_const, T, Sum
   integer :: i, j, l
 
   real, parameter :: hp = 6.626e-34
@@ -367,7 +367,7 @@ program test
   dust_to_gas_c = 0.01
 
 
-  cst_th = hp*c/kb
+  thermal_const = hp*c/kb
 
   mcfost =  read_mcfost()
 
@@ -409,7 +409,7 @@ program test
 !        do l=1,n_lambda
 !           wl = mcfost%wavelengths(l) * 1.e-6
 !           delta_wl = wl * delta_lambda
-!           B = 2.*hp*c**2 *  1./ ( (exp(cst_th/(T*wl)) -1.) * wl**5 )
+!           B = 2.*hp*c**2 *  1./ ( (exp(thermal_const/(T*wl)) -1.) * wl**5 )
 !
 !           ! mcfost%J is lambda.J_lambda
 !           Sum_J = Sum_J + mcfost%kappa_abs(i,j,l) * mcfost%J(i,j,l)/wl * delta_wl

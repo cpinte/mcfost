@@ -1,7 +1,7 @@
 module grid
 
-  use parametres
-  use constantes
+  use parameters
+  use constants
   use grains
   use utils
   use sort, only : index_quicksort
@@ -14,9 +14,9 @@ module grid
   implicit none
 
   procedure(cross_cylindrical_cell), pointer :: cross_cell => null()
-  procedure(pos_em_cellule_cyl), pointer :: pos_em_cellule => null()
+  procedure(pos_em_cell_cyl), pointer :: pos_em_cell => null()
   procedure(move_to_grid_cyl), pointer :: move_to_grid => null()
-  procedure(indice_cellule_cyl), pointer :: indice_cellule => null()
+  procedure(index_cell_cyl), pointer :: index_cell => null()
   procedure(test_exit_grid_cyl), pointer :: test_exit_grid => null()
   procedure(define_cylindrical_grid), pointer :: define_grid => null()
   procedure(distance_to_closest_wall_cyl), pointer :: distance_to_closest_wall => null()
@@ -134,8 +134,8 @@ module grid
 !******************************************************************************
 
 subroutine define_physical_zones()
-  ! Recheche les connections de zone 2 a 2
-  ! on doit pouvoir faire mieux que ca
+  ! Searching for connections between zones 2 by 2
+  ! we should be able to do better than this
   ! C. Pinte
   ! 03/05/11
 
@@ -159,15 +159,15 @@ subroutine define_physical_zones()
         minR = disk_zone(i)%Rmin
         maxR = disk_zone(i)%Rmax
 
-        ! Besoin d'iterer au cas ou les connections entre zones sont multiples
-        ! probablement pas autant mais ca ne coute rien en calcul
+        ! Need to iterate in case connections between zones are multiple
+        ! probably not that many, but it costs nothing in calculation
         do iter=1, n_zones-1
            do j=i+1, n_zones
 
               r1 = disk_zone(j)%Rmin
               r2 = disk_zone(j)%Rmax
 
-              ! Test if the 2 zones are imbrigated
+              ! Test if the 2 zones are overlapping
               test_j_in_i = ((r1 > minR).and.(r1 < maxR)) .or. ((r2 > minR).and.(r2 <= maxR))
               test_i_in_j = ((minR > r1).and.(minR < r2)) .or. ((maxR > r1).and.(maxR <= r2))
 
@@ -184,7 +184,7 @@ subroutine define_physical_zones()
                  ! Updating minimum & maximum radii of region
                  minR = min(minR,r1)
                  maxR = max(maxR,r2)
-              endif ! test rayon
+              endif ! test radius
 
            enddo ! j
         enddo ! iter
@@ -235,10 +235,10 @@ subroutine define_physical_zones()
   Rmax = maxval(regions(:)%Rmax)
 
   if (Rmin < 0.0) call error("R_min < 0.0")
-  do i=1, n_etoiles
-     if ( (abs(etoile(i)%x) < tiny_real).and.(abs(etoile(i)%x) < tiny_real).and.(abs(etoile(i)%x) < tiny_real) ) then
-        if (etoile(i)%r > Rmin) then
-           write(*,*) "Rstar =", etoile(i)%r, "Rmin=", Rmin
+  do i=1, n_stars
+     if ( (abs(star(i)%x) < tiny_real).and.(abs(star(i)%x) < tiny_real).and.(abs(star(i)%x) < tiny_real) ) then
+        if (star(i)%r > Rmin) then
+           write(*,*) "Rstar =", star(i)%r, "Rmin=", Rmin
            call error("inner disk radius is smaller than stellar radius")
         endif
      endif
@@ -301,9 +301,9 @@ subroutine setup_grid()
      lspherical = .false.
      cross_cell => cross_Voronoi_cell
      !cross_cell => cross_Voronoi_cell_vect
-     pos_em_cellule => pos_em_cellule_Voronoi
+     pos_em_cell => pos_em_cell_voronoi
      move_to_grid => move_to_grid_Voronoi
-     indice_cellule => indice_cellule_Voronoi
+     index_cell => index_cell_voronoi
      test_exit_grid => test_exit_grid_Voronoi
      define_grid => define_Voronoi_grid
      distance_to_closest_wall => distance_to_closest_wall_Voronoi
@@ -336,9 +336,9 @@ subroutine setup_grid()
         lcylindrical = .true.
         lspherical = .false.
         cross_cell => cross_cylindrical_cell
-        pos_em_cellule => pos_em_cellule_cyl
+        pos_em_cell => pos_em_cell_cyl
         move_to_grid => move_to_grid_cyl
-        indice_cellule => indice_cellule_cyl
+        index_cell => index_cell_cyl
         test_exit_grid => test_exit_grid_cyl
         define_grid => define_cylindrical_grid
         distance_to_closest_wall => distance_to_closest_wall_cyl
@@ -346,9 +346,9 @@ subroutine setup_grid()
         lcylindrical = .false.
         lspherical = .true.
         cross_cell => cross_spherical_cell
-        pos_em_cellule => pos_em_cellule_sph
+        pos_em_cell => pos_em_cell_sph
         move_to_grid => move_to_grid_sph
-        indice_cellule => indice_cellule_sph
+        index_cell => index_cell_sph
         test_exit_grid => test_exit_grid_sph
         define_grid => define_cylindrical_grid ! same routine at the moment
         distance_to_closest_wall => distance_to_closest_wall_sph

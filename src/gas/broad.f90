@@ -1,6 +1,6 @@
 module broad
 
-   use constantes
+   use constants
    use atom_type
    use elements_type
    use grid, only : T, ne, vturb
@@ -164,7 +164,7 @@ module broad
          Z = line%atom%stage( line%i) + 1 !physical, not index
          ic = find_continuum(line%atom, line%i)
 
-         ERYDBERG = E_RYDBERG / (1.+Mel / (line%atom%weight*amu_kg)) !corection
+         ERYDBERG = E_RYDBERG / (1.+Mel / (line%atom%weight*amu_kg)) !correction
          neff_l = Z*sqrt(ERYDBERG/(line%atom%E(ic)-line%atom%E( line%i)))
          neff_u = Z*sqrt(ERYDBERG/(line%atom%E(ic)-line%atom%E( line%j)))
 
@@ -205,7 +205,7 @@ module broad
 
       n_lower = sqrt(line%atom%g(line%i)/2.)
       n_upper = sqrt(line%atom%g(line%j)/2.) !works because stark linear only for Hydrogen.
-      !at the moment. otherwise use n_eff, wich works for H
+      !at the moment. otherwise use n_eff, which works for H
 
       dn = real(n_upper - n_lower)
 
@@ -232,7 +232,7 @@ module broad
    !    ! need a check on other atoms, like Na and Ca.
    !    ! Do not use if the model atom is small, because the damping would be underestimated
    !    ! even by an order of magnitude.
-   !    ! Stimulated emission is neglected, the lower lovel is infinitely sharp.
+   !    ! Stimulated emission is neglected, the lower level is infinitely sharp.
    !    ! -------------------------------------------------------------------------- !
    !    type (AtomType), intent(in) :: atom
    !    type (AtomicLine), intent(in) :: line
@@ -280,7 +280,7 @@ module broad
    !       nu1j = M_TO_NM * CLIGHT / atom%lines(kr)%lambda0 !ground state is i
    !       a1 = sqrt(gr) * atom%lines(kr)%fosc / nu1j
    !    else !transition between two exited states
-   !       !only one is resonance boradened
+   !       !only one is resonance broadened
    !       nu1j = (atom%E(i) - atom%E(1)) / HPLANCK
    !       gr = atom%g(1) / atom%g(i)
    !       np = n_eff(atom%rydberg, atom%E(ic),atom%E(i), atom%stage(ic))

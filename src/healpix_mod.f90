@@ -19,8 +19,8 @@
 module healpix_mod
 
 	use mcfost_env, only	: dp
-	use constantes, only	: pi
-	use parametres, only	: n_cells
+	use constants, only	: pi
+	use parameters, only	: n_cells
 
 	implicit none
 

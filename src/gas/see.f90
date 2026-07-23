@@ -3,7 +3,7 @@ module see
     use atom_type
     use elements_type
     use grid
-    use parametres
+    use parameters
     use gas_contopac, only        : H_bf_Xsection
     use wavelengths, only         : n_lambda
     use wavelengths_gas, only     : Nlambda_max_line, Nlambda_max_trans, Nlambda_max_cont, n_lambda_cont, &
@@ -26,7 +26,7 @@ module see
     real(kind=dp), allocatable :: tab_Aji_cont(:,:,:), tab_Vij_cont(:,:,:)
 
 
-    !variables for non-LTE H (+He) ionisation
+    !variables for non-LTE H (+He) ionization
     integer :: Neq_ne, Neq_ng
     integer, allocatable, dimension(:,:) :: gs_ion !index of the ground states of each ion
     real(kind=dp), allocatable :: gtot(:,:,:), gr_save(:,:,:,:), dgrdne(:,:,:), dgcdne(:,:,:)
@@ -55,7 +55,7 @@ module see
         NlevelTotal = 0 !sum of all levels among all active atoms
         NmaxLine = 0 !maximum number of lines
         Nmaxcont = 0 !maximum number of cont
-        NmaxStage = 0 !maximum number of ionisation stages
+        NmaxStage = 0 !maximum number of ionization stages
         !neglect size of rates
         do n=1, NactiveAtoms
             atom => ActiveAtoms(n)%p
@@ -189,10 +189,10 @@ module see
         enddo
         atom => null()
 
-        !see + ionisation for all atoms ??
+        !see + ionization for all atoms ??
         if (n_iterate_ne > 0) then
             Neq_ne = NlevelTotal + 1 !adding charge conservation
-            write(*,*) " There are ", Neq_ne, " equations for non-LTE SEE + ionisation"
+            write(*,*) " There are ", Neq_ne, " equations for non-LTE SEE + ionization"
             allocate(gtot(NlevelTotal,NlevelTotal,nb_proc),gr_save(NmaxLevel,NlevelTotal,NactiveAtoms,nb_proc))
             allocate(dgrdne(NlevelTotal,NlevelTotal,nb_proc),dgcdne(NlevelTotal,NlevelTotal,nb_proc))
             allocate(gs_ion(NmaxStage,NactiveAtoms),pops_ion(NmaxStage-1,NactiveAtoms,nb_proc))
@@ -621,7 +621,7 @@ module see
             !      atom%nstar(i,icell)/atom%nstar(j,icell)
             atom%continua(kr)%Rji(id) = nlte_fact * tab_Aji_cont(kr,atom%activeindex,icell) * &
                  atom%ni_on_nj_star(i,icell)
-            !check ratio ni_on_nj_star for the continua when there are multiple ionisation states (works for H, test for He)
+            !check ratio ni_on_nj_star for the continua when there are multiple ionization states (works for H, test for He)
             !should be okey as i goes from 1 to Nlevel-1 and one i is associated to only one continuum state.
         enddo
 
@@ -676,7 +676,7 @@ module see
                 i0 = Nb - 1
 
                 phi0(1:Nl) = phi_loc(1:Nl,kr,nact,iray,id)
-                !-> otherwise phi_loc is 0 and there are normalisation issues with wphi
+                !-> otherwise phi_loc is 0 and there are normalization issues with wphi
                 if ((atom%n(i,icell) - atom%n(j,icell)*atom%lines(kr)%gij) <= 0.0_dp) cycle line_loop
 
                 Jbar_up = 0.0
@@ -864,7 +864,7 @@ module see
 
     subroutine update_populations(id, icell, iterate_ne, delta)
     ! --------------------------------------------------------------------!
-    ! Performs a solution of SEE for each atom and simultneously solves
+    ! Performs a solution of SEE for each atom and simultaneously solves
     ! the charge conservation equations for hydrogen and helium.          !
     ! To do: implements Ng's acceleration iteration here
     ! --------------------------------------------------------------------!
@@ -978,7 +978,7 @@ module see
         !fix during the iterative loop (depends only on T)
         call init_local_saha_factor_elems(id,T(icell))
 
-        !gather informations for all active atoms in the same arrays
+        !gather information for all active atoms in the same arrays
         !store populations and densities of the cell icell of this MALI iteration.
         npop_dag(Neq_ne,id) = ne(icell)
         i = 1
@@ -1013,9 +1013,9 @@ module see
 
             !initiate with CURRENT values
             !get the total populations of each ion except the neutrals!
-            !ionisation fraction is
+            !ionization fraction is
             !do j=1,nstage-1
-            ! j * pops_ion(j) (pops_ion(1)=singly ionised, pops_ion(2)=twice ionised)
+            ! j * pops_ion(j) (pops_ion(1)=singly ionized, pops_ion(2)=twice ionized)
             !enddo
             i = 1
             do n=1,nactiveatoms
@@ -1047,7 +1047,7 @@ module see
                     ip = at%i_trans(kr); jp = at%j_trans(kr)
                     gtot(i+ip-1,i+jp-1,id) = gtot(i+ip-1,i+jp-1,id) * xvar(neq_ne,id)
                 enddo
-                !recompute diagonal for that atom now that ne is taken intout account in gam_rad
+                !recompute diagonal for that atom now that ne is taken into account in gam_rad
                 !can be done better
                 do j=1,at%Nlevel
                     gtot(i-1+j,i-1+j,id) = 0.0_dp !set to 0 because the diag id already filled
@@ -1069,7 +1069,7 @@ module see
             call non_lte_charge_conservation (id,icell, neq_ne, xvar(:,id), fvar(:,id), dfvar(:,:,id))
 
             !replace one equation of SEE by particle number conservation
-            !particule conservation!
+            !particle conservation!
             call particle_conservation (icell, Neq_ne, xvar(:,id), fvar(:,id), dfvar(:,:,id))
 
             !newton raphson!
@@ -1125,8 +1125,8 @@ module see
 
             if (verbose) then
                 write(*,'("niter #",(1I5))') n_iter
-                write(*,'("non-LTE ionisation delta=",(1ES17.8E3)," dfpop=",(1ES17.8E3)," dfne=",(1ES17.8E3))') delta_f, dfpop, dfne
-                write(*,'("non-LTE ionisation ne=",(1ES17.8E3)," m^-3; nedag=",(1ES17.8E3)," m^-3")') ne(icell), npop_dag(Neq_ne,id)
+                write(*,'("non-LTE ionization delta=",(1ES17.8E3)," dfpop=",(1ES17.8E3)," dfne=",(1ES17.8E3))') delta_f, dfpop, dfne
+                write(*,'("non-LTE ionization ne=",(1ES17.8E3)," m^-3; nedag=",(1ES17.8E3)," m^-3")') ne(icell), npop_dag(Neq_ne,id)
                 ! stop
             endif
 
@@ -1138,10 +1138,10 @@ module see
                     !! and it is dangerous/unethical to hide that(?).
                     if (verbose) then
                         write(*,*) ""
-                        write(*,*) "-> (non-LTE ionisation): Not enough iterations to converge after second try"
+                        write(*,*) "-> (non-LTE ionization): Not enough iterations to converge after second try"
                         write(*,'("cell #",(1I7),"; proc #",(1I3),", niter #",(1I5))') icell, id, n_iter
                         write(*,'("maxIter: ",(1I5),"; damp=",(1I4))')  max_iter, nint(d_damp)
-                        write(*,'("non-LTE ionisation delta=",(1ES17.8E3)," dfpop=",(1ES17.8E3)," dfne=",(1ES17.8E3))') &
+                        write(*,'("non-LTE ionization delta=",(1ES17.8E3)," dfpop=",(1ES17.8E3)," dfne=",(1ES17.8E3))') &
                              delta_f, dfpop, dfne
                         write(*,*) ""
                     endif
@@ -1167,7 +1167,7 @@ module see
         !compute global convergence rate and reset values (ne, n) to
         ! the value of the MALI iteration.
         ! the new ne and n are updated only after the end of a MALI iteration (loop over all cells) to avoid
-        ! introducing to much non-linearity.
+        ! introducing too much non-linearity.
 
         dne = abs(1.0_dp - npop_dag(Neq_ne,id)/ne(icell))
         dM = 0
@@ -1182,7 +1182,7 @@ module see
         enddo
         at => null()
 
-        if (verbose) write(*,'("(DELTA) non-LTE ionisation dM=",(1ES17.8E3)," dne=",(1ES17.8E3))') dM, dne
+        if (verbose) write(*,'("(DELTA) non-LTE ionization dM=",(1ES17.8E3)," dne=",(1ES17.8E3))') dM, dne
 
         ! ne_new(icell) = ne(icell)
         ngpop(1,NactiveAtoms+1,icell,1) = ne(icell)
@@ -1192,8 +1192,8 @@ module see
         return
     end subroutine see_atoms_ne
 
-  subroutine ionisation_frac_lte(id,elem, k, ne, fjk, dfjk)
-  !special version that forces ionisation fraction at LTE.
+  subroutine ionization_frac_lte(id,elem, k, ne, fjk, dfjk)
+  !special version that forces ionization fraction at LTE.
     real(kind=dp), intent(in) :: ne
     integer, intent(in) :: k, id
     type (Element), intent(in) :: Elem
@@ -1223,10 +1223,10 @@ module see
 
 
     return
-  end subroutine ionisation_frac_lte
+  end subroutine ionization_frac_lte
 
-!   subroutine ionisation_frac_lte(id,elem, k, ne, fjk, dfjk)
-!   !special version that forces ionisation fraction at LTE.
+!   subroutine ionization_frac_lte(id,elem, k, ne, fjk, dfjk)
+!   !special version that forces ionization fraction at LTE.
 !     real(kind=dp), intent(in) :: ne
 !     integer, intent(in) :: k, id
 !     type (Element), intent(in) :: Elem
@@ -1260,7 +1260,7 @@ module see
 
 
 !     return
-!   end subroutine ionisation_frac_lte
+!   end subroutine ionization_frac_lte
 
   function jions(id)
   !sum of ions times charge for nlte ions
@@ -1291,7 +1291,7 @@ module see
         real(kind=dp), intent(inout) :: df(neq,neq), f(neq)
         integer :: n, j, i, k
         real(kind=dp) :: akj, sum_ions, st
-        real(kind=dp), dimension(max_ionisation_stage) :: fjk, dfjk
+        real(kind=dp), dimension(max_ionization_stage) :: fjk, dfjk
 
         ! sum_ions = 0
         ! do n=1,Nactiveatoms
@@ -1306,12 +1306,12 @@ module see
         df(neq,neq) = sum_ions / x(neq)**2
 
         !derivative of CC to ions and individual levels making up to the ions pops.
-        !in otherword, derivative to x(1:neq-1) if x belongs to an ion (stage > 0, not neutral)
-        !taking into account the ionisation stage.
+        !in other words, derivative to x(1:neq-1) if x belongs to an ion (stage > 0, not neutral)
+        !taking into account the ionization stage.
         !e.g. dne/dnp = -1/ne
         !      dne/dnHeIII = -2/ne
         !     dne/nHeII_i = -1/ne
-        ! which means that ions with the same ionisation stage gives the same derivative.
+        ! which means that ions with the same ionization stage give the same derivative.
         !I can do better here
         i = 1
         do n=1,NactiveAtoms
@@ -1329,18 +1329,18 @@ module see
         ! f(neq) = 1.0
         ! df(neq,neq) = 0
         ! df(neq,:) = 0.0
-        !now contribution from bacgrkound atoms.
+        !now contribution from background atoms.
         lte_elem_loop : do n=1, 26 !for 26 elements, can go up to Nelem(size(Elems)) in principle!
             if (Elems(n)%nm>0) then
                 if (atoms(Elems(n)%nm)%p%active) cycle lte_elem_loop
             endif
 
-            call ionisation_frac_lte(id,Elems(n), icell, x(neq), fjk, dfjk)
+            call ionization_frac_lte(id,Elems(n), icell, x(neq), fjk, dfjk)
 
             do j=2, Elems(n)%Nstage
-                !pure LTE term j = 1 corresponds to the first ionisation stage always
-                !unlike in solve_ne where this loop is also for non-LTE models (with non-LTE ionisation fraction, still)
-                akj = (j-1) * Elems(n)%abund * nhtot(icell) !(j-1) = 0 for neutrals and 1 for singly ionised
+                !pure LTE term j = 1 corresponds to the first ionization stage always
+                !unlike in solve_ne where this loop is also for non-LTE models (with non-LTE ionization fraction, still)
+                akj = (j-1) * Elems(n)%abund * nhtot(icell) !(j-1) = 0 for neutrals and 1 for singly ionized
                 f(neq) = f(neq) - akj * fjk(j) / x(neq)
                 df(neq,neq) = df(neq,neq) + akj * fjk(j) / x(neq)**2 - akj / x(neq) * dfjk(j)
             end do
@@ -1360,7 +1360,7 @@ module see
         integer :: kr, i, j
 
         gr(:,:) = 0.0_dp
-        dgrdne(:,:) = 0.0_dp !derivative of recombinaison rate matrix to dne
+        dgrdne(:,:) = 0.0_dp !derivative of recombination rate matrix to dne
 
         do kr=1, atom%Nline
             i = atom%lines(kr)%i; j = atom%lines(kr)%j
@@ -1641,7 +1641,7 @@ module see
                     rates(kr,icell,1) = atom%col_mat(j_miss(krmiss),i_miss(krmiss),id)
                     rates(kr,icell,2) = atom%col_mat(i_miss(krmiss),j_miss(krmiss),id)
                 enddo
-            endif !non-zerto
+            endif !non-zero
         enddo !cell
         !$omp end do
         !$omp end parallel
@@ -1900,7 +1900,7 @@ module see
 
                 Ieff(1:Nl) = Itot(Nb:Nr,iray,id)
 !put back the explicit sum to preserve the accuracy of the integral
-                !the factor 0.5 and c_light / atom%lines(kr)%lambda0 simplfy on Jbar/wphi
+                !the factor 0.5 and c_light / atom%lines(kr)%lambda0 simplify on Jbar/wphi
                 wphi = sum( (phi0(2:Nl) + phi0(1:Nl-1)) * (xl(2:Nl) - xl(1:Nl-1))  )
                 Jbar_up = sum( (Ieff(2:Nl)*phi0(2:Nl) + Ieff(1:Nl-1)*phi0(1:Nl-1))* &
                                 (xl(2:Nl) - xl(1:Nl-1)) ) / wphi
@@ -2034,7 +2034,7 @@ module see
         !$omp default(none) &
         !$omp private(weight,n,id,icell,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02,argmt)&
         !$omp shared(etape,n_cells,voronoi,r_grid,z_grid,phi_grid,n_rayons,xmu,wmu,xmux,xmuy,NactiveAtoms) &
-        !$omp shared(pos_em_cellule,labs,n_lambda,tab_lambda_nm,icompute_atomRT,activeatoms,seed,nb_proc,gtype) &
+        !$omp shared(pos_em_cell,labs,n_lambda,tab_lambda_nm,icompute_atomRT,activeatoms,seed,nb_proc,gtype) &
         !$omp shared(stream,lvoronoi,ibar,n_cells_done,Itot)
         !$omp do schedule(static,1)
         do icell=1, n_cells
@@ -2074,16 +2074,16 @@ module see
                 enddo
 
             else
-                ! Position aleatoire dans la cellule
+                ! Random position in the cell
                 do iray=1,n_rayons
 
                     rand  = sprng(stream(id))
                     rand2 = sprng(stream(id))
                     rand3 = sprng(stream(id))
 
-                    call pos_em_cellule(icell ,rand,rand2,rand3,x0,y0,z0)
+                    call pos_em_cell(icell ,rand,rand2,rand3,x0,y0,z0)
 
-                    ! Direction de propagation aleatoire
+                    ! Random propagation direction
                     rand = sprng(stream(id))
                     W0 = 2.0_dp * rand - 1.0_dp !nz
                     W02 =  1.0_dp - W0*W0 !1-mu**2 = sin(theta)**2
