@@ -225,7 +225,9 @@ Disk physics
   hydrostatic equilibrium assuming Tgas = Tdust
 
 * ``sublimate_dust``: this option will iteratively remove the dust if the
-  temperature reaches the dust sublimation temperature
+  temperature reaches the dust sublimation temperature. On Voronoi grids,
+  dust is removed inside the sublimation radius of each star and in
+  cells where the dust temperature exceeds the sublimation temperature.
 
 * ``viscous_heating``: (*work in progress*) includes additional heating
   source due to viscous accretion (note that it does not account for the
