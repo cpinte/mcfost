@@ -3,6 +3,7 @@ module SPH2mcfost
   use parameters
   use constants
   use utils
+  use messages
   use sort, only : find_kth_smallest_inplace
   use density, only : normalize_dust_density, reduce_density, read_Voronoi_fits_file, find_non_empty_cell
   use read_phantom, only : read_phantom_bin_files, read_phantom_hdf_files
@@ -82,8 +83,10 @@ contains
        endif
     else if (lgadget2_file) then
        write(*,*) "Performing gadget2mcfost setup"
-       write(*,*) "Reading Gadget-2 density file: "//trim(density_files(1))
-       call read_gadget2_file(iunit,density_files(1), x,y,z,h,massgas,rho,rhodust,ndusttypes,n_SPH,ierr)
+       write(*,*) "Reading Gadget/GIZMO density file: "//trim(density_files(1))
+       call read_gadget2_file(iunit,density_files(1), x,y,z,h,vx,vy,vz,particle_id,massgas,rho,rhodust, &
+            ndusttypes,n_SPH,ierr)
+       if (ierr /= 0) call error("Error reading Gadget/GIZMO file")
     else if (ldensity_file) then
        call read_Voronoi_fits_file(density_files(1), x,y,z,h,vx,vy,vz,particle_id,massgas,n_SPH)
        ldust_moments = .false.

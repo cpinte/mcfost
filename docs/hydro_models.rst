@@ -11,6 +11,7 @@ specific needs. Current interfaces where mcfost can natively read dumps exist fo
 * athena++
 * idefix
 * pluto
+* gadget-2 / gizmo
 
 
 Generic interface (via fits files)
@@ -159,6 +160,22 @@ Typical syntax for reading a phantom file is:``mcfost <para_file> -phantom <phan
 Any additional option can be used in conjonction with the `-phantom` option.
 
 When reading a phantom dump, sections of the parameter file will be ignored, in particular any section describing the disc density, model grid and stellar properties (unless the stellar properties are forced).
+
+
+Gadget-2 / Gizmo interface
+##########################
+
+MCFOST can read native dumps from gadget-2 / gizmo in both the native binary and hdf5 formats. 
+The syntax is the similar to the phantom case.
+
+For gadget-2::
+
+  $ mcfost <para_file> -gadget2 <gadget2_dump>
+
+which is the same as::
+
+  $ mcfost <para_file> -gizmo <gizmo_dump>
+
 
 Idefix, pluto, fargo3d and athena++ interfaces
 ##############################################

@@ -994,7 +994,7 @@ subroutine initialisation_mcfost()
      case("-force_Mgas")
         lforce_Mgas = .true.
         i_arg = i_arg + 1
-     case("-gadget","-gadget2")
+     case("-gadget","-gadget2","-gizmo")
         i_arg = i_arg + 1
         lgadget2_file=.true.
         lVoronoi = .true.
@@ -1915,7 +1915,7 @@ subroutine display_help()
   write(*,*) " "
   write(*,*) " Reading hydrodynamics model"
   write(*,*) "        : -phantom <dump> : reads a phantom dump file"
-  write(*,*) "        : -gadget : reads a gadget-2 dump file"
+  write(*,*) "        : -gadget / -gizmo : reads a Gadget-2 or GIZMO dump (binary or HDF5)"
   write(*,*) "        : -fargo3d <dir> <id> : reads a fargo3d model"
   write(*,*) "        : -athena++ <dump> : reads an athena++ athdf file"
   write(*,*) "        : -idefix <dump> : reads an idefix vtk file"
