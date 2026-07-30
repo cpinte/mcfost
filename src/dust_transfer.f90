@@ -529,81 +529,7 @@ subroutine dust_transfer_sub()
      endif
 
 
-     ! Les pointeurs (meme les tab) doivent �tre priv�s !!! COPYIN
-     !$omp parallel &
-     !$omp default(none) &
-     !$omp firstprivate(lambda,p_lambda) &
-     !$omp private(id,icell,lpacket_alive,lintersect,p_nnfot2,nnfot2,n_phot_envoyes_in_loop,rand) &
-     !$omp private(x,y,z,u,v,w,Stokes,flag_star,flag_ISM,flag_scatt,n_phot_sed2,capt) &
-     !$omp shared(nnfot1_start,n_photons_loop,capt_sup,n_phot_lim,lscatt_ray_tracing1) &
-     !$omp shared(n_photons2,n_phot_envoyes,nb_proc) &
-     !$omp shared(stream,laffichage,lmono,lmono0,lProDiMo,lML,letape_th,tab_lambda,n_photons_lambda, n_photons1_cumul,ibar) &
-     !$omp reduction(+:E_abs_nRE)
-     if (letape_th) then
-        p_nnfot2 => nnfot2
-        E_abs_nRE = 0.0
-     else
-        if (lmono0) then
-           p_nnfot2 => nnfot2
-        else
-           p_nnfot2 => n_phot_sed2
-
-           if (lProDiMo.or.lML)  then
-              p_nnfot2 => nnfot2  ! Constant number of packets per wavelength
-              ! Increase number of packets in the UV
-              if (tab_lambda(lambda) < 0.5) n_photons2 = n_photons_lambda * 10
-           endif
-        endif
-     endif
-
-     id = 1 ! For sequential code
-     !$ id = omp_get_thread_num() + 1
-     ibar=1 ;  n_photons1_cumul = 0
-
-     !$omp do schedule(dynamic,1)
-     do nnfot1=nnfot1_start,n_photons_loop
-        p_nnfot2 = 0.0_dp
-        n_phot_envoyes_in_loop = 0.0_dp
-        photon : do while ((p_nnfot2 < n_photons2).and.(n_phot_envoyes_in_loop < n_phot_lim))
-           nnfot2=nnfot2+1.0_dp
-           n_phot_envoyes(lambda,id) = n_phot_envoyes(lambda,id) + 1.0_dp
-           n_phot_envoyes_in_loop = n_phot_envoyes_in_loop + 1.0_dp
-
-           ! Wavelength choice
-           if (.not.lmono) then
-              rand = sprng(stream(id))
-              call select_wl_em(rand,lambda)
-           endif
-
-           ! Packet emission
-           call emit_packet(id,lambda, icell,x,y,z,u,v,w,stokes,flag_star,flag_ISM,lintersect)
-           lpacket_alive = .true.
-
-           ! Packet propagation
-           if (lintersect) call propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes, &
-                flag_star,flag_ISM,flag_scatt,lpacket_alive)
-
-           ! The packet has now exited : on le met dans le bon capteur
-           if (lpacket_alive.and.(.not.flag_ISM)) then
-              call capteur(id,lambda,icell,x,y,z,u,v,w,Stokes,flag_star,flag_scatt,capt)
-              if (capt == capt_sup) n_phot_sed2 = n_phot_sed2 + 1.0_dp ! number of photons received for step 2
-           endif
-        enddo photon !nnfot2
-
-        ! Progress bar
-        !$omp atomic
-        n_photons1_cumul = n_photons1_cumul+1
-        if (laffichage) then
-           if (real(n_photons1_cumul) > 0.02*ibar * real(n_photons_loop)) then
-              call progress_bar(ibar)
-              !$omp atomic
-              ibar = ibar+1
-           endif
-        endif
-     enddo !nnfot1
-     !$omp end do
-     !$omp end parallel
-     if (laffichage) call progress_bar(50)
+     call mc_photon_loop(lambda, p_lambda, n_photons2, n_phot_lim, nnfot1_start, laffichage, n_phot_sed2)
 
      ! Interstellar radiation field
      if ((.not.letape_th).and.(lProDiMo.or.lML)) then
@@ -843,6 +769,124 @@ subroutine dust_transfer_sub()
   return
 
 end subroutine dust_transfer_sub
+
+!***********************************************************
+
+subroutine mc_photon_loop(lambda_in, p_lambda_in, n_photons2, n_phot_lim, nnfot1_start, laffichage, n_phot_sed2)
+  ! Monte Carlo photon loop — shared kernel used by thermal, image, and SED modes.
+  ! The mode-dependent behaviour is controlled by module-level flags:
+  !   letape_th  -> thermal structure (multi-wavelength, re-emission)
+  !   lmono      -> monochromatic (forced scattering, image/SED)
+  !   lmono0     -> image mode (fixed photon count)
+  ! C. Pinte
+  ! 07/2026 — Extracted from dust_transfer_sub
+
+  implicit none
+
+#include "sprng_f.h"
+
+  integer, intent(in) :: lambda_in, p_lambda_in, n_photons2, nnfot1_start
+  real, intent(in) :: n_phot_lim
+  logical, intent(in) :: laffichage
+  real(kind=dp), intent(inout), target :: n_phot_sed2
+
+  ! Local variables
+  real(kind=dp), dimension(4) :: Stokes
+  integer :: id, icell, capt, ibar, n_photons1_cumul, n_photons2_local
+  real :: rand
+  logical :: lpacket_alive, lintersect, flag_star, flag_scatt, flag_ISM
+  real(kind=dp) :: x, y, z, u, v, w
+  real(kind=dp), target :: nnfot2
+  real(kind=dp), pointer :: p_nnfot2
+  real(kind=dp) :: n_phot_envoyes_in_loop
+  integer, target :: lambda_local, p_lambda_local
+  integer, pointer :: p_lambda_ptr
+
+  ! Copy intent(in) arguments to local targets for OMP firstprivate
+  lambda_local = lambda_in
+  p_lambda_local = p_lambda_in
+  p_lambda_ptr => p_lambda_local
+  n_photons2_local = n_photons2
+
+  ! OMP parallel photon transport loop
+  !$omp parallel &
+  !$omp default(none) &
+  !$omp firstprivate(lambda_local,p_lambda_ptr) &
+  !$omp private(id,icell,lpacket_alive,lintersect,p_nnfot2,nnfot2,n_phot_envoyes_in_loop,rand) &
+  !$omp private(x,y,z,u,v,w,Stokes,flag_star,flag_ISM,flag_scatt,capt) &
+  !$omp shared(nnfot1_start,n_photons_loop,capt_sup,n_phot_lim,lscatt_ray_tracing1) &
+  !$omp shared(n_photons2_local,n_phot_envoyes,nb_proc,n_phot_sed2) &
+  !$omp shared(stream,laffichage,lmono,lmono0,lProDiMo,lML,letape_th,tab_lambda,n_photons_lambda, n_photons1_cumul,ibar) &
+  !$omp reduction(+:E_abs_nRE)
+  if (letape_th) then
+     p_nnfot2 => nnfot2
+     E_abs_nRE = 0.0
+  else
+     if (lmono0) then
+        p_nnfot2 => nnfot2
+     else
+        p_nnfot2 => n_phot_sed2
+
+        if (lProDiMo.or.lML)  then
+           p_nnfot2 => nnfot2  ! Constant number of packets per wavelength
+           ! Increase number of packets in the UV
+           if (tab_lambda(lambda_local) < 0.5) n_photons2_local = n_photons_lambda * 10
+        endif
+     endif
+  endif
+
+  id = 1 ! For sequential code
+  !$ id = omp_get_thread_num() + 1
+  ibar=1 ;  n_photons1_cumul = 0
+
+  !$omp do schedule(dynamic,1)
+  do nnfot1=nnfot1_start,n_photons_loop
+     p_nnfot2 = 0.0_dp
+     n_phot_envoyes_in_loop = 0.0_dp
+     photon : do while ((p_nnfot2 < n_photons2_local).and.(n_phot_envoyes_in_loop < n_phot_lim))
+        nnfot2=nnfot2+1.0_dp
+        n_phot_envoyes(lambda_local,id) = n_phot_envoyes(lambda_local,id) + 1.0_dp
+        n_phot_envoyes_in_loop = n_phot_envoyes_in_loop + 1.0_dp
+
+        ! Wavelength choice
+        if (.not.lmono) then
+           rand = sprng(stream(id))
+           call select_wl_em(rand,lambda_local)
+        endif
+
+        ! Packet emission
+        call emit_packet(id,lambda_local, icell,x,y,z,u,v,w,stokes,flag_star,flag_ISM,lintersect)
+        lpacket_alive = .true.
+
+        ! Packet propagation
+        if (lintersect) call propagate_packet(id,lambda_local,p_lambda_ptr,icell,x,y,z,u,v,w,stokes, &
+             flag_star,flag_ISM,flag_scatt,lpacket_alive)
+
+        ! The packet has now exited : on le met dans le bon capteur
+        if (lpacket_alive.and.(.not.flag_ISM)) then
+           call capteur(id,lambda_local,icell,x,y,z,u,v,w,Stokes,flag_star,flag_scatt,capt)
+           if (capt == capt_sup) n_phot_sed2 = n_phot_sed2 + 1.0_dp ! number of photons received for step 2
+        endif
+     enddo photon !nnfot2
+
+     ! Progress bar
+     !$omp atomic
+     n_photons1_cumul = n_photons1_cumul+1
+     if (laffichage) then
+        if (real(n_photons1_cumul) > 0.02*ibar * real(n_photons_loop)) then
+           call progress_bar(ibar)
+           !$omp atomic
+           ibar = ibar+1
+        endif
+     endif
+  enddo !nnfot1
+  !$omp end do
+  !$omp end parallel
+  if (laffichage) call progress_bar(50)
+
+  return
+
+end subroutine mc_photon_loop
 
 !***********************************************************
 
