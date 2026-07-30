@@ -384,267 +384,187 @@ subroutine dust_transfer_sub()
      ind_etape = first_etape_obs
   endif
 
-  !************************************************************
-  ! Main loop over calculation steps
-  !************************************************************
-  n_iter = 0 ! Number of iterations for non-equilibrium grains
-  do while (ind_etape <= etape_f)
-     step_index=ind_etape
+  if ((ind_etape == first_etape_obs) .and. lremove) then
+     call remove_species()
+     if (lTemp .and. lsed_complete) then
+        write(*,'(a30, $)') "Computing dust properties ..."
+        do lambda=1, n_lambda
+           call prop_grains(lambda) ! recompute opacity
+           call opacity(lambda, p_lambda)
+        enddo
+        write(*,*) "Done"
+     endif
+  endif
 
-     ! observables calculation
-     ! becomes monochromatic
-     lmono=.true.
-     E_paquet = 1.0_dp
+  if (lmono0) then
+     call run_image_mc()
+  else if (lsed) then
 
-     !Todo: maybe we can use a variable lscatt_method2_mono
-     if (lscattering_method1) then
-        lambda = 1
-        p_lambda => lambda
-     else
-        if (p_n_lambda_pos == n_lambda) then
+     !************************************************************
+     ! Main loop over calculation steps (SED)
+     !************************************************************
+     do while (ind_etape <= etape_f)
+        step_index=ind_etape
+
+        ! becomes monochromatic
+        lmono=.true.
+        E_paquet = 1.0_dp
+
+        !Todo: maybe we can use a variable lscatt_method2_mono
+        if (lscattering_method1) then
            lambda = 1
            p_lambda => lambda
         else
-           lambda0 = 1
-           p_lambda => lambda0
+           if (p_n_lambda_pos == n_lambda) then
+              lambda = 1
+              p_lambda => lambda
+           else
+              lambda0 = 1
+              p_lambda => lambda0
+           endif
         endif
-     endif
 
-     if (lmono0) then ! image
-        laffichage=.true.
-        n_photons2 = n_photons_image
-        n_phot_lim = 1.0e30 ! Number of photons is not limited
-     else ! SED
         lambda=1
         laffichage=.false.
         n_photons2 = n_photons_lambda
         n_phot_lim = n_photons_lim
-     endif
 
-     if ((ind_etape==first_etape_obs).and.lremove) then
-        call remove_species()
-        if (lTemp.and.lsed_complete) then
-           write(*,'(a30, $)') "Computing dust properties ..."
-           do lambda=1, n_lambda
-              call prop_grains(lambda) ! recompute opacity
-              call opacity(lambda, p_lambda)
-           enddo
-           write(*,*) "Done"
-        endif
-     endif
-
-     if ((ind_etape==first_etape_obs).and.(lsed_complete).and.(.not.lmono0)) then
-        if (.not.lMueller_pos_multi .and. lscatt_ray_tracing) call realloc_ray_tracing_scattering_matrix()
-     endif
-
-     if ((ind_etape==first_etape_obs).and.(.not.lsed_complete).and.(.not.lmono0)) then ! wavelength change
-        ! if we reallocate, we are now in monochromatic
-        ! except if we want to save the dust properties
-        if (ldust_prop) then
-           p_lambda => lambda
-        else
-           lambda0 = 1 ; p_lambda => lambda0
+        if ((ind_etape==first_etape_obs).and.(lsed_complete)) then
+           if (.not.lMueller_pos_multi .and. lscatt_ray_tracing) call realloc_ray_tracing_scattering_matrix()
         endif
 
-        call setup_scattering()
-
-        ! memory reorganization
-        call realloc_step2()
-
-        call init_lambda2()
-        call init_optical_indices()
-
-        call star_energy_distribution()
-        E_ISM = 0.0 ! ISM done a second step in SED step2 calculation
-
-        if (lscatt_ray_tracing) then
-           call alloc_ray_tracing()
-           call init_directions_ray_tracing()
-        endif
-
-        ! Recompute optical properties
-        ! Try to restore dust calculation from previous run
-        call read_saved_dust_prop(letape_th, lcompute_dust_prop)
-        if (lcompute_dust_prop) then
-           write(*,'(a30, $)') "Computing dust properties ..."
-        else
-           write(*,'(a46, $)') "Reading dust properties from previous run ..."
-        endif
-        do lambda=1,n_lambda2
-           if (lcompute_dust_prop) call prop_grains(lambda)
-           call opacity(lambda, p_lambda)!_eqdiff!_data  ! ~ takes 2 seconds
-        enddo !n
-        if (lcompute_dust_prop) call save_dust_prop(letape_th)
-        write(*,*) "Done"
-     endif ! ind_etape==first_etape_obs
-
-     lambda = ind_etape - first_etape_obs + 1
-
-     if (.not.lMueller_pos_multi .and. lscatt_ray_tracing) then
-        call calc_local_scattering_matrices(lambda, p_lambda) ! Todo : this is not good, we compute this twice
-     endif
-
-     if (lspherical.or.l3D) then
-        call no_dark_zone()
-     else
-        if (lcylindrical) call define_dark_zone(lambda,p_lambda,tau_dark_zone_obs,.false.)
-     endif
-     !call no_dark_zone()
-     ! n_dif_max = seuil_n_dif(lambda)
-
-     if (lweight_emission) call define_proba_weight_emission(lambda)
-
-     call repartition_energie(lambda)
-     if (lmono0) then
-        write(*,*) "frac. energy emitted by star(s) : ", real(frac_E_stars(1))
-        if (n_stars > 1) then
-           write(*,*) "Relative fraction of energy emitted by each star:"
-           do i=1, n_stars
-              write(*,*) "Star #", i, "-->", real(prob_E_star(1,i))
-           enddo
-        endif
-     endif
-
-     if (ind_etape==etape_start) then
-        call system_clock(time_end)
-
-        time=(time_end - time_begin)/real(time_tick)
-         if (time > 60) then
-            itime = int(time)
-            write (*,'(" Initialization complete in ", I3, "h", I3, "m", I3, "s")')  itime/3600, mod(itime/60,60), mod(itime,60)
-         else
-            write (*,'(" Initialization complete in ", F5.2, "s")')  time
-         endif
-      endif
-
-     if (lmono0) write(*,*) "Computing MC radiation field ..."
-
-     if (laffichage) call progress_bar(0)
-
-     if ((ind_etape >= first_etape_obs).and.(.not.lmono0)) then
-        if (ind_etape == first_etape_obs) write(*,*) "# Wavelength [mum]  frac. E star     tau midplane"
-        ! Optical depth along midplane
-        x=0.0 ; y=0.0 ; z=0.0
-        Stokes = 0.0_dp ; Stokes(1) = 1.0_dp
-        w = 0.0 ; u = 1.0 ; v = 0.0
-        call index_cell(x,y,z, icell)
-        call optical_length_tot(1,lambda,Stokes,icell,x,y,y,u,v,w,tau,lmin,lmax)
-        write(*,*) "", real(tab_lambda(lambda)) ,"  ", real(frac_E_stars(lambda)), "  ", tau
-     endif
-
-     call mc_photon_loop(lambda, p_lambda, n_photons2, n_phot_lim, nnfot1_start, laffichage)
-
-     ! Interstellar radiation field
-     if ((.not.letape_th).and.(lProDiMo.or.lML)) then
-        ! No ray-tracing with ISM packets
-        lscatt_ray_tracing1_save = lscatt_ray_tracing1
-        lscatt_ray_tracing2_save = lscatt_ray_tracing2
-        lscatt_ray_tracing1 = .false.
-        lscatt_ray_tracing2 = .false.
-
-        ! Saving stellar and thermal fields separately
-        if (lProDiMo) call save_J_ProDiMo(lambda)
-        if (lML)      call save_J_ML(lambda,.false.)
-
-        !$omp parallel &
-        !$omp default(none) &
-        !$omp shared(lambda,p_lambda,n_photons_lambda,n_photons_loop,n_phot_envoyes_ISM) &
-        !$omp private(id, flag_star,flag_ISM,flag_scatt,nnfot1,x,y,z,u,v,w,stokes,lintersect,icell,lpacket_alive,nnfot2)
-
-        flag_star = .false.
-
-        !$omp do schedule(dynamic,1)
-        do nnfot1=1,n_photons_loop
-           !$ id = omp_get_thread_num() + 1
-           nnfot2 = 0.0_dp
-           photon_ISM : do while (nnfot2 < n_photons_lambda)
-              n_phot_envoyes_ISM(lambda,id) = n_phot_envoyes_ISM(lambda,id) + 1.0_dp
-
-              ! Packet emission
-              call emit_packet_ISM(id, icell,x,y,z,u,v,w,stokes,lintersect)
-              flag_ISM = .true.
-
-              ! Is the photon useful or not ??
-              if (.not.lintersect) then
-                 cycle photon_ISM
-              else
-                 nnfot2 = nnfot2 + 1.0_dp
-                 ! Packet propagation
-                 call propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_star,flag_ISM,flag_scatt,lpacket_alive)
-              endif
-           enddo photon_ISM ! nnfot2
-        enddo ! nnfot1
-        !$omp end do
-        !$omp end parallel
-
-        lscatt_ray_tracing1 = lscatt_ray_tracing1_save
-        lscatt_ray_tracing2 = lscatt_ray_tracing2_save
-
-        if (lML) call save_J_ML(lambda,.true.)
-     endif ! champ ISM
-
-     !----------------------------------------------------
-     if (lmono0) then ! Image creation
-        if (loutput_mc) call write_stokes_fits()
-
-        ! Ray-tracing map
-        if (lscatt_ray_tracing) then
-
-           call system_clock(time_end)
-           time=(time_end - time_begin)/real(time_tick)
-           if (time > 60) then
-              itime = int(time)
-              write (*,'(" Time = ", I3, "h", I3, "m", I3, "s")')  itime/3600, mod(itime/60,60), mod(itime,60)
+        if ((ind_etape==first_etape_obs).and.(.not.lsed_complete)) then ! wavelength change
+           ! if we reallocate, we are now in monochromatic
+           ! except if we want to save the dust properties
+           if (ldust_prop) then
+              p_lambda => lambda
            else
-              write (*,'(" Time = ", F5.2, "s")')  time
+              lambda0 = 1 ; p_lambda => lambda0
            endif
 
-           do ibin=1,RT_n_incl
-              if (lscatt_ray_tracing1) then
-                 do iaz=1, RT_n_az
-                    call system_clock(time_1)
-                    call init_dust_source_fct1(lambda,ibin,iaz)
-                    call system_clock(time_2)
-                    time_source_fct = time_source_fct + (time_2 - time_1)
+           call setup_scattering()
 
-                    time_1 = time_2
-                    call dust_map(lambda,ibin,iaz) ! Does not take time in SED
-                    if (ltau_surface) call compute_tau_surface_map(lambda,tau_surface, ibin,iaz)
-                    if (ltau_map) call compute_tau_map(lambda, ibin, iaz)
-                    call system_clock(time_2)
-                    time_RT = time_RT + (time_2 - time_1)
-                 enddo
-              else
-                 iaz=1
-                 call system_clock(time_1)
-                 call init_dust_source_fct2(lambda,p_lambda,ibin)
-                 call system_clock(time_2)
-                 time_source_fct = time_source_fct + (time_2 - time_1)
+           ! memory reorganization
+           call realloc_step2()
 
-                 time_1 = time_2
-                 call dust_map(lambda,ibin,iaz) ! Does not take time in SED
-                 if (ltau_surface) call compute_tau_surface_map(lambda,tau_surface, ibin,iaz)
-                 if (ltau_map) call compute_tau_map(lambda, ibin, iaz)
-                 call system_clock(time_2)
-                 time_RT = time_RT + (time_2 - time_1)
-              endif
+           call init_lambda2()
+           call init_optical_indices()
 
-              call system_clock(time_end)
-              time=(time_end - time_begin)/real(time_tick)
-              if (time > 60) then
-                 itime = int(time)
-                 write (*,'(" Time = ", I3, "h", I3, "m", I3, "s")')  itime/3600, mod(itime/60,60), mod(itime,60)
-              else
-                 write (*,'(" Time = ", F5.2, "s")')  time
-              endif
-           enddo
+           call star_energy_distribution()
+           E_ISM = 0.0 ! ISM done a second step in SED step2 calculation
 
-           call ecriture_map_ray_tracing()
-           if (ltau_surface) call write_tau_surface(0) ! 0 for continuum
-           if (ltau_map) call write_tau_map(0)
+           if (lscatt_ray_tracing) then
+              call alloc_ray_tracing()
+              call init_directions_ray_tracing()
+           endif
+
+           ! Recompute optical properties
+           ! Try to restore dust calculation from previous run
+           call read_saved_dust_prop(letape_th, lcompute_dust_prop)
+           if (lcompute_dust_prop) then
+              write(*,'(a30, $)') "Computing dust properties ..."
+           else
+              write(*,'(a46, $)') "Reading dust properties from previous run ..."
+           endif
+           do lambda=1,n_lambda2
+              if (lcompute_dust_prop) call prop_grains(lambda)
+              call opacity(lambda, p_lambda)!_eqdiff!_data  ! ~ takes 2 seconds
+           enddo !n
+           if (lcompute_dust_prop) call save_dust_prop(letape_th)
+           write(*,*) "Done"
+        endif ! ind_etape==first_etape_obs
+
+        lambda = ind_etape - first_etape_obs + 1
+
+        if (.not.lMueller_pos_multi .and. lscatt_ray_tracing) then
+           call calc_local_scattering_matrices(lambda, p_lambda) ! Todo : this is not good, we compute this twice
         endif
 
-     else ! Etape 2 SED
+        if (lspherical.or.l3D) then
+           call no_dark_zone()
+        else
+           if (lcylindrical) call define_dark_zone(lambda,p_lambda,tau_dark_zone_obs,.false.)
+        endif
+
+        if (lweight_emission) call define_proba_weight_emission(lambda)
+
+        call repartition_energie(lambda)
+
+        if (ind_etape==etape_start) then
+           call system_clock(time_end)
+
+           time=(time_end - time_begin)/real(time_tick)
+            if (time > 60) then
+               itime = int(time)
+               write (*,'(" Initialization complete in ", I3, "h", I3, "m", I3, "s")')  itime/3600, mod(itime/60,60), mod(itime,60)
+            else
+               write (*,'(" Initialization complete in ", F5.2, "s")')  time
+            endif
+         endif
+
+        if (laffichage) call progress_bar(0)
+
+        if (ind_etape >= first_etape_obs) then
+           if (ind_etape == first_etape_obs) write(*,*) "# Wavelength [mum]  frac. E star     tau midplane"
+           ! Optical depth along midplane
+           x=0.0 ; y=0.0 ; z=0.0
+           Stokes = 0.0_dp ; Stokes(1) = 1.0_dp
+           w = 0.0 ; u = 1.0 ; v = 0.0
+           call index_cell(x,y,z, icell)
+           call optical_length_tot(1,lambda,Stokes,icell,x,y,y,u,v,w,tau,lmin,lmax)
+           write(*,*) "", real(tab_lambda(lambda)) ,"  ", real(frac_E_stars(lambda)), "  ", tau
+        endif
+
+        call mc_photon_loop(lambda, p_lambda, n_photons2, n_phot_lim, nnfot1_start, laffichage)
+
+        ! Interstellar radiation field
+        if ((.not.letape_th).and.(lProDiMo.or.lML)) then
+           ! No ray-tracing with ISM packets
+           lscatt_ray_tracing1_save = lscatt_ray_tracing1
+           lscatt_ray_tracing2_save = lscatt_ray_tracing2
+           lscatt_ray_tracing1 = .false.
+           lscatt_ray_tracing2 = .false.
+
+           ! Saving stellar and thermal fields separately
+           if (lProDiMo) call save_J_ProDiMo(lambda)
+           if (lML)      call save_J_ML(lambda,.false.)
+
+           !$omp parallel &
+           !$omp default(none) &
+           !$omp shared(lambda,p_lambda,n_photons_lambda,n_photons_loop,n_phot_envoyes_ISM) &
+           !$omp private(id, flag_star,flag_ISM,flag_scatt,nnfot1,x,y,z,u,v,w,stokes,lintersect,icell,lpacket_alive,nnfot2)
+
+           flag_star = .false.
+
+           !$omp do schedule(dynamic,1)
+           do nnfot1=1,n_photons_loop
+              !$ id = omp_get_thread_num() + 1
+              nnfot2 = 0.0_dp
+              photon_ISM : do while (nnfot2 < n_photons_lambda)
+                 n_phot_envoyes_ISM(lambda,id) = n_phot_envoyes_ISM(lambda,id) + 1.0_dp
+
+                 ! Packet emission
+                 call emit_packet_ISM(id, icell,x,y,z,u,v,w,stokes,lintersect)
+                 flag_ISM = .true.
+
+                 ! Is the photon useful or not ??
+                 if (.not.lintersect) then
+                    cycle photon_ISM
+                 else
+                    nnfot2 = nnfot2 + 1.0_dp
+                    ! Packet propagation
+                    call propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_star,flag_ISM,flag_scatt,lpacket_alive)
+                 endif
+              enddo photon_ISM ! nnfot2
+           enddo ! nnfot1
+           !$omp end do
+           !$omp end parallel
+
+           lscatt_ray_tracing1 = lscatt_ray_tracing1_save
+           lscatt_ray_tracing2 = lscatt_ray_tracing2_save
+
+           if (lML) call save_J_ML(lambda,.true.)
+        endif ! champ ISM
 
         ! SED ray-tracing
         if (lscatt_ray_tracing) then
@@ -691,10 +611,10 @@ subroutine dust_transfer_sub()
            if (loutput_J) call ecriture_J(2)
         endif
 
-     endif
+        ind_etape = ind_etape + 1
+     enddo ! nbre_etapes
 
-     ind_etape = ind_etape + 1
-  enddo ! nbre_etapes
+  endif ! lsed
 
   if (lscatt_ray_tracing) then
      call dealloc_ray_tracing()
@@ -928,6 +848,137 @@ subroutine run_thermal_mc()
   return
 
 end subroutine run_thermal_mc
+
+!***********************************************************
+
+subroutine run_image_mc()
+  ! Runs monochromatic image calculation (MC photon loop + ray-tracing maps)
+  ! C. Pinte
+  ! 07/2026 — Extracted from dust_transfer_sub
+
+  implicit none
+
+  integer, target :: lambda, lambda0
+  integer :: ibin, iaz, itime, i
+  integer, pointer :: p_lambda
+  integer :: nnfot1_start, n_photons2
+  real :: n_phot_lim, time
+  integer :: time_1, time_2, time_RT, time_source_fct
+  logical :: laffichage
+
+  time_source_fct = 0 ; time_RT = 0
+  lmono = .true.
+  E_paquet = 1.0_dp
+  laffichage = .true.
+  nnfot1_start = 1
+  n_photons2 = n_photons_image
+  n_phot_lim = 1.0e30
+
+  if (lscattering_method1) then
+     lambda = 1
+     p_lambda => lambda
+  else
+     if (p_n_lambda_pos == n_lambda) then
+        lambda = 1
+        p_lambda => lambda
+     else
+        lambda0 = 1
+        p_lambda => lambda0
+     endif
+  endif
+
+  if (.not.lMueller_pos_multi .and. lscatt_ray_tracing) then
+     call calc_local_scattering_matrices(lambda, p_lambda)
+  endif
+
+  if (lspherical.or.l3D) then
+     call no_dark_zone()
+  else
+     if (lcylindrical) call define_dark_zone(lambda,p_lambda,tau_dark_zone_obs,.false.)
+  endif
+
+  if (lweight_emission) call define_proba_weight_emission(lambda)
+
+  call repartition_energie(lambda)
+
+  write(*,*) "frac. energy emitted by star(s) : ", real(frac_E_stars(1))
+  if (n_stars > 1) then
+     write(*,*) "Relative fraction of energy emitted by each star:"
+     do i=1, n_stars
+        write(*,*) "Star #", i, "-->", real(prob_E_star(1,i))
+     enddo
+  endif
+
+  write(*,*) "Computing MC radiation field ..."
+  if (laffichage) call progress_bar(0)
+
+  ! MC photon loop
+  call mc_photon_loop(lambda, p_lambda, n_photons2, n_phot_lim, nnfot1_start, laffichage)
+
+  ! Stokes FITS output from MC packets
+  if (loutput_mc) call write_stokes_fits()
+
+  ! Ray-tracing map
+  if (lscatt_ray_tracing) then
+
+     call system_clock(time_end)
+     time=(time_end - time_begin)/real(time_tick)
+     if (time > 60) then
+        itime = int(time)
+        write (*,'(" Time = ", I3, "h", I3, "m", I3, "s")')  itime/3600, mod(itime/60,60), mod(itime,60)
+     else
+        write (*,'(" Time = ", F5.2, "s")')  time
+     endif
+
+     do ibin=1,RT_n_incl
+        if (lscatt_ray_tracing1) then
+           do iaz=1, RT_n_az
+              call system_clock(time_1)
+              call init_dust_source_fct1(lambda,ibin,iaz)
+              call system_clock(time_2)
+              time_source_fct = time_source_fct + (time_2 - time_1)
+
+              time_1 = time_2
+              call dust_map(lambda,ibin,iaz)
+              if (ltau_surface) call compute_tau_surface_map(lambda,tau_surface, ibin,iaz)
+              if (ltau_map) call compute_tau_map(lambda, ibin, iaz)
+              call system_clock(time_2)
+              time_RT = time_RT + (time_2 - time_1)
+           enddo
+        else
+           iaz=1
+           call system_clock(time_1)
+           call init_dust_source_fct2(lambda,p_lambda,ibin)
+           call system_clock(time_2)
+           time_source_fct = time_source_fct + (time_2 - time_1)
+
+           time_1 = time_2
+           call dust_map(lambda,ibin,iaz)
+           if (ltau_surface) call compute_tau_surface_map(lambda,tau_surface, ibin,iaz)
+           if (ltau_map) call compute_tau_map(lambda, ibin, iaz)
+           call system_clock(time_2)
+           time_RT = time_RT + (time_2 - time_1)
+        endif
+
+        call system_clock(time_end)
+        time=(time_end - time_begin)/real(time_tick)
+        if (time > 60) then
+           itime = int(time)
+           write (*,'(" Time = ", I3, "h", I3, "m", I3, "s")')  itime/3600, mod(itime/60,60), mod(itime,60)
+        else
+           write (*,'(" Time = ", F5.2, "s")')  time
+        endif
+     enddo
+
+     call ecriture_map_ray_tracing()
+     if (ltau_surface) call write_tau_surface(0) ! 0 for continuum
+     if (ltau_map) call write_tau_map(0)
+  endif
+
+  return
+
+end subroutine run_image_mc
+
 
 
 !***********************************************************
