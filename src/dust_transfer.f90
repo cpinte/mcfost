@@ -342,9 +342,11 @@ end subroutine init_dust_transfer
 
 !***********************************************************
 
-subroutine dust_transfer_sub()
-  ! Main entry point for radiative transfer calculation
+subroutine recompute_opacities()
+  ! Recompute grain properties and opacity tables across all wavelengths.
+  ! Called when density structure or grain distribution changes during physics iterations.
   ! C. Pinte
+  ! 07/2026
 
   implicit none
 
@@ -352,27 +354,65 @@ subroutine dust_transfer_sub()
   integer, target :: lambda_target
   integer, pointer :: p_lambda
 
+  write(*,'(a30, $)') "Computing dust properties ..."
+  do lambda = 1, n_lambda
+     call prop_grains(lambda)
+     lambda_target = lambda
+     p_lambda => lambda_target
+     call opacity(lambda, p_lambda)
+  enddo
+  write(*,*) "Done"
+
+  return
+
+end subroutine recompute_opacities
+
+!***********************************************************
+
+subroutine dust_transfer_sub()
+  ! Main entry point for radiative transfer calculation
+  ! C. Pinte
+
+  implicit none
+
+  integer :: iter, n_iter_physics
+  logical :: lconverged
+
   call init_dust_transfer()
   if (lonly_diff_approx) return
 
+  ! ── Thermal structure & Physics Iteration Loop ──
   if (letape_th) then
-     call run_thermal_mc()
+     n_iter_physics = 1
+     if (lhydrostatic) n_iter_physics = 10 ! Max iterations for physics convergence
+
+     physics_loop : do iter = 1, n_iter_physics
+        call run_thermal_mc()
+
+        lconverged = .true.
+
+        ! Physics iteration hook: Hydrostatic equilibrium
+        if (lhydrostatic) then
+           write(*,*) "Updating hydrostatic equilibrium (iteration", iter, ")"
+           call equilibre_hydrostatique()
+           call recompute_opacities()
+           lconverged = .false. ! Architectural hook for convergence criteria
+        endif
+
+        ! Additional physics iteration hooks can be added here
+        ! e.g., dust sublimation iteration, grain growth, etc.
+
+        if (lconverged) exit physics_loop
+     enddo physics_loop
   endif
 
+  ! ── Dust Species Removal ──
   if (lremove) then
      call remove_species()
-     if (lTemp .and. lsed_complete) then
-        write(*,'(a30, $)') "Computing dust properties ..."
-        do lambda=1, n_lambda
-           call prop_grains(lambda)
-           lambda_target = lambda
-           p_lambda => lambda_target
-           call opacity(lambda, p_lambda)
-        enddo
-        write(*,*) "Done"
-     endif
+     if (lTemp .and. lsed_complete) call recompute_opacities()
   endif
 
+  ! ── Observables (Image / SED) ──
   if (lmono0) then
      call run_image_mc()
   else if (lsed) then
