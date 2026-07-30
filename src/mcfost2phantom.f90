@@ -172,7 +172,7 @@ contains
     use naleat, only : seed, stream, gtype
     use SPH2mcfost, only : SPH_to_Voronoi, compute_stellar_parameters
     use Voronoi_grid, only : Voronoi
-    use dust_transfer, only : emit_packet, propagate_packet
+    use dust_transfer, only : emit_packet, propagate_packet, run_thermal_mc
     use utils, only : progress_bar
     use stars, only : star_energy_distribution, ism_energy_distribution
     use grid,only : setup_grid
@@ -342,70 +342,7 @@ contains
     write(*,*) "lambda =", real(tab_lambda(lambda_threshold))
     call integ_tau(lambda_threshold)
 
-    write(*,*) "Computing temperature structure ..."
-    ! Making the MC run
-    if (laffichage) call progress_bar(0)
-    !$omp parallel &
-    !$omp default(none) &
-    !$omp firstprivate(lambda,p_lambda) &
-    !$omp private(id,icell,lpacket_alive,lintersect,nnfot2,rand) &
-    !$omp private(x,y,z,u,v,w,Stokes,flag_star,flag_ISM,flag_scatt) &
-    !$omp shared(n_photons_loop) &
-    !$omp shared(n_photons2,nb_proc) &
-    !$omp shared(stream,laffichage,n_photons_lambda, n_photons1_cumul,ibar) &
-    !$omp reduction(+:E_abs_nRE)
-    E_abs_nRE = 0.0
-
-    id = 1 ! for sequential code
-    !$ id = omp_get_thread_num() + 1
-    ibar=1 ;  n_photons1_cumul = 0
-
-    !$omp do schedule(dynamic,1)
-    do nnfot1=1,n_photons_loop
-       nnfot2 = 0.0_dp
-       photon : do while ((nnfot2 < n_photons2))
-          nnfot2=nnfot2+1.0_dp
-
-          ! Choix length d'onde
-          rand = sprng(stream(id))
-          call select_wl_em(rand,lambda)
-
-          ! Packet emission
-          call emit_packet(id,lambda, icell,x,y,z,u,v,w,stokes,flag_star,flag_ISM,lintersect)
-          Stokes = 0.0_dp ; Stokes(1) = 1.0_dp
-          lpacket_alive = .true.
-
-          ! Packet propagation
-          if (lintersect) then
-             call propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,&
-                flag_star,flag_ISM,flag_scatt,lpacket_alive)
-          endif
-       enddo photon !nnfot2
-
-       ! Progress bar
-       !$omp atomic
-       n_photons1_cumul = n_photons1_cumul+1
-       if (laffichage) then
-          if (real(n_photons1_cumul) > 0.02*ibar * real(n_photons_loop)) then
-             call progress_bar(ibar)
-             !$omp atomic
-             ibar = ibar+1
-          endif
-       endif
-    enddo !nnfot1
-    !$omp end do
-    !$omp end parallel
-    if (laffichage) call progress_bar(50)
-
-    if (lRE_LTE) then
-       call Temp_finale()
-    end if
-    if (lRE_nLTE) then
-       call Temp_finale_nLTE()
-    endif
-    if (lnRE) then
-       ! TBD
-    endif
+    call run_thermal_mc()
 
     call set_min_Temperature(Tmin)
 

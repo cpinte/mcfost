@@ -378,127 +378,132 @@ subroutine dust_transfer_sub()
   ! Main loop over calculation steps
   !************************************************************
   n_iter = 0 ! Number of iterations for non-equilibrium grains
+
+  if (letape_th) then
+     call run_thermal_mc()
+     ind_etape = first_etape_obs
+  endif
+
+  !************************************************************
+  ! Main loop over calculation steps
+  !************************************************************
+  n_iter = 0 ! Number of iterations for non-equilibrium grains
   do while (ind_etape <= etape_f)
      step_index=ind_etape
 
-     if (letape_th) then ! Temperature calculation
-        n_photons2 = n_photons_eq_th
-        n_phot_lim = 1.0e30 ! packets are not killed
-     else ! observables calculation
-        ! becomes monochromatic
-        lmono=.true.
-        E_paquet = 1.0_dp
+     ! observables calculation
+     ! becomes monochromatic
+     lmono=.true.
+     E_paquet = 1.0_dp
 
-        !Todo: maybe we can use a variable lscatt_method2_mono
-        if (lscattering_method1) then
+     !Todo: maybe we can use a variable lscatt_method2_mono
+     if (lscattering_method1) then
+        lambda = 1
+        p_lambda => lambda
+     else
+        if (p_n_lambda_pos == n_lambda) then
            lambda = 1
            p_lambda => lambda
         else
-           if (p_n_lambda_pos == n_lambda) then
-              lambda = 1
-              p_lambda => lambda
-           else
-              lambda0 = 1
-              p_lambda => lambda0
-           endif
+           lambda0 = 1
+           p_lambda => lambda0
         endif
+     endif
 
-        if (lmono0) then ! image
-           laffichage=.true.
-           n_photons2 = n_photons_image
-           n_phot_lim = 1.0e30 ! Number of photons is not limited
-        else ! SED
-           lambda=1
-           laffichage=.false.
-           n_photons2 = n_photons_lambda
-           n_phot_lim = n_photons_lim
-        endif
+     if (lmono0) then ! image
+        laffichage=.true.
+        n_photons2 = n_photons_image
+        n_phot_lim = 1.0e30 ! Number of photons is not limited
+     else ! SED
+        lambda=1
+        laffichage=.false.
+        n_photons2 = n_photons_lambda
+        n_phot_lim = n_photons_lim
+     endif
 
-        if ((ind_etape==first_etape_obs).and.lremove) then
-           call remove_species()
-           if (lTemp.and.lsed_complete) then
-              write(*,'(a30, $)') "Computing dust properties ..."
-              do lambda=1, n_lambda
-                 call prop_grains(lambda) ! recompute opacity
-                 call opacity(lambda, p_lambda)
-              enddo
-              write(*,*) "Done"
-           endif
-        endif
-
-        if ((ind_etape==first_etape_obs).and.(lsed_complete).and.(.not.lmono0)) then
-           if (.not.lMueller_pos_multi .and. lscatt_ray_tracing) call realloc_ray_tracing_scattering_matrix()
-        endif
-
-        if ((ind_etape==first_etape_obs).and.(.not.lsed_complete).and.(.not.lmono0)) then ! wavelength change
-           ! if we reallocate, we are now in monochromatic
-           ! except if we want to save the dust properties
-           if (ldust_prop) then
-              p_lambda => lambda
-           else
-              lambda0 = 1 ; p_lambda => lambda0
-           endif
-
-           call setup_scattering()
-
-           ! memory reorganization
-           call realloc_step2()
-
-           call init_lambda2()
-           call init_optical_indices()
-
-           call star_energy_distribution()
-           E_ISM = 0.0 ! ISM done a second step in SED step2 calculation
-
-           if (lscatt_ray_tracing) then
-              call alloc_ray_tracing()
-              call init_directions_ray_tracing()
-           endif
-
-           ! Recompute optical properties
-           ! Try to restore dust calculation from previous run
-           call read_saved_dust_prop(letape_th, lcompute_dust_prop)
-           if (lcompute_dust_prop) then
-              write(*,'(a30, $)') "Computing dust properties ..."
-           else
-              write(*,'(a46, $)') "Reading dust properties from previous run ..."
-           endif
-           do lambda=1,n_lambda2
-              if (lcompute_dust_prop) call prop_grains(lambda)
-              call opacity(lambda, p_lambda)!_eqdiff!_data  ! ~ takes 2 seconds
-           enddo !n
-           if (lcompute_dust_prop) call save_dust_prop(letape_th)
+     if ((ind_etape==first_etape_obs).and.lremove) then
+        call remove_species()
+        if (lTemp.and.lsed_complete) then
+           write(*,'(a30, $)') "Computing dust properties ..."
+           do lambda=1, n_lambda
+              call prop_grains(lambda) ! recompute opacity
+              call opacity(lambda, p_lambda)
+           enddo
            write(*,*) "Done"
-        endif ! ind_etape==first_etape_obs
-
-        lambda = ind_etape - first_etape_obs + 1
-
-        if (.not.lMueller_pos_multi .and. lscatt_ray_tracing) then
-           call calc_local_scattering_matrices(lambda, p_lambda) ! Todo : this is not good, we compute this twice
         endif
+     endif
 
-        if (lspherical.or.l3D) then
-           call no_dark_zone()
+     if ((ind_etape==first_etape_obs).and.(lsed_complete).and.(.not.lmono0)) then
+        if (.not.lMueller_pos_multi .and. lscatt_ray_tracing) call realloc_ray_tracing_scattering_matrix()
+     endif
+
+     if ((ind_etape==first_etape_obs).and.(.not.lsed_complete).and.(.not.lmono0)) then ! wavelength change
+        ! if we reallocate, we are now in monochromatic
+        ! except if we want to save the dust properties
+        if (ldust_prop) then
+           p_lambda => lambda
         else
-           if (lcylindrical) call define_dark_zone(lambda,p_lambda,tau_dark_zone_obs,.false.)
-        endif
-        !call no_dark_zone()
-        ! n_dif_max = seuil_n_dif(lambda)
-
-        if (lweight_emission) call define_proba_weight_emission(lambda)
-
-        call repartition_energie(lambda)
-        if (lmono0) then
-           write(*,*) "frac. energy emitted by star(s) : ", real(frac_E_stars(1))
-           if (n_stars > 1) then
-              write(*,*) "Relative fraction of energy emitted by each star:"
-              do i=1, n_stars
-                 write(*,*) "Star #", i, "-->", real(prob_E_star(1,i))
-              enddo
-           endif
+           lambda0 = 1 ; p_lambda => lambda0
         endif
 
-     endif !letape_th
+        call setup_scattering()
+
+        ! memory reorganization
+        call realloc_step2()
+
+        call init_lambda2()
+        call init_optical_indices()
+
+        call star_energy_distribution()
+        E_ISM = 0.0 ! ISM done a second step in SED step2 calculation
+
+        if (lscatt_ray_tracing) then
+           call alloc_ray_tracing()
+           call init_directions_ray_tracing()
+        endif
+
+        ! Recompute optical properties
+        ! Try to restore dust calculation from previous run
+        call read_saved_dust_prop(letape_th, lcompute_dust_prop)
+        if (lcompute_dust_prop) then
+           write(*,'(a30, $)') "Computing dust properties ..."
+        else
+           write(*,'(a46, $)') "Reading dust properties from previous run ..."
+        endif
+        do lambda=1,n_lambda2
+           if (lcompute_dust_prop) call prop_grains(lambda)
+           call opacity(lambda, p_lambda)!_eqdiff!_data  ! ~ takes 2 seconds
+        enddo !n
+        if (lcompute_dust_prop) call save_dust_prop(letape_th)
+        write(*,*) "Done"
+     endif ! ind_etape==first_etape_obs
+
+     lambda = ind_etape - first_etape_obs + 1
+
+     if (.not.lMueller_pos_multi .and. lscatt_ray_tracing) then
+        call calc_local_scattering_matrices(lambda, p_lambda) ! Todo : this is not good, we compute this twice
+     endif
+
+     if (lspherical.or.l3D) then
+        call no_dark_zone()
+     else
+        if (lcylindrical) call define_dark_zone(lambda,p_lambda,tau_dark_zone_obs,.false.)
+     endif
+     !call no_dark_zone()
+     ! n_dif_max = seuil_n_dif(lambda)
+
+     if (lweight_emission) call define_proba_weight_emission(lambda)
+
+     call repartition_energie(lambda)
+     if (lmono0) then
+        write(*,*) "frac. energy emitted by star(s) : ", real(frac_E_stars(1))
+        if (n_stars > 1) then
+           write(*,*) "Relative fraction of energy emitted by each star:"
+           do i=1, n_stars
+              write(*,*) "Star #", i, "-->", real(prob_E_star(1,i))
+           enddo
+        endif
+     endif
 
      if (ind_etape==etape_start) then
         call system_clock(time_end)
@@ -512,8 +517,7 @@ subroutine dust_transfer_sub()
          endif
       endif
 
-     if (letape_th) write(*,*) "Computing temperature structure ..."
-     if (lmono0)    write(*,*) "Computing MC radiation field ..."
+     if (lmono0) write(*,*) "Computing MC radiation field ..."
 
      if (laffichage) call progress_bar(0)
 
@@ -528,8 +532,7 @@ subroutine dust_transfer_sub()
         write(*,*) "", real(tab_lambda(lambda)) ,"  ", real(frac_E_stars(lambda)), "  ", tau
      endif
 
-
-     call mc_photon_loop(lambda, p_lambda, n_photons2, n_phot_lim, nnfot1_start, laffichage, n_phot_sed2)
+     call mc_photon_loop(lambda, p_lambda, n_photons2, n_phot_lim, nnfot1_start, laffichage)
 
      ! Interstellar radiation field
      if ((.not.letape_th).and.(lProDiMo.or.lML)) then
@@ -641,73 +644,6 @@ subroutine dust_transfer_sub()
            if (ltau_map) call write_tau_map(0)
         endif
 
-     elseif (letape_th) then ! Calculation of la structure en temperature
-
-        letape_th=.false. ! A priori, on a Calculates la temperature
-        if (lRE_LTE) then
-           call Temp_finale()
-           if (lreemission_stats) call reemission_stats()
-        end if
-        if (lRE_nLTE) then
-           call Temp_finale_nLTE()
-        endif
-        if (lnRE) then
-           call Temp_nRE(flag_em_nRE)
-           call update_proba_abs_nRE()
-           if (n_iter > 10) then
-              flag_em_nRE = .true.
-              write(*,*) "WARNING: Reaching the maximum number of iterations"
-              write(*,*) "radiation field may not be converged"
-           endif
-
-           if (.not.flag_em_nRE) then ! need to iterate
-              call emission_nRE()
-              letape_th=.true.
-              first_etape_obs = first_etape_obs + 1
-              etape_f = etape_f + 1
-              n_iter = n_iter + 1
-              write(*,*) "Starting iteration", n_iter
-           endif
-        endif
-
-        if (ldust_sublimation) then
-           call sublimate_dust()
-        endif
-
-        ! Have we finished the calculation of non-eq grains ?
-        if (.not.letape_th) then ! yes, proceed to the next step
-           call ecriture_temperature(1)
-           call ecriture_sed(1)
-
-           if (lapprox_diffusion.and.l_is_dark_zone.and.&
-            (lemission_mol.or.lprodimo.or.lML.or.lforce_diff_approx.or.lemission_atom)) then
-              call Temp_approx_diffusion_vertical()
-              ! call Temp_approx_diffusion()
-              call diffusion_approx_nLTE_nRE()
-              call ecriture_temperature(2)
-           endif
-
-           ! Reset for the next step
-           sed=0.0; sed_q=0.0 ; sed_u=0.0 ; sed_v=0.0
-           n_phot_sed=0.0;  n_phot_sed2=0.0; n_phot_envoyes=0.0
-           sed_star=0.0 ; sed_star_scat=0.0 ; sed_disk=0.0 ; sed_disk_scat=0.0
-        endif ! .not.letape_th
-
-        call system_clock(time_end)
-        if (time_end < time_begin) then
-           time=(time_end + (1.0 * time_max)- time_begin)/real(time_tick)
-        else
-           time=(time_end - time_begin)/real(time_tick)
-        endif
-        if (time > 60) then
-           itime = int(time)
-           write (*,'(" Temperature calculation complete in ", I3, "h", I3, "m", I3, "s")')  &
-                itime/3600, mod(itime/60,60), mod(itime,60)
-        else
-           write (*,'(" Temperature calculation complete in ", F5.2, "s")')  time
-        endif
-        if (loutput_J_step1) call ecriture_J(1)
-
      else ! Etape 2 SED
 
         ! SED ray-tracing
@@ -772,7 +708,7 @@ end subroutine dust_transfer_sub
 
 !***********************************************************
 
-subroutine mc_photon_loop(lambda_in, p_lambda_in, n_photons2, n_phot_lim, nnfot1_start, laffichage, n_phot_sed2)
+subroutine mc_photon_loop(lambda_in, p_lambda_in, n_photons2, n_phot_lim, nnfot1_start, laffichage)
   ! Monte Carlo photon loop — shared kernel used by thermal, image, and SED modes.
   ! The mode-dependent behaviour is controlled by module-level flags:
   !   letape_th  -> thermal structure (multi-wavelength, re-emission)
@@ -788,7 +724,6 @@ subroutine mc_photon_loop(lambda_in, p_lambda_in, n_photons2, n_phot_lim, nnfot1
   integer, intent(in) :: lambda_in, p_lambda_in, n_photons2, nnfot1_start
   real, intent(in) :: n_phot_lim
   logical, intent(in) :: laffichage
-  real(kind=dp), intent(inout), target :: n_phot_sed2
 
   ! Local variables
   real(kind=dp), dimension(4) :: Stokes
@@ -796,7 +731,7 @@ subroutine mc_photon_loop(lambda_in, p_lambda_in, n_photons2, n_phot_lim, nnfot1
   real :: rand
   logical :: lpacket_alive, lintersect, flag_star, flag_scatt, flag_ISM
   real(kind=dp) :: x, y, z, u, v, w
-  real(kind=dp), target :: nnfot2
+  real(kind=dp), target :: nnfot2, n_phot_sed2
   real(kind=dp), pointer :: p_nnfot2
   real(kind=dp) :: n_phot_envoyes_in_loop
   integer, target :: lambda_local, p_lambda_local
@@ -812,10 +747,10 @@ subroutine mc_photon_loop(lambda_in, p_lambda_in, n_photons2, n_phot_lim, nnfot1
   !$omp parallel &
   !$omp default(none) &
   !$omp firstprivate(lambda_local,p_lambda_ptr) &
-  !$omp private(id,icell,lpacket_alive,lintersect,p_nnfot2,nnfot2,n_phot_envoyes_in_loop,rand) &
+  !$omp private(id,icell,lpacket_alive,lintersect,p_nnfot2,nnfot2,n_phot_sed2,n_phot_envoyes_in_loop,rand) &
   !$omp private(x,y,z,u,v,w,Stokes,flag_star,flag_ISM,flag_scatt,capt) &
   !$omp shared(nnfot1_start,n_photons_loop,capt_sup,n_phot_lim,lscatt_ray_tracing1) &
-  !$omp shared(n_photons2_local,n_phot_envoyes,nb_proc,n_phot_sed2) &
+  !$omp shared(n_photons2_local,n_phot_envoyes,nb_proc) &
   !$omp shared(stream,laffichage,lmono,lmono0,lProDiMo,lML,letape_th,tab_lambda,n_photons_lambda, n_photons1_cumul,ibar) &
   !$omp reduction(+:E_abs_nRE)
   if (letape_th) then
@@ -887,6 +822,113 @@ subroutine mc_photon_loop(lambda_in, p_lambda_in, n_photons2, n_phot_lim, nnfot1
   return
 
 end subroutine mc_photon_loop
+
+!***********************************************************
+
+subroutine run_thermal_mc()
+  ! Runs the thermal structure Monte Carlo calculation
+  ! Iterates over non-equilibrium grains (nRE) if needed
+  ! Calculates temperature structure and writes output
+  ! C. Pinte
+  ! 07/2026 — Extracted from dust_transfer_sub
+
+  implicit none
+
+  integer :: n_photons2, nnfot1_start, n_iter, itime
+  real :: n_phot_lim, time
+  logical :: flag_em_nRE, laffichage
+  integer, target :: lambda, lambda0
+  integer, pointer :: p_lambda
+  real(kind=dp) :: n_phot_sed2
+
+  laffichage = .true.
+  n_photons2 = n_photons_eq_th
+  n_phot_lim = 1.0e30 ! packets are not killed
+  nnfot1_start = 1
+  n_phot_sed2 = 0.0_dp
+
+  lambda = 1
+  lambda0 = 1
+  p_lambda => lambda
+
+  letape_th = .true.
+
+  write(*,*) "Computing temperature structure ..."
+  if (laffichage) call progress_bar(0)
+
+  n_iter = 0
+  do
+     n_photons2 = n_photons_eq_th
+     call mc_photon_loop(lambda, p_lambda, n_photons2, n_phot_lim, nnfot1_start, laffichage)
+
+     letape_th = .false. ! A priori, on a calcule la temperature
+     if (lRE_LTE) then
+        call Temp_finale()
+        if (lreemission_stats) call reemission_stats()
+     endif
+     if (lRE_nLTE) then
+        call Temp_finale_nLTE()
+     endif
+     if (lnRE) then
+        call Temp_nRE(flag_em_nRE)
+        call update_proba_abs_nRE()
+        if (n_iter > 10) then
+           flag_em_nRE = .true.
+           write(*,*) "WARNING: Reaching the maximum number of iterations"
+           write(*,*) "radiation field may not be converged"
+        endif
+
+        if (.not.flag_em_nRE) then ! need to iterate
+           call emission_nRE()
+           letape_th = .true.
+           n_iter = n_iter + 1
+           write(*,*) "Starting iteration", n_iter
+        endif
+     endif
+
+     if (ldust_sublimation) then
+        call sublimate_dust()
+     endif
+
+     if (.not.letape_th) exit
+  enddo
+
+  call ecriture_temperature(1)
+  call ecriture_sed(1)
+
+  if (lapprox_diffusion.and.l_is_dark_zone.and.&
+   (lemission_mol.or.lprodimo.or.lML.or.lforce_diff_approx.or.lemission_atom)) then
+     call Temp_approx_diffusion_vertical()
+     ! call Temp_approx_diffusion()
+     call diffusion_approx_nLTE_nRE()
+     call ecriture_temperature(2)
+  endif
+
+  ! Reset for the next step
+  sed=0.0; sed_q=0.0 ; sed_u=0.0 ; sed_v=0.0
+  n_phot_sed=0.0;  n_phot_sed2=0.0; n_phot_envoyes=0.0
+  sed_star=0.0 ; sed_star_scat=0.0 ; sed_disk=0.0 ; sed_disk_scat=0.0
+
+  call system_clock(time_end)
+  if (time_end < time_begin) then
+     time=(time_end + (1.0 * time_max)- time_begin)/real(time_tick)
+  else
+     time=(time_end - time_begin)/real(time_tick)
+  endif
+  if (time > 60) then
+     itime = int(time)
+     write (*,'(" Temperature calculation complete in ", I3, "h", I3, "m", I3, "s")')  &
+          itime/3600, mod(itime/60,60), mod(itime,60)
+  else
+     itime = int(time)
+     write (*,'(" Temperature calculation complete in ", F5.2, "s")')  time
+  endif
+  if (loutput_J_step1) call ecriture_J(1)
+
+  return
+
+end subroutine run_thermal_mc
+
 
 !***********************************************************
 
