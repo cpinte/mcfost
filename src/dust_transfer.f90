@@ -772,6 +772,8 @@ subroutine run_image_mc()
      call ecriture_map_ray_tracing()
      if (ltau_surface) call write_tau_surface(0) ! 0 for continuum
      if (ltau_map) call write_tau_map(0)
+     write(*,*) "Source fct time", time_source_fct/real(time_tick), "s"
+     write(*,*) "RT time        ", time_RT/real(time_tick), "s"
   endif
 
   return
@@ -979,7 +981,11 @@ subroutine run_sed_mc()
 
   ! Write outputs after completing all wavelengths
   call ecriture_sed(2)
-  if (lscatt_ray_tracing) call ecriture_sed_ray_tracing()
+  if (lscatt_ray_tracing) then
+     call ecriture_sed_ray_tracing()
+     write(*,*) "Source fct time", time_source_fct/real(time_tick), "s"
+     write(*,*) "RT time        ", time_RT/real(time_tick), "s"
+  endif
   if (lProDiMo) call mcfost2ProDiMo()
   if (loutput_UV_field) call ecriture_UV_field()
   if (loutput_J) call ecriture_J(2)
