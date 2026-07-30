@@ -38,7 +38,7 @@ module dust_transfer
 
   contains
 
-subroutine dust_transfer_sub()
+subroutine init_dust_transfer()
 ! Added the case where Mueller matrices are given as inputs
 ! 20/04/2023
 
@@ -341,10 +341,15 @@ subroutine dust_transfer_sub()
            endif
         endif
 
+        if (lscatt_ray_tracing) then
+           if (lspherical.or.l3D) then
+              call no_dark_zone()
+           endif
+        endif
+
         if (lonly_diff_approx) then
            call lect_temperature()
            call Temp_approx_diffusion_vertical()
-           ! call Temp_approx_diffusion()
            call diffusion_approx_nLTE_nRE()
            call ecriture_temperature(2)
            return
@@ -361,7 +366,6 @@ subroutine dust_transfer_sub()
         !$omp end parallel
 
         call repartition_wl_em()
-
      endif ! lTemp.or.lsed_complete
 
      if (lTemp.and.lnRE) call init_emissivite_nRE()
@@ -369,15 +373,28 @@ subroutine dust_transfer_sub()
 
   if (laverage_grain_size) call taille_moyenne_grains()
 
-  etape_start=etape_i
-  nnfot1_start=1
-  lambda=1 ! to avoid array overflow at initialization
+  etape_start = etape_i
   ind_etape = etape_start
 
-  !************************************************************
-  ! Main loop over calculation steps
-  !************************************************************
-  n_iter = 0 ! Number of iterations for non-equilibrium grains
+end subroutine init_dust_transfer
+
+
+!***********************************************************
+
+subroutine dust_transfer_sub()
+  ! Main entry point for radiative transfer calculation
+  ! C. Pinte
+
+  implicit none
+
+  integer :: lambda, ind_etape, first_etape_obs, time_RT, time_source_fct
+  integer, target :: lambda_target
+  integer, pointer :: p_lambda
+
+  time_source_fct = 0 ; time_RT = 0
+
+  call init_dust_transfer()
+  if (lonly_diff_approx) return
 
   if (letape_th) then
      call run_thermal_mc()
@@ -389,7 +406,9 @@ subroutine dust_transfer_sub()
      if (lTemp .and. lsed_complete) then
         write(*,'(a30, $)') "Computing dust properties ..."
         do lambda=1, n_lambda
-           call prop_grains(lambda) ! recompute opacity
+           call prop_grains(lambda)
+           lambda_target = lambda
+           p_lambda => lambda_target
            call opacity(lambda, p_lambda)
         enddo
         write(*,*) "Done"
