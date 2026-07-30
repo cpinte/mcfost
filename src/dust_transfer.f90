@@ -48,44 +48,12 @@ subroutine init_dust_transfer()
 
 #include "sprng_f.h"
 
-  ! Packet energy
-  real(kind=dp), dimension(4) :: Stokes
-
-  ! Simulation parameters
-  integer :: itime, lambda_threshold, n_photons2
-  integer :: ind_etape, first_etape_obs
-  integer :: etape_start, nnfot1_start, n_iter, ibin, iaz, ibar, n_photons1_cumul
-
-  real :: time, n_phot_lim
-  logical :: lpacket_alive, lintersect
-
-  logical :: lscatt_ray_tracing1_save, lscatt_ray_tracing2_save
-
+  integer :: lambda_threshold
   integer, target :: lambda, lambda0
-  integer, pointer, save :: p_lambda
-  integer :: capt
-
-  real(kind=dp) :: x,y,z, u,v,w, lmin, lmax
-  real :: rand, tau
-  integer :: i, icell, p_icell
-  logical :: flag_star, flag_scatt, flag_ISM
-
-  logical :: laffichage, flag_em_nRE, lcompute_dust_prop
-
-  ! Param�tres parallelisation
-  integer :: id=1
-
-  real(kind=dp), target :: nnfot2, n_phot_sed2
-  real(kind=dp), pointer :: p_nnfot2
-  real(kind=dp) :: n_phot_envoyes_in_loop
-
-  integer :: time_1, time_2, time_RT, time_source_fct
-
+  integer, pointer :: p_lambda
+  integer :: i, p_icell
+  logical :: laffichage, lcompute_dust_prop
   real, allocatable, dimension(:) :: extra_heating
-
-  time_source_fct = 0 ; time_RT = 0
-
-  lambda0 = -99 ; nnfot2=0.0_dp ; n_phot_sed2 = 0.0_dp
 
   ! Packet energy mise a 1
   E_paquet = 1.0_dp
@@ -180,9 +148,6 @@ subroutine init_dust_transfer()
      etape_i=1
      etape_f=1
      letape_th = .false.
-     first_etape_obs=1
-
-     n_phot_lim=1.0e30
 
      if (aniso_method==1) then
         lmethod_aniso1=.true.
@@ -234,7 +199,6 @@ subroutine init_dust_transfer()
         lmethod_aniso1 = .false.
      endif
 
-     first_etape_obs=2
      ! Number of steps to determine for the thermal calculation
      if (lTemp) then
         etape_i=1
@@ -373,9 +337,6 @@ subroutine init_dust_transfer()
 
   if (laverage_grain_size) call taille_moyenne_grains()
 
-  etape_start = etape_i
-  ind_etape = etape_start
-
 end subroutine init_dust_transfer
 
 
@@ -387,21 +348,18 @@ subroutine dust_transfer_sub()
 
   implicit none
 
-  integer :: lambda, ind_etape, first_etape_obs, time_RT, time_source_fct
+  integer :: lambda
   integer, target :: lambda_target
   integer, pointer :: p_lambda
-
-  time_source_fct = 0 ; time_RT = 0
 
   call init_dust_transfer()
   if (lonly_diff_approx) return
 
   if (letape_th) then
      call run_thermal_mc()
-     ind_etape = first_etape_obs
   endif
 
-  if ((ind_etape == first_etape_obs) .and. lremove) then
+  if (lremove) then
      call remove_species()
      if (lTemp .and. lsed_complete) then
         write(*,'(a30, $)') "Computing dust properties ..."
@@ -421,11 +379,7 @@ subroutine dust_transfer_sub()
      call run_sed_mc()
   endif
 
-  if (lscatt_ray_tracing) then
-     call dealloc_ray_tracing()
-     write(*,*) "Source fct time", time_source_fct/real(time_tick), "s"
-     write(*,*) "RT time        ", time_RT/real(time_tick), "s"
-  endif
+  if (lscatt_ray_tracing) call dealloc_ray_tracing()
 
   return
 
