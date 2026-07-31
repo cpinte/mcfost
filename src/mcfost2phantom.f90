@@ -172,7 +172,7 @@ contains
     use naleat, only : seed, stream, gtype
     use SPH2mcfost, only : SPH_to_Voronoi, compute_stellar_parameters
     use Voronoi_grid, only : Voronoi
-    use dust_transfer, only : emit_packet, propagate_packet, run_thermal_mc
+    use dust_transfer, only : run_thermal_mc
     use utils, only : progress_bar
     use stars, only : star_energy_distribution, ism_energy_distribution
     use grid,only : setup_grid
