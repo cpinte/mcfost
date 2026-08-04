@@ -465,11 +465,11 @@ subroutine mc_photon_loop(lambda_in, p_lambda_in, n_photons2, n_phot_lim, nnfot1
   ! OMP parallel photon transport loop
   !$omp parallel &
   !$omp default(none) &
-  !$omp firstprivate(lambda_local,p_lambda_ptr) &
+  !$omp firstprivate(lambda_local,p_lambda_ptr,n_photons2_local) &
   !$omp private(id,icell,lpacket_alive,lintersect,p_nnfot2,nnfot2,n_phot_sed2,n_phot_envoyes_in_loop,rand) &
   !$omp private(x,y,z,u,v,w,Stokes,flag_star,flag_ISM,flag_scatt,capt) &
   !$omp shared(nnfot1_start,n_photons_loop,capt_sup,n_phot_lim,lscatt_ray_tracing1) &
-  !$omp shared(n_photons2_local,n_phot_envoyes,nb_proc) &
+  !$omp shared(n_phot_envoyes,nb_proc) &
   !$omp shared(stream,laffichage,lmono,lmono0,lProDiMo,lML,letape_th,tab_lambda,n_photons_lambda, n_photons1_cumul,ibar) &
   !$omp reduction(+:E_abs_nRE)
   if (letape_th) then
