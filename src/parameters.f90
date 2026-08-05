@@ -12,7 +12,7 @@ module parameters
   real(kind=dp) :: simu_time = 0.0
 
   logical :: lpara, lstop_after_init
-  integer :: step_index, etape_i, etape_f
+  integer :: step_index
 
   ! Number of photons launched
   logical :: ldust_transfer

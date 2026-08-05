@@ -145,8 +145,6 @@ subroutine init_dust_transfer()
 
   if (lmono) then ! monochromatic code
      lambda=1
-     etape_i=1
-     etape_f=1
      letape_th = .false.
 
      if (aniso_method==1) then
@@ -201,10 +199,8 @@ subroutine init_dust_transfer()
 
      ! Number of steps to determine for the thermal calculation
      if (lTemp) then
-        etape_i=1
         letape_th=.true.
      else
-        etape_i=2
         letape_th=.false.
         if (.not.(ldust_prop.and.lstop_after_init)) then ! we do not need the temperature if we only compute the dust prop
            call lect_Temperature()
@@ -212,15 +208,9 @@ subroutine init_dust_transfer()
      endif
      if (lsed) then
         if (lsed_complete) then
-           etape_f=1+n_lambda
            n_lambda2 = n_lambda
-        else
-           etape_f=1+n_lambda2 ! modified number of steps
         endif
-     else
-        etape_f=1
      endif
-
 
      if (lTemp.or.lsed_complete) then
         call star_energy_distribution()
