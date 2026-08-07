@@ -24,21 +24,20 @@ subroutine compute_othin_sublimation_radius()
   ! In the optically thin case, depends only on the temperature (and spectrum) of the star
 
   real(kind=dp) :: E_dust, E_etoile, coeff_exp, cst_wl, sublimation_radius
-  real :: cst, wl, delta_wl, star_flux
+  real(kind=dp) :: cst, wl, delta_wl, star_flux
   integer :: lambda, icell, i
 
   E_dust = 0.0
   cst=thermal_const/dust_pop(1)%T_sub
-  cst=thermal_const/1500.
 
   icell = icell1
 
   do lambda=1, n_lambda
      ! wavelength in metres
-     wl = tab_lambda(lambda)*1.e-6
-     delta_wl=tab_delta_lambda(lambda)*1.e-6
+     wl = tab_lambda(lambda) * 1.0e-6_dp
+     delta_wl = tab_delta_lambda(lambda) * 1.0e-6_dp
      cst_wl=cst/wl
-     if (cst_wl < 500.0) then
+     if (cst_wl < 500.0_dp) then
         coeff_exp=exp(cst_wl)
         E_dust = E_dust + 4.0 * kappa_abs_LTE(icell,lambda)/((wl**5)*(coeff_exp-1.0)) *delta_wl
      endif
@@ -202,7 +201,7 @@ subroutine sublimate_dust()
   ! D. Price 25/06/26: updated to work with all grid types (esp. Voronoi)
 
   integer :: icell, k, ipop, p_k
-  real :: mass
+  real(kind=dp) :: mass
   logical :: lchanged
 
   write(*,*) "Sublimating dust"

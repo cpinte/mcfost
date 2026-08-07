@@ -1,0 +1,48 @@
+name: MCFOST Code Reviewer
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gemini Reviewer
+        uses: sshnaidm/gemini-code-review-action@v2
+        with:
+          gemini-key: ${{ secrets.GEMINI_API_KEY }}
+          model: "gemini-3.6-flash"
+          prompt: |
+            You are reviewing a pull request for MCFOST, a high-performance 3D Monte Carlo radiative transfer code written in modern/Legacy Fortran (F90/F95/F2003) and C/C++.
+
+            Note that gemini-3.6-flash is a valid Gemini model ID.
+
+            Please review the diff with strict focus on:
+
+            1. High-Performance & Parallel Computing Bugs (OpenMP / MPI / SIMD):
+               - Race conditions, missing `PRIVATE` or `REDUCTION` clauses in `$OMP PARALLEL` loops.
+               - Non-contiguous memory access (Fortran is column-major: loops must iterate over the first index in the inner loop).
+               - Unnecessary array reallocations or heap allocations inside hot loops (e.g., ray-tracing, photon propagation routines).
+
+            2. Numerical Precision & Physical Correctness:
+               - Unsafe floating-point operations, division-by-zero risks, or underflow/overflow handling in optical depth ($\tau$), temperature calculations, or scattering matrices.
+               - Inconsistent double/single precision (`real(dp)` vs `real` literals like `1.0` vs `1.0_dp`).
+               - Correct array bounds checking, particularly on grid interpolations (3D cylindrical/spherical/Voronoi grids).
+
+            3. Fortran / C Interoperability & Memory Safety:
+               - Dangling pointers, memory leaks, or unallocated array usage.
+               - Incorrect `ISO_C_BINDING` types or missing `intent(in/out/inout)` specifications on modified interfaces.
+
+            Guidelines:
+            - Ignore stylistic/formatting nitpicks unless they impact readability or compiler optimization.
+            - Provide concrete, inline Fortran code snippets for suggested fixes.
