@@ -3,17 +3,19 @@ module disk_physics
   use grains
   use mcfost_env
   use dust_prop
-  use density, only : gas_density, dust_density_o_n_grains
+  use density, only : dust_density_o_n_grains, dust_mass, find_non_empty_cell
   use constants
-  use stars, only : star_spectrum
+  use stars, only : star_spectrum, prob_E_star
   use messages
   use wavelengths
   use temperature
   use cylindrical_grid
+  use parameters
 
   implicit none
 
   character(len=32) :: sublimationFile = "sublimation_radius.txt"
+  real(kind=dp), parameter :: sub_factor = 1.6_dp
 
 contains
 
@@ -21,10 +23,8 @@ contains
 subroutine compute_othin_sublimation_radius()
   ! In the optically thin case, depends only on the temperature (and spectrum) of the star
 
-  implicit none
-
   real(kind=dp) :: E_dust, E_etoile, coeff_exp, cst_wl, sublimation_radius
-  real :: cst, wl, delta_wl
+  real :: cst, wl, delta_wl, star_flux
   integer :: lambda, icell, i
 
   E_dust = 0.0
@@ -45,29 +45,31 @@ subroutine compute_othin_sublimation_radius()
   enddo
   E_dust = E_dust * 2.0*pi*hp*c_light**2
 
-  ! Emission etoiles
+  if (E_dust < tiny_real) then
+     call error("Sublimation radius : opacity is not defined yet", &
+          msg2="Maybe the parameter file is old ?")
+  endif
+
+  ! Emission etoiles: per-star flux via prob_E_star * star_spectrum
   do i=1, n_stars
      E_etoile = 0.0
      do lambda=1, n_lambda
-        E_etoile = E_etoile + kappa_abs_LTE(icell,lambda) * star_spectrum(lambda) / ( 4*pi * AU_to_m**2)
+        star_flux = prob_E_star(lambda,i) * star_spectrum(lambda)
+        E_etoile = E_etoile + kappa_abs_LTE(icell,lambda) * star_flux / ( 4*pi * AU_to_m**2)
      enddo
-
-     if (E_dust < tiny_real) then
-        call error("Sublimation radius : opacity is not defined yet", &
-             msg2="Maybe the parameter file is old ?")
-     endif
      star(i)%othin_sublimation_radius = sqrt(E_etoile/E_dust)
+     write(*,'(a,i0,a,f6.3,a)') "Optically thin sublimation radius (star #", i, ") = ", &
+          real(star(i)%othin_sublimation_radius), " AU"
   enddo
 
-  if (.not.lVoronoi) then
-     sublimation_radius = real(star(1)%othin_sublimation_radius)
-     write(*,*) "Optically thin sublimation radius =", real(sublimation_radius), "AU"
-     sublimation_radius = sublimation_radius * 1.6
+  open(unit=1,file=trim(data_dir)//"/"//trim(sublimationFile),status="replace")
+  write(1,*) star(:)%othin_sublimation_radius
+  close(1)
 
-     open(unit=1,file=trim(data_dir)//"/"//trim(sublimationFile),status="replace")
-     write(1,*) star(:)%othin_sublimation_radius
-     close(1)
-
+  if (lVoronoi) then
+     call sublimate_dust_Voronoi_radius(sub_factor)
+  else
+     sublimation_radius = real(star(1)%othin_sublimation_radius) * sub_factor
      call set_sublimation_radius(sublimation_radius)
   endif
 
@@ -120,7 +122,12 @@ subroutine read_sublimation_radius()
      call error("read_sublimation_radius: error reading sublimation radius (file may be from an older run or have wrong format)")
   endif
 
-  call set_sublimation_radius(sublimation_radius)
+  if (lVoronoi) then
+     call sublimate_dust_Voronoi_radius(sub_factor)
+  else
+     sublimation_radius = real(star(1)%othin_sublimation_radius) * sub_factor
+     call set_sublimation_radius(sublimation_radius)
+  endif
 
   return
 
@@ -128,52 +135,112 @@ end subroutine read_sublimation_radius
 
 !**********************************************************************
 
+subroutine sublimate_dust_Voronoi_radius(rsub_factor)
+  ! Remove dust inside the sublimation radius of each star on a Voronoi grid.
+  ! Radius for star i is rsub_factor * star(i)%othin_sublimation_radius.
+
+  use Voronoi_grid, only : Voronoi
+
+  real(kind=dp), intent(in) :: rsub_factor
+
+  integer :: icell, istar, n_delete_star, n_delete_total
+  real(kind=dp) :: dx, dy, dz, d2, r2, sublimation_radius
+  logical, dimension(:), allocatable :: lcleared
+
+  allocate(lcleared(n_cells))
+  lcleared = .false.
+  n_delete_total = 0
+
+  do istar=1, n_stars
+     sublimation_radius = real(star(istar)%othin_sublimation_radius, kind=dp) * rsub_factor
+     r2 = sublimation_radius**2
+     n_delete_star = 0
+
+     write(*,'(a,i0,a,f6.3,a,f6.3,a,f3.1,a)') "Star #", istar, ": sublimation radius = ", &
+          real(sublimation_radius), " AU (= ", real(star(istar)%othin_sublimation_radius), &
+          " x ", real(rsub_factor), ")"
+
+     do icell=1, n_cells
+        ! Skip star sink cells (no dust)
+        if (Voronoi(icell)%is_star) cycle
+
+        dx = Voronoi(icell)%xyz(1) - star(istar)%x
+        if (abs(dx) > sublimation_radius) cycle
+        dy = Voronoi(icell)%xyz(2) - star(istar)%y
+        if (abs(dy) > sublimation_radius) cycle
+        dz = Voronoi(icell)%xyz(3) - star(istar)%z
+        if (abs(dz) > sublimation_radius) cycle
+
+        d2 = dx**2 + dy**2 + dz**2
+        if (d2 < r2) then
+           dust_density_o_n_grains(:,icell) = 0.0
+           dust_mass(icell) = 0.0
+           n_delete_star = n_delete_star + 1
+           if (.not.lcleared(icell)) then
+              lcleared(icell) = .true.
+              n_delete_total = n_delete_total + 1
+           endif
+        endif
+     enddo
+
+     write(*,'(a,i0,a)') "  -> removing dust in ", n_delete_star, " cells"
+  enddo
+
+  write(*,'(a,i0)') "Total cells cleared inside sublimation radii: ", n_delete_total
+  deallocate(lcleared)
+  call find_non_empty_cell()
+
+  return
+
+end subroutine sublimate_dust_Voronoi_radius
+
+!**********************************************************************
+
 subroutine sublimate_dust()
   ! Remove grains whose temperature exceeds the sublimation temperature
-  ! C. Pinte
-  ! 07/08/12
+  ! C. Pinte 07/08/12
+  ! D. Price 25/06/26: updated to work with all grid types (esp. Voronoi)
 
-  integer :: i, j, pk, icell, k, ipop, l
+  integer :: icell, k, ipop, p_k
   real :: mass
+  logical :: lchanged
 
   write(*,*) "Sublimating dust"
 
-  do i=1,n_rad
-     do j=j_start,nz
-        if (j==0) cycle
-        do pk=1,n_az
-           icell = cell_map(i,j,pk)
+  do icell=1, n_cells
+     lchanged = .false.
+     do k=1, n_grains_tot
+        ipop = grain(k)%pop
 
-           ! Cas LTE
-           do k=1,n_grains_tot
-              ipop = grain(k)%pop
-
-              if (.not.dust_pop(ipop)%is_PAH) then
-                 if (Tdust(icell) > dust_pop(ipop)%T_sub) then
-                    dust_density_o_n_grains(k,icell) = 0.0
-                 endif
-              endif
-           enddo
-
-
-        enddo !pk
-     enddo !j
-  enddo !i
-
-  mass = 0.0
-  do i=1,n_rad
-     do j=j_start,nz
-        if (j==0) cycle
-        do k=1,n_az
-           icell = cell_map(i,j,k)
-           do l=1,n_grains_tot
-              mass=mass + dust_density_o_n_grains(l,icell) * n_grains(l) * M_grain(l) * (volume(icell) * AU3_to_cm3)
-           enddo
-        enddo
+        if (.not.dust_pop(ipop)%is_PAH) then
+           if (Tdust(icell) > dust_pop(ipop)%T_sub) then
+              ! (n_grains_tot,n_cells) if lvariable_dust, else (n_zones,n_cells)
+              p_k = merge(k, grain(k)%zone, lvariable_dust)
+              dust_density_o_n_grains(p_k,icell) = 0.0
+              lchanged = .true.
+           endif
+        endif
      enddo
-  enddo
-  mass =  mass/Msun_to_g
 
+     ! Keep dust_mass consistent with density (needed for kappa_factor when .not.lvariable_dust)
+     if (lchanged) then
+        if (lvariable_dust) then
+           dust_mass(icell) = 0.0
+           do k=1, n_grains_tot
+              dust_mass(icell) = dust_mass(icell) + dust_density_o_n_grains(k,icell) * n_grains(k) &
+                   * M_grain(k) * volume(icell) * AU3_to_cm3
+           enddo
+        else
+           ! Zone-indexed density: if wiped, mass is zero (SPH and analytic single-zone)
+           if (maxval(dust_density_o_n_grains(:,icell)) <= 0.0) then
+              dust_mass(icell) = 0.0
+           endif
+        endif
+     endif
+  enddo
+
+  call find_non_empty_cell()
+  mass = real(sum(dust_mass) * g_to_Msun)
   write(*,*) 'New total dust mass in model :', mass,' Msun'
 
 end subroutine sublimate_dust
@@ -188,8 +255,6 @@ subroutine equilibre_hydrostatique()
   !
   ! C. Pinte
   ! 25/09/07
-
-  implicit none
 
   real, dimension(nz) :: rho, ln_rho
   real :: dz, dz_m1, dTdz, fac1, fac2, M_stars, M_mol, total_sum, cst
