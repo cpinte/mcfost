@@ -34,10 +34,10 @@ subroutine compute_othin_sublimation_radius()
 
   do lambda=1, n_lambda
      ! wavelength in metres
-     wl = tab_lambda(lambda)*1.e-6
-     delta_wl=tab_delta_lambda(lambda)*1.e-6
+     wl = tab_lambda(lambda) * 1.0e-6_dp
+     delta_wl = tab_delta_lambda(lambda) * 1.0e-6_dp
      cst_wl=cst/wl
-     if (cst_wl < 500.0) then
+     if (cst_wl < 500.0_dp) then
         coeff_exp=exp(cst_wl)
         E_dust = E_dust + 4.0 * kappa_abs_LTE(icell,lambda)/((wl**5)*(coeff_exp-1.0)) *delta_wl
      endif
