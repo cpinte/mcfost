@@ -232,6 +232,7 @@ subroutine sublimate_dust()
      endif
   enddo
 
+  call find_non_empty_cell()
   mass = real(sum(dust_mass) * g_to_Msun)
   write(*,*) 'New total dust mass in model :', mass,' Msun'
 
