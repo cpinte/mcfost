@@ -24,7 +24,7 @@ subroutine compute_othin_sublimation_radius()
   ! In the optically thin case, depends only on the temperature (and spectrum) of the star
 
   real(kind=dp) :: E_dust, E_etoile, coeff_exp, cst_wl, sublimation_radius
-  real :: cst, wl, delta_wl, star_flux
+  real(kind=dp) :: cst, wl, delta_wl, star_flux
   integer :: lambda, icell, i
 
   E_dust = 0.0

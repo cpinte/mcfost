@@ -25,6 +25,8 @@ jobs:
           prompt: |
             You are reviewing a pull request for MCFOST, a high-performance 3D Monte Carlo radiative transfer code written in modern/Legacy Fortran (F90/F95/F2003) and C/C++.
 
+            Note that gemini-3.6-flash is a valid Gemini model ID.
+
             Please review the diff with strict focus on:
 
             1. High-Performance & Parallel Computing Bugs (OpenMP / MPI / SIMD):
