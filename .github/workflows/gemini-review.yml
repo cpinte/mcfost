@@ -21,7 +21,7 @@ jobs:
         uses: sshnaidm/gemini-code-review-action@v2
         with:
           gemini-key: ${{ secrets.GEMINI_API_KEY }}
-          model: "gemini-1.5-pro"
+          model: "gemini-3.6-flash"
           prompt: |
             You are reviewing a pull request for MCFOST, a high-performance 3D Monte Carlo radiative transfer code written in modern/Legacy Fortran (F90/F95/F2003) and C/C++.
 
