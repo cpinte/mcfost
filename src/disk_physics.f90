@@ -29,7 +29,6 @@ subroutine compute_othin_sublimation_radius()
 
   E_dust = 0.0
   cst=thermal_const/dust_pop(1)%T_sub
-  cst=thermal_const/1500.
 
   icell = icell1
 
@@ -45,17 +44,17 @@ subroutine compute_othin_sublimation_radius()
   enddo
   E_dust = E_dust * 2.0*pi*hp*c_light**2
 
+  if (E_dust < tiny_real) then
+     call error("Sublimation radius : opacity is not defined yet", &
+          msg2="Maybe the parameter file is old ?")
+  endif
+
   ! Emission etoiles
   do i=1, n_stars
      E_etoile = 0.0
      do lambda=1, n_lambda
         E_etoile = E_etoile + kappa_abs_LTE(icell,lambda) * star_spectrum(lambda) / ( 4*pi * AU_to_m**2)
      enddo
-
-     if (E_dust < tiny_real) then
-        call error("Sublimation radius : opacity is not defined yet", &
-             msg2="Maybe the parameter file is old ?")
-     endif
      star(i)%othin_sublimation_radius = sqrt(E_etoile/E_dust)
   enddo
 
@@ -165,7 +164,7 @@ subroutine sublimate_dust()
         enddo
      enddo
   enddo
-  mass =  mass/Msun_to_g
+  mass =  mass * g_to_Msun
 
   write(*,*) 'New total dust mass in model :', mass,' Msun'
 
