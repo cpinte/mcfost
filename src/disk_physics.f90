@@ -108,12 +108,19 @@ end subroutine set_sublimation_radius
 subroutine read_sublimation_radius()
 
   real(kind=dp) :: sublimation_radius
+  integer :: ios
 
   write(*,*) "Reading sublimation file : ./data_th/"//trim(sublimationfile)
 
-  open(unit=1,file=trim(root_dir)//"/"//trim(seed_dir)//"/data_th/"//trim(sublimationfile), status="old")
-  read(1,*) star(:)%othin_sublimation_radius
+  open(unit=1,file=trim(root_dir)//"/"//trim(seed_dir)//"/data_th/"//trim(sublimationfile), status="old", iostat=ios)
+  if (ios /= 0) then
+     call error("read_sublimation_radius: cannot open "//trim(root_dir)//"/"//trim(seed_dir)//"/data_th/"//trim(sublimationfile))
+  endif
+  read(1,*,iostat=ios) sublimation_radius
   close(unit=1)
+  if (ios /= 0) then
+     call error("read_sublimation_radius: error reading sublimation radius (file may be from an older run or have wrong format)")
+  endif
 
   if (lVoronoi) then
      call sublimate_dust_Voronoi_radius(sub_factor)
