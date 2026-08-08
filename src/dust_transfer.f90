@@ -473,22 +473,19 @@ subroutine mc_photon_loop(lambda_in, p_lambda_in, n_photons2, n_phot_lim, nnfot1
   !$omp private(id,icell,lpacket_alive,lintersect,p_nnfot2,nnfot2,n_phot_sed2,n_phot_envoyes_in_loop,rand) &
   !$omp private(x,y,z,u,v,w,Stokes,flag_star,flag_ISM,flag_scatt,capt) &
   !$omp shared(lambda_in, p_lambda_in, nnfot1_start,n_photons_loop,capt_sup,n_phot_lim,lscatt_ray_tracing1) &
-  !$omp shared(n_phot_envoyes,nb_proc) &
+  !$omp shared(n_phot_envoyes,nb_proc,p_n_lambda_pos,n_lambda) &
   !$omp shared(stream,laffichage,lmono,lmono0,lProDiMo,lML,letape_th,tab_lambda,n_photons_lambda, n_photons1_cumul,ibar) &
   !$omp reduction(+:E_abs_nRE)
   ! Establish thread-private pointer association inside the parallel region.
-  ! p_lambda_ptr is always fixed at p_lambda_in (the scattering grid index set by the
-  ! caller). This matches main's effective behavior: in main, firstprivate(p_lambda)
-  ! copied the pointer association to each thread, but the target (master's lambda)
-  ! was never modified inside the parallel region, so p_lambda was effectively
-  ! constant at its pre-parallel value in all threads.
-  ! - Thermal MC: p_lambda_in = 1 (from lambda0), stays fixed even as lambda_local
-  !   changes per photon via select_wl_em. Correct for scattering method 2 (p_lambda
-  !   indexes the wavelength-averaged scattering matrix).
-  ! - SED/image (lmono=.true.): lambda_local never changes, so p_lambda_ptr stays
-  !   correctly at p_lambda_in (either current lambda or 1 for sub-sampled grid).
+  ! In thermal MC (letape_th) with scattering method 2 (p_n_lambda_pos == n_lambda),
+  ! p_lambda_ptr must track lambda_local (the thread-private emitted photon wavelength).
+  ! Otherwise (monochromatic/SED mode or method 1), p_lambda_ptr is fixed at p_lambda_in.
   p_lambda_local = p_lambda_in
-  p_lambda_ptr => p_lambda_local
+  if (letape_th .and. (p_n_lambda_pos == n_lambda)) then
+     p_lambda_ptr => lambda_local
+  else
+     p_lambda_ptr => p_lambda_local
+  endif
   if (letape_th) then
      p_nnfot2 => nnfot2
      E_abs_nRE = 0.0
