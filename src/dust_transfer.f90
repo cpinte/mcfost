@@ -159,8 +159,10 @@ subroutine init_dust_transfer()
 
      if (ldust_sublimation) then
         call read_sublimation_radius()
-        call define_grid()
-        call define_dust_density()
+        if (.not.lVoronoi) then
+           call define_grid()
+           call define_dust_density()
+        endif
      endif
 
      call prop_grains(1)
@@ -188,6 +190,12 @@ subroutine init_dust_transfer()
      else ! Only the star is emitting
         Tdust=0.0
      endif !l_em_disk_image
+
+     ! Re-apply T-based sublimation so -img matches the thermal-run dust
+     if (ldust_sublimation) then
+        call sublimate_dust()
+        call opacity(1,1)
+     endif
 
   else ! not lmono
 
@@ -255,8 +263,10 @@ subroutine init_dust_transfer()
 
         if (ldust_sublimation)  then
            call compute_othin_sublimation_radius()
-           call define_grid()
-           call define_dust_density()
+           if (.not.lVoronoi) then
+              call define_grid()
+              call define_dust_density()
+           endif
 
            if (ldisk_struct) call write_disk_struct(.false.,lwrite_column_density,lwrite_velocity)
 
