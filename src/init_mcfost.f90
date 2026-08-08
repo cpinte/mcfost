@@ -1824,7 +1824,7 @@ subroutine initialisation_mcfost()
   endif
 
   if ((l_sym_ima).and.(abs(ang_disque) > 1e-6)) then
-     call warning("Disc is not aligned woth x-axis in image plane: removing image symmetry")
+     call warning("Disc is not aligned with x-axis in image plane: removing image symmetry")
      l_sym_ima=.false.
      do imol=1,n_molecules
         mol(imol)%l_sym_ima = .false.

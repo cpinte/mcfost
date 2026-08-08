@@ -453,25 +453,42 @@ subroutine mc_photon_loop(lambda_in, p_lambda_in, n_photons2, n_phot_lim, nnfot1
   real(kind=dp), target :: nnfot2, n_phot_sed2
   real(kind=dp), pointer :: p_nnfot2
   real(kind=dp) :: n_phot_envoyes_in_loop
-  integer, target :: lambda_local, p_lambda_local
+  integer, target :: lambda_local
+  integer, target :: p_lambda_local
   integer, pointer :: p_lambda_ptr
 
   ! Copy intent(in) arguments to local targets for OMP firstprivate
   lambda_local = lambda_in
-  p_lambda_local = p_lambda_in
-  p_lambda_ptr => p_lambda_local
   n_photons2_local = n_photons2
+  ! Note: p_lambda_local and p_lambda_ptr are private (not firstprivate) because
+  ! pointer association must be established inside the parallel region on each
+  ! thread's own private targets. A firstprivate pointer would still point to the
+  ! master thread's stack frame, causing cross-thread data races.
 
   ! OMP parallel photon transport loop
   !$omp parallel &
   !$omp default(none) &
-  !$omp firstprivate(lambda_local,p_lambda_ptr,n_photons2_local) &
+  !$omp firstprivate(lambda_local, n_photons2_local) &
+  !$omp private(p_lambda_local, p_lambda_ptr) &
   !$omp private(id,icell,lpacket_alive,lintersect,p_nnfot2,nnfot2,n_phot_sed2,n_phot_envoyes_in_loop,rand) &
   !$omp private(x,y,z,u,v,w,Stokes,flag_star,flag_ISM,flag_scatt,capt) &
-  !$omp shared(nnfot1_start,n_photons_loop,capt_sup,n_phot_lim,lscatt_ray_tracing1) &
+  !$omp shared(lambda_in, p_lambda_in, nnfot1_start,n_photons_loop,capt_sup,n_phot_lim,lscatt_ray_tracing1) &
   !$omp shared(n_phot_envoyes,nb_proc) &
   !$omp shared(stream,laffichage,lmono,lmono0,lProDiMo,lML,letape_th,tab_lambda,n_photons_lambda, n_photons1_cumul,ibar) &
   !$omp reduction(+:E_abs_nRE)
+  ! Establish thread-private pointer association inside the parallel region.
+  ! p_lambda_ptr is always fixed at p_lambda_in (the scattering grid index set by the
+  ! caller). This matches main's effective behavior: in main, firstprivate(p_lambda)
+  ! copied the pointer association to each thread, but the target (master's lambda)
+  ! was never modified inside the parallel region, so p_lambda was effectively
+  ! constant at its pre-parallel value in all threads.
+  ! - Thermal MC: p_lambda_in = 1 (from lambda0), stays fixed even as lambda_local
+  !   changes per photon via select_wl_em. Correct for scattering method 2 (p_lambda
+  !   indexes the wavelength-averaged scattering matrix).
+  ! - SED/image (lmono=.true.): lambda_local never changes, so p_lambda_ptr stays
+  !   correctly at p_lambda_in (either current lambda or 1 for sub-sampled grid).
+  p_lambda_local = p_lambda_in
+  p_lambda_ptr => p_lambda_local
   if (letape_th) then
      p_nnfot2 => nnfot2
      E_abs_nRE = 0.0
@@ -910,8 +927,6 @@ subroutine run_sed_mc()
         !$omp private(id, flag_star,flag_ISM,flag_scatt,nnfot1,x,y,z,u,v,w,stokes) &
         !$omp private(lintersect,icell,lpacket_alive,nnfot2,lambda_local)
 
-        flag_star = .false.
-
         !$omp do schedule(dynamic,1)
         do nnfot1=1,n_photons_loop
            !$ id = omp_get_thread_num() + 1
@@ -921,6 +936,7 @@ subroutine run_sed_mc()
 
               call emit_packet_ISM(id, icell,x,y,z,u,v,w,stokes,lintersect)
               flag_ISM = .true.
+              flag_star = .false.
 
               if (.not.lintersect) then
                  cycle photon_ISM
@@ -993,9 +1009,6 @@ subroutine run_sed_mc()
   return
 
 end subroutine run_sed_mc
-
-
-
 
 
 !***********************************************************
