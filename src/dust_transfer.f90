@@ -580,6 +580,7 @@ subroutine run_thermal_mc()
   ! C. Pinte
   ! 07/2026 — Extracted from dust_transfer_sub
 
+  use radiation_field, only : reset_radiation_field
   implicit none
 
   integer :: n_photons2, nnfot1_start, n_iter, itime
@@ -588,6 +589,10 @@ subroutine run_thermal_mc()
   integer, target :: lambda, lambda0
   integer, pointer :: p_lambda
   real(kind=dp) :: n_phot_sed2
+
+  ! Reset energy and temperature arrays for clean iteration state
+  call reset_radiation_field()
+  call reset_temperature()
 
   laffichage = .true.
   n_photons2 = n_photons_eq_th
@@ -644,15 +649,17 @@ subroutine run_thermal_mc()
      if (.not.letape_th) exit
   enddo
 
-  call ecriture_temperature(1)
-  call ecriture_sed(1)
+  if (.not. lmcfost_lib) then
+     call ecriture_temperature(1)
+     call ecriture_sed(1)
+  endif
 
   if (lapprox_diffusion.and.l_is_dark_zone.and.&
    (lemission_mol.or.lprodimo.or.lML.or.lforce_diff_approx.or.lemission_atom)) then
      call Temp_approx_diffusion_vertical()
      ! call Temp_approx_diffusion()
      call diffusion_approx_nLTE_nRE()
-     call ecriture_temperature(2)
+     if (.not. lmcfost_lib) call ecriture_temperature(2)
   endif
 
   ! Reset for the next step
