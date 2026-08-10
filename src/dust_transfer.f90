@@ -351,14 +351,23 @@ subroutine recompute_opacities()
   implicit none
 
   integer :: lambda
-  integer, target :: lambda_target
+  integer, target :: lambda_target, lambda0_target
   integer, pointer :: p_lambda
 
   write(*,'(a30, $)') "Computing dust properties ..."
   do lambda = 1, n_lambda
      call prop_grains(lambda)
      lambda_target = lambda
-     p_lambda => lambda_target
+     if (lscattering_method1) then
+        p_lambda => lambda_target
+     else
+        if (p_n_lambda_pos == n_lambda) then
+           p_lambda => lambda_target
+        else
+           lambda0_target = 1
+           p_lambda => lambda0_target
+        endif
+     endif
      call opacity(lambda, p_lambda)
   enddo
   write(*,*) "Done"
@@ -460,6 +469,8 @@ subroutine mc_photon_loop(lambda_in, p_lambda_in, n_photons2, n_phot_lim, nnfot1
   ! Copy intent(in) arguments to local targets for OMP firstprivate
   lambda_local = lambda_in
   n_photons2_local = n_photons2
+  ibar = 1
+  n_photons1_cumul = 0
   ! Note: p_lambda_local and p_lambda_ptr are private (not firstprivate) because
   ! pointer association must be established inside the parallel region on each
   ! thread's own private targets. A firstprivate pointer would still point to the
@@ -508,7 +519,6 @@ subroutine mc_photon_loop(lambda_in, p_lambda_in, n_photons2, n_phot_lim, nnfot1
 
   id = 1 ! For sequential code
   !$ id = omp_get_thread_num() + 1
-  ibar=1 ;  n_photons1_cumul = 0
 
   !$omp do schedule(dynamic,1)
   do nnfot1=nnfot1_start,n_photons_loop
@@ -938,6 +948,7 @@ subroutine run_sed_mc()
 
         !$omp do schedule(dynamic,1)
         do nnfot1=1,n_photons_loop
+           id = 1
            !$ id = omp_get_thread_num() + 1
            nnfot2 = 0.0_dp
            photon_ISM : do while (nnfot2 < n_photons_lambda)
