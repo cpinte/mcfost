@@ -446,7 +446,7 @@ subroutine mc_photon_loop(lambda_in, p_lambda_in, n_photons2, n_phot_lim, nnfot1
 
   ! Local variables
   real(kind=dp), dimension(4) :: Stokes
-  integer :: id, icell, capt, ibar, n_photons1_cumul, n_photons2_local
+  integer :: id, icell, capt, ibar, n_photons1_cumul, n_photons2_local, nnfot1
   real :: rand
   logical :: lpacket_alive, lintersect, flag_star, flag_scatt, flag_ISM
   real(kind=dp) :: x, y, z, u, v, w
@@ -471,7 +471,7 @@ subroutine mc_photon_loop(lambda_in, p_lambda_in, n_photons2, n_phot_lim, nnfot1
   !$omp firstprivate(lambda_local, n_photons2_local) &
   !$omp private(p_lambda_local, p_lambda_ptr) &
   !$omp private(id,icell,lpacket_alive,lintersect,p_nnfot2,nnfot2,n_phot_sed2,n_phot_envoyes_in_loop,rand) &
-  !$omp private(x,y,z,u,v,w,Stokes,flag_star,flag_ISM,flag_scatt,capt) &
+  !$omp private(x,y,z,u,v,w,Stokes,flag_star,flag_ISM,flag_scatt,capt,nnfot1) &
   !$omp shared(lambda_in, p_lambda_in, nnfot1_start,n_photons_loop,capt_sup,n_phot_lim,lscatt_ray_tracing1) &
   !$omp shared(n_phot_envoyes,nb_proc,p_n_lambda_pos,n_lambda) &
   !$omp shared(stream,laffichage,lmono,lmono0,lProDiMo,lML,letape_th,tab_lambda,n_photons_lambda, n_photons1_cumul,ibar) &
@@ -509,8 +509,10 @@ subroutine mc_photon_loop(lambda_in, p_lambda_in, n_photons2, n_phot_lim, nnfot1
 
   !$omp do schedule(dynamic,1)
   do nnfot1=nnfot1_start,n_photons_loop
+     nnfot2 = 0.0_dp
      p_nnfot2 = 0.0_dp
      n_phot_envoyes_in_loop = 0.0_dp
+     n_phot_sed2 = 0.0_dp
      photon : do while ((p_nnfot2 < n_photons2_local).and.(n_phot_envoyes_in_loop < n_phot_lim))
         nnfot2=nnfot2+1.0_dp
         n_phot_envoyes(lambda_local,id) = n_phot_envoyes(lambda_local,id) + 1.0_dp
@@ -592,6 +594,8 @@ subroutine run_thermal_mc()
   n_iter = 0
   do
      n_photons2 = n_photons_eq_th
+
+     ! Todo : we do no need to pass lambda here
      call mc_photon_loop(lambda, p_lambda, n_photons2, n_phot_lim, nnfot1_start, laffichage)
 
      letape_th = .false. ! A priori, on a calcule la temperature
@@ -619,6 +623,7 @@ subroutine run_thermal_mc()
         endif
      endif
 
+     ! todo_physics : this should be moved into the dust_transfer_sub and compared with remove_species
      if (ldust_sublimation) then
         call sublimate_dust()
      endif
@@ -700,6 +705,8 @@ subroutine run_image_mc()
      endif
   endif
 
+  ! lambda and p_lambda are always 1 here
+
   if (.not.lMueller_pos_multi .and. lscatt_ray_tracing) then
      call calc_local_scattering_matrices(lambda, p_lambda)
   endif
@@ -726,6 +733,8 @@ subroutine run_image_mc()
   if (laffichage) call progress_bar(0)
 
   ! MC photon loop
+
+  ! todo : lambda and p_lambda are always 1 here : it does not look like we need to pass lambda as input here
   call mc_photon_loop(lambda, p_lambda, n_photons2, n_phot_lim, nnfot1_start, laffichage)
 
   ! Stokes FITS output from MC packets
@@ -922,7 +931,7 @@ subroutine run_sed_mc()
         !$omp default(none) &
         !$omp shared(lambda,p_lambda,n_photons_lambda,n_photons_loop,n_phot_envoyes_ISM) &
         !$omp private(id, flag_star,flag_ISM,flag_scatt,nnfot1,x,y,z,u,v,w,stokes) &
-        !$omp private(lintersect,icell,lpacket_alive,nnfot2,lambda_local)
+        !$omp private(lintersect,icell,lpacket_alive,nnfot2,lambda_local,p_lambda_ptr)
 
         !$omp do schedule(dynamic,1)
         do nnfot1=1,n_photons_loop
