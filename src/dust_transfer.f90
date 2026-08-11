@@ -833,8 +833,8 @@ subroutine run_sed_mc()
 
   implicit none
 
-  integer, target :: lambda_target, lambda0_target
-  integer, pointer :: p_lambda
+  integer, target :: lambda_target, lambda0_target, p_lambda_local
+  integer, pointer :: p_lambda, p_lambda_ptr
   integer :: lambda, lambda_local, ibin, iaz, itime, nnfot1_start, n_photons2, nnfot1, n_lambda_sed, id, icell
   real :: n_phot_lim, time, tau
   real(kind=dp) :: x, y, z, u, v, w, nnfot2, lmin, lmax
@@ -880,6 +880,7 @@ subroutine run_sed_mc()
      endif
      do lambda=1,n_lambda2
         if (lcompute_dust_prop) call prop_grains(lambda)
+        lambda_target = lambda
         call opacity(lambda, p_lambda)
      enddo
      if (lcompute_dust_prop) call save_dust_prop(letape_th)
@@ -951,7 +952,10 @@ subroutine run_sed_mc()
         !$omp default(none) &
         !$omp shared(lambda,p_lambda,n_photons_lambda,n_photons_loop,n_phot_envoyes_ISM) &
         !$omp private(id, flag_star,flag_ISM,flag_scatt,nnfot1,x,y,z,u,v,w,stokes) &
-        !$omp private(lintersect,icell,lpacket_alive,nnfot2,lambda_local)
+        !$omp private(lintersect,icell,lpacket_alive,nnfot2,lambda_local,p_lambda_local,p_lambda_ptr)
+
+        p_lambda_local = p_lambda
+        p_lambda_ptr => p_lambda_local
 
         !$omp do schedule(dynamic,1)
         do nnfot1=1,n_photons_loop
@@ -970,8 +974,7 @@ subroutine run_sed_mc()
               else
                  nnfot2 = nnfot2 + 1.0_dp
                  lambda_local = lambda
-                 ! todo: there is a otential issue as p_lambda is shared but also inout
-                 call propagate_packet(id,lambda_local,p_lambda,icell,x,y,z,u,v,w,stokes, &
+                 call propagate_packet(id,lambda_local,p_lambda_ptr,icell,x,y,z,u,v,w,stokes, &
                       flag_star,flag_ISM,flag_scatt,lpacket_alive)
               endif
            enddo photon_ISM
