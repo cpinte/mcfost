@@ -12,13 +12,12 @@ module parameters
   real(kind=dp) :: simu_time = 0.0
 
   logical :: lpara, lstop_after_init
-  integer :: step_index, etape_i, etape_f
+  integer :: step_index
 
   ! Number of photons launched
   logical :: ldust_transfer
   integer :: n_photons_loop, n_photons_eq_th, n_photons_lambda, n_photons_image, n_photons_spectrum
   real :: n_photons_lim = 1.e4 ! how many times more we would have received without the Disk
-  integer :: nnfot1
   real :: n_photons_total
   real(kind=dp) :: E_paquet
   integer :: n_dif_max_eq_th = 100000 ! Max number of scattering allowed in thermal eq. calculation OUTDATED
