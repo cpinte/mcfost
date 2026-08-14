@@ -143,7 +143,7 @@ subroutine init_dust_transfer()
      endif
   endif
 
-  if (lmono) then ! monochromatic code
+  if (lmono) then ! monochromatic code: image or SED
      lambda=1
      letape_th = .false.
 
@@ -170,7 +170,7 @@ subroutine init_dust_transfer()
         call alloc_ray_tracing()
         call init_directions_ray_tracing()
      endif
-     call opacity(1,1)
+     call opacity(1)
      call integ_tau(1)
 
      if (loptical_depth_to_cell) call write_optical_depth_to_cell(1)
@@ -194,7 +194,7 @@ subroutine init_dust_transfer()
      ! Re-apply T-based sublimation so -img matches the thermal-run dust
      if (ldust_sublimation) then
         call sublimate_dust()
-        call opacity(1,1)
+        call opacity(1)
      endif
 
   else ! not lmono
@@ -233,19 +233,6 @@ subroutine init_dust_transfer()
            call init_directions_ray_tracing()
         endif
 
-        if (lscattering_method1) then
-           lambda = 1
-           p_lambda => lambda
-        else
-           if (p_n_lambda_pos == n_lambda) then
-              lambda = 1
-              p_lambda => lambda
-           else
-              lambda0 = 1
-              p_lambda => lambda0
-           endif
-        endif
-
         ! Try to restore dust calculation from previous run
         call read_saved_dust_prop(letape_th, lcompute_dust_prop)
         if (lcompute_dust_prop) then
@@ -256,7 +243,7 @@ subroutine init_dust_transfer()
 
         do lambda=1,n_lambda
            if (lcompute_dust_prop) call prop_grains(lambda)
-           call opacity(lambda, p_lambda)!_eqdiff!_data  ! ~ takes 2 seconds  PB : takes a long time in RT as using method 2 for scattering
+           call opacity(lambda)!_eqdiff!_data  ! ~ takes 2 seconds  PB : takes a long time in RT as using method 2 for scattering
         enddo !n
         if (lcompute_dust_prop) call save_dust_prop(letape_th)
         write(*,*) "Done"
@@ -273,7 +260,7 @@ subroutine init_dust_transfer()
            do lambda=1,n_lambda
               ! recalculation for opacity 2 :peut etre eviter mais implique + meme : garder tab_s11 en mem
               call prop_grains(lambda)
-              call opacity(lambda, p_lambda)
+              call opacity(lambda)
            enddo
         endif ! ldust_sublimation
 
@@ -351,24 +338,11 @@ subroutine recompute_opacities()
   implicit none
 
   integer :: lambda
-  integer, target :: lambda_target, lambda0_target
-  integer, pointer :: p_lambda
 
   write(*,'(a30, $)') "Computing dust properties ..."
   do lambda = 1, n_lambda
      call prop_grains(lambda)
-     lambda_target = lambda
-     if (lscattering_method1) then
-        p_lambda => lambda_target
-     else
-        if (p_n_lambda_pos == n_lambda) then
-           p_lambda => lambda_target
-        else
-           lambda0_target = 1
-           p_lambda => lambda0_target
-        endif
-     endif
-     call opacity(lambda, p_lambda)
+     call opacity(lambda)
   enddo
   write(*,*) "Done"
 
@@ -728,7 +702,7 @@ subroutine run_image_mc()
   ! lambda and p_lambda are always 1 here
 
   if (.not.lMueller_pos_multi .and. lscatt_ray_tracing) then
-     call calc_local_scattering_matrices(lambda, p_lambda)
+     call calc_local_scattering_matrices(lambda)
   endif
 
   if (lspherical.or.l3D) then
@@ -881,7 +855,7 @@ subroutine run_sed_mc()
      do lambda=1,n_lambda2
         if (lcompute_dust_prop) call prop_grains(lambda)
         lambda_target = lambda
-        call opacity(lambda, p_lambda)
+        call opacity(lambda)
      enddo
      if (lcompute_dust_prop) call save_dust_prop(letape_th)
      write(*,*) "Done"
@@ -910,7 +884,7 @@ subroutine run_sed_mc()
      endif
 
      if (.not.lMueller_pos_multi .and. lscatt_ray_tracing) then
-        call calc_local_scattering_matrices(lambda, p_lambda)
+        call calc_local_scattering_matrices(lambda)
      endif
 
      if (lspherical.or.l3D) then

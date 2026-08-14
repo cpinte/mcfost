@@ -788,7 +788,7 @@ end subroutine read_saved_dust_prop
 
 !******************************************************************************
 
-subroutine opacity(lambda, p_lambda, no_scatt)
+subroutine opacity(lambda, no_scatt)
 ! Calculates the opacity table and ksca_CDF
 ! Includes empirical stratification
 ! Uses results from density and prop_grains routines
@@ -800,13 +800,22 @@ subroutine opacity(lambda, p_lambda, no_scatt)
 
   implicit none
 
-  integer, intent(in) :: lambda, p_lambda
+  integer, intent(in) :: lambda
   logical, intent(in), optional :: no_scatt
 
-  integer :: icell, k
+  integer :: icell, k, p_lambda_val
   integer, dimension(n_grains_tot) :: p_k_arr
   real(kind=dp) ::  density, fact, k_abs_RE, k_abs_LTE, k_abs_tot, k_sca_tot, rho0, d1, d_k
   logical :: lcompute_obs,  ldens0, compute_scatt
+
+  ! Compute p_lambda_val: index into the scattering position arrays (ksca_CDF, tab_s11_pos, etc.)
+  ! When using method 1, or when the position grid matches the full wavelength grid,
+  ! the index tracks the current wavelength; otherwise it is always 1.
+  if (lscattering_method1 .or. (p_n_lambda_pos == n_lambda)) then
+     p_lambda_val = lambda
+  else
+     p_lambda_val = 1
+  endif
 
   if (lvariable_dust) then
      do k=1, n_grains_tot
@@ -971,25 +980,25 @@ subroutine opacity(lambda, p_lambda, no_scatt)
 
   if (compute_scatt) then
      if (scattering_method==2) then
-        call calc_local_scattering_matrices(lambda, p_lambda)
+        call calc_local_scattering_matrices(lambda)
      else ! scattering_method ==1
         if (.not.low_mem_scattering) then ! we precompute the CDF (otherwise, we recalculate it live)
            do icell=1, p_n_cells
-              ksca_CDF(0,icell,p_lambda)=0.0
+              ksca_CDF(0,icell,p_lambda_val)=0.0
 
               do  k=1,n_grains_tot
-                 ksca_CDF(k,icell,p_lambda) = ksca_CDF(k-1,icell,p_lambda) + C_sca(k,lambda) &
+                 ksca_CDF(k,icell,p_lambda_val) = ksca_CDF(k-1,icell,p_lambda_val) + C_sca(k,lambda) &
                  * dust_density_o_n_grains(p_k_arr(k),icell) * n_grains(k)
               enddo !k
 
-              if  (ksca_CDF(n_grains_tot,icell,p_lambda) > tiny_real) then
-                 ksca_CDF(:,icell,p_lambda)= ksca_CDF(:,icell,p_lambda)/ ksca_CDF(n_grains_tot,icell,p_lambda)
+              if  (ksca_CDF(n_grains_tot,icell,p_lambda_val) > tiny_real) then
+                 ksca_CDF(:,icell,p_lambda_val)= ksca_CDF(:,icell,p_lambda_val)/ ksca_CDF(n_grains_tot,icell,p_lambda_val)
               else
                  ! at the surface, we can have a probability of 0.0 everywhere
                  ! in this case, we decide there are only the smallest grains
                  ! Note: in practice, the density is too low for
                  ! scattering to occur here.
-                 ksca_CDF(:,icell,p_lambda) = 1.0
+                 ksca_CDF(:,icell,p_lambda_val) = 1.0
               endif
            enddo ! icell
         endif ! .not.low_mem_scattering
@@ -1034,9 +1043,10 @@ end subroutine opacity
 
 !******************************************************************************
 
-subroutine calc_local_scattering_matrices(lambda, p_lambda)
+subroutine calc_local_scattering_matrices(lambda)
 
-  integer, intent(in) :: lambda, p_lambda
+  integer, intent(in) :: lambda
+  integer :: p_lambda_val
 
   real(kind=dp), parameter :: dtheta = pi/real(nang_scatt)
   real(kind=dp) :: density, theta, norm, fact, k_sca_tot, d1
@@ -1048,7 +1058,14 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
   logical :: ldens0
 
   fact = AU_to_cm * mum_to_cm**2
-  !write(*,*) "Computing local scattering properties", lambda, p_lambda
+  !write(*,*) "Computing local scattering properties", lambda
+
+  ! See opacity() for the p_lambda_val logic
+  if (lscattering_method1 .or. (p_n_lambda_pos == n_lambda)) then
+     p_lambda_val = lambda
+  else
+     p_lambda_val = 1
+  endif
 
   ! see opacity()
   ! Warning: in the no_strat case, the cell (1,1,1) must not be empty.
@@ -1076,7 +1093,8 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
   !$omp parallel &
   !$omp default(none) &
   !$omp shared(tab_s11_pos,tab_s12_o_s11_pos,tab_s22_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos,tab_s44_o_s11_pos) &
-  !$omp shared(tab_s11,tab_s12,tab_s22,tab_s33,tab_s34,tab_s44,lambda,p_lambda,n_grains_tot,tab_albedo_pos,prob_s11_pos,p_k_arr) &
+  !$omp shared(tab_s11,tab_s12,tab_s22,tab_s33,tab_s34,tab_s44,lambda,n_grains_tot,tab_albedo_pos,prob_s11_pos,p_k_arr) &
+  !$omp shared(p_lambda_val) &
   !$omp shared(zmax,kappa,kappa_abs_LTE,ksca_CDF,p_n_cells,fact,lvariable_dust,n_grains) &
   !$omp shared(C_ext,C_sca,dust_density_o_n_grains,S_grain,scattering_method, &
   !$omp&       tab_g_pos,aniso_method,tab_g,lisotropic,low_mem_scattering) &
@@ -1086,13 +1104,13 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
   !$omp do schedule(dynamic,1)
   do icell=1, p_n_cells
      if (aniso_method==1) then
-        tab_s11_pos(:,icell,p_lambda) = 0.
+        tab_s11_pos(:,icell,p_lambda_val) = 0.
         if (lsepar_pola) then
-           tab_s12_o_s11_pos(:,icell,p_lambda) = 0.
-           tab_s22_o_s11_pos(:,icell,p_lambda) = 0.
-           tab_s33_o_s11_pos(:,icell,p_lambda) = 0.
-           tab_s34_o_s11_pos(:,icell,p_lambda) = 0.
-           tab_s44_o_s11_pos(:,icell,p_lambda) = 0.
+           tab_s12_o_s11_pos(:,icell,p_lambda_val) = 0.
+           tab_s22_o_s11_pos(:,icell,p_lambda_val) = 0.
+           tab_s33_o_s11_pos(:,icell,p_lambda_val) = 0.
+           tab_s34_o_s11_pos(:,icell,p_lambda_val) = 0.
+           tab_s44_o_s11_pos(:,icell,p_lambda_val) = 0.
         endif
      endif
 
@@ -1102,18 +1120,18 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
            ! Mueller matrix averaging (CPU intensive) (the last index is the angle)
            ! tab_s11 is normalized to Qsca --> S_grain * density factor so that
            ! tab_s11_pos is normalized to k_sca_tot
-           tab_s11_pos(:,icell,p_lambda) = tab_s11_pos(:,icell,p_lambda) + &
+           tab_s11_pos(:,icell,p_lambda_val) = tab_s11_pos(:,icell,p_lambda_val) + &
                 tab_s11(:,k,lambda) * S_grain(k) * density
            if (lsepar_pola) then
-              tab_s12_o_s11_pos(:,icell,p_lambda) = tab_s12_o_s11_pos(:,icell,p_lambda) + &
+              tab_s12_o_s11_pos(:,icell,p_lambda_val) = tab_s12_o_s11_pos(:,icell,p_lambda_val) + &
                    tab_s12(:,k,lambda) * S_grain(k) * density
-              tab_s22_o_s11_pos(:,icell,p_lambda) = tab_s22_o_s11_pos(:,icell,p_lambda) + &
+              tab_s22_o_s11_pos(:,icell,p_lambda_val) = tab_s22_o_s11_pos(:,icell,p_lambda_val) + &
                    tab_s22(:,k,lambda) * S_grain(k) * density
-              tab_s33_o_s11_pos(:,icell,p_lambda) = tab_s33_o_s11_pos(:,icell,p_lambda) + &
+              tab_s33_o_s11_pos(:,icell,p_lambda_val) = tab_s33_o_s11_pos(:,icell,p_lambda_val) + &
                    tab_s33(:,k,lambda) * S_grain(k) * density
-              tab_s34_o_s11_pos(:,icell,p_lambda) = tab_s34_o_s11_pos(:,icell,p_lambda) + &
+              tab_s34_o_s11_pos(:,icell,p_lambda_val) = tab_s34_o_s11_pos(:,icell,p_lambda_val) + &
                    tab_s34(:,k,lambda) * S_grain(k) * density
-              tab_s44_o_s11_pos(:,icell,p_lambda) = tab_s44_o_s11_pos(:,icell,p_lambda) + &
+              tab_s44_o_s11_pos(:,icell,p_lambda_val) = tab_s44_o_s11_pos(:,icell,p_lambda_val) + &
                    tab_s44(:,k,lambda) * S_grain(k) * density
            endif
         endif !aniso_method
@@ -1123,58 +1141,58 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
 
      ! Over-riding phase function
      if (lphase_function_file)  then
-        tab_s11_pos(:,icell,p_lambda) = s11_file(:)
+        tab_s11_pos(:,icell,p_lambda_val) = s11_file(:)
 
         ! Normalization of phase-function to k_sca_tot, ie like the internal routines
         norm = 0.0
         do l=1,nang_scatt-1 ! on saute j=0 & nang_scatt car sin(theta) = 0
            theta = real(l)*dtheta
-           norm = norm + tab_s11_pos(l,icell,p_lambda)*sin(theta)*dtheta
+           norm = norm + tab_s11_pos(l,icell,p_lambda_val)*sin(theta)*dtheta
         enddo
-        tab_s11_pos(:,icell,p_lambda) = tab_s11_pos(:,icell,p_lambda) * k_sca_tot / norm
+        tab_s11_pos(:,icell,p_lambda_val) = tab_s11_pos(:,icell,p_lambda_val) * k_sca_tot / norm
      endif
 
      if (k_sca_tot > tiny_real) then
 
         if (aniso_method==1) then ! full phase function
            ! Propriétés optiques des cellules
-           prob_s11_pos(0,icell,p_lambda)=0.0
+           prob_s11_pos(0,icell,p_lambda_val)=0.0
 
            do l=2,nang_scatt ! scattering probability up to angle j, j=0 is skipped because sin(theta) = 0
               theta = real(l)*dtheta
-              prob_s11_pos(l,icell,p_lambda)=prob_s11_pos(l-1,icell,p_lambda)+ &
-                   tab_s11_pos(l,icell,p_lambda)*sin(theta)*dtheta
+              prob_s11_pos(l,icell,p_lambda_val)=prob_s11_pos(l-1,icell,p_lambda_val)+ &
+                   tab_s11_pos(l,icell,p_lambda_val)*sin(theta)*dtheta
            enddo
 
            ! tab_s11_pos is calculated such that the normalization is: k_sca_tot
-           prob_s11_pos(1:nang_scatt,icell,p_lambda) = prob_s11_pos(1:nang_scatt,icell,p_lambda) + &
-                k_sca_tot - prob_s11_pos(nang_scatt,icell,p_lambda)
+           prob_s11_pos(1:nang_scatt,icell,p_lambda_val) = prob_s11_pos(1:nang_scatt,icell,p_lambda_val) + &
+                k_sca_tot - prob_s11_pos(nang_scatt,icell,p_lambda_val)
 
            ! Normalization of the cumulative probability to 1
-           prob_s11_pos(:,icell,p_lambda)=prob_s11_pos(:,icell,p_lambda)/k_sca_tot
+           prob_s11_pos(:,icell,p_lambda_val)=prob_s11_pos(:,icell,p_lambda_val)/k_sca_tot
 
            ! Normalization of Mueller matrices (same as in mueller_Mie)
            do l=0,nang_scatt
-              if (tab_s11_pos(l,icell,p_lambda) > tiny_real) then
-                 norm=1.0/tab_s11_pos(l,icell,p_lambda)
+              if (tab_s11_pos(l,icell,p_lambda_val) > tiny_real) then
+                 norm=1.0/tab_s11_pos(l,icell,p_lambda_val)
                  if (lsepar_pola) then
-                    tab_s12_o_s11_pos(l,icell,p_lambda)=tab_s12_o_s11_pos(l,icell,p_lambda)*norm
-                    tab_s22_o_s11_pos(l,icell,p_lambda)=tab_s22_o_s11_pos(l,icell,p_lambda)*norm
-                    tab_s33_o_s11_pos(l,icell,p_lambda)=tab_s33_o_s11_pos(l,icell,p_lambda)*norm
-                    tab_s34_o_s11_pos(l,icell,p_lambda)=tab_s34_o_s11_pos(l,icell,p_lambda)*norm
-                    tab_s44_o_s11_pos(l,icell,p_lambda)=tab_s44_o_s11_pos(l,icell,p_lambda)*norm
+                    tab_s12_o_s11_pos(l,icell,p_lambda_val)=tab_s12_o_s11_pos(l,icell,p_lambda_val)*norm
+                    tab_s22_o_s11_pos(l,icell,p_lambda_val)=tab_s22_o_s11_pos(l,icell,p_lambda_val)*norm
+                    tab_s33_o_s11_pos(l,icell,p_lambda_val)=tab_s33_o_s11_pos(l,icell,p_lambda_val)*norm
+                    tab_s34_o_s11_pos(l,icell,p_lambda_val)=tab_s34_o_s11_pos(l,icell,p_lambda_val)*norm
+                    tab_s44_o_s11_pos(l,icell,p_lambda_val)=tab_s44_o_s11_pos(l,icell,p_lambda_val)*norm
                  endif
               endif
            enddo
 
            ! Normalization : we want the total energy scattered over [0,pi] in theta and [0,2pi] in phi = 1
            ! (for ray-tracing)
-           tab_s11_pos(:,icell,p_lambda) = tab_s11_pos(:,icell,p_lambda) * dtheta / (k_sca_tot * two_pi)
+           tab_s11_pos(:,icell,p_lambda_val) = tab_s11_pos(:,icell,p_lambda_val) * dtheta / (k_sca_tot * two_pi)
 
            if (lsepar_pola .and. loverwrite_s12) then
               do l=0,nang_scatt
                  theta = real(l)*dtheta
-                 tab_s12_o_s11_pos(l,icell,p_lambda) = - Pmax * (1-(cos(theta))**2)
+                 tab_s12_o_s11_pos(l,icell,p_lambda_val) = - Pmax * (1-(cos(theta))**2)
               enddo
            endif
 
@@ -1188,17 +1206,17 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
            ! Normalization : we want the total energy scattered over [0,pi] in theta and [0,2pi] in phi = 1
            ! (for ray-tracing)
            do l=0,nang_scatt
-              g = tab_g_pos(icell,p_lambda) ; g2 = g**2
+              g = tab_g_pos(icell,p_lambda_val) ; g2 = g**2
               mu = cos((real(l))/real(nang_scatt)*pi) ! cos(theta)
-              tab_s11_pos(l,icell,p_lambda) = 1.0/four_pi * (1-g2) * (1+g2-2*g*mu)**(-1.5) * dtheta
+              tab_s11_pos(l,icell,p_lambda_val) = 1.0/four_pi * (1-g2) * (1+g2-2*g*mu)**(-1.5) * dtheta
            enddo
 
            if (lsepar_pola) then
-              tab_s12_o_s11_pos(:,icell,p_lambda)=0.0
-              tab_s22_o_s11_pos(:,icell,p_lambda)=0.0
-              tab_s33_o_s11_pos(:,icell,p_lambda)=0.0
-              tab_s34_o_s11_pos(:,icell,p_lambda)=0.0
-              tab_s44_o_s11_pos(:,icell,p_lambda)=0.0
+              tab_s12_o_s11_pos(:,icell,p_lambda_val)=0.0
+              tab_s22_o_s11_pos(:,icell,p_lambda_val)=0.0
+              tab_s33_o_s11_pos(:,icell,p_lambda_val)=0.0
+              tab_s34_o_s11_pos(:,icell,p_lambda_val)=0.0
+              tab_s44_o_s11_pos(:,icell,p_lambda_val)=0.0
            endif
         endif !aniso_method
 
@@ -1215,16 +1233,16 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
      else ! k_sca_tot = 0.0
         tab_albedo_pos(icell,lambda)=0.0
         ! Propri\E9t\E9s optiques des cellules
-        prob_s11_pos(:,icell,p_lambda)=1.0
-        prob_s11_pos(0,icell,p_lambda)=0.0
+        prob_s11_pos(:,icell,p_lambda_val)=1.0
+        prob_s11_pos(0,icell,p_lambda_val)=0.0
         ! Normalization (same as in mueller)
-        tab_s11_pos(:,icell,p_lambda)=1.0
+        tab_s11_pos(:,icell,p_lambda_val)=1.0
         if (lsepar_pola) then
-           tab_s12_o_s11_pos(:,icell,p_lambda)=0.0
-           tab_s22_o_s11_pos(:,icell,p_lambda)=0.0
-           tab_s33_o_s11_pos(:,icell,p_lambda)=0.0
-           tab_s34_o_s11_pos(:,icell,p_lambda)=0.0
-           tab_s44_o_s11_pos(:,icell,p_lambda)=0.0
+           tab_s12_o_s11_pos(:,icell,p_lambda_val)=0.0
+           tab_s22_o_s11_pos(:,icell,p_lambda_val)=0.0
+           tab_s33_o_s11_pos(:,icell,p_lambda_val)=0.0
+           tab_s34_o_s11_pos(:,icell,p_lambda_val)=0.0
+           tab_s44_o_s11_pos(:,icell,p_lambda_val)=0.0
         endif
 
      endif ! k_sca_tot > or = 0

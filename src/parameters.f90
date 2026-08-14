@@ -40,7 +40,7 @@ module parameters
   ! 1 -> draw scattering grain size + Mueller matrix per grain
   ! 2 -> average Mueller matrix per cell (benchmark)
   integer :: scattering_method, scattering_method0
-  logical :: lscattering_method1
+  logical :: lscattering_method1 ! Mueller matrix per grain
 
   ! Mie or HG theory
   integer :: aniso_method ! 1 = full phase function, 2 = HG
@@ -118,7 +118,7 @@ module parameters
   integer :: grid_type ! 1 = cylindrical, 2 = spherical
   integer :: n_rad, n_rad_in  ! subdivision of the first cell
   ! Number of vertical layers (= stratifications)
-  integer :: nz, p_n_rad, p_nz, p_n_az, p_n_lambda_pos, p_n_lambda_grain
+  integer :: nz, p_n_rad, p_nz, p_n_az, p_n_lambda_pos
   ! Number of azimuthal cells
   integer :: n_az, j_start, pj_start
   ! Total number of cells
