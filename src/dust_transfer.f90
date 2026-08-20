@@ -49,8 +49,7 @@ subroutine init_dust_transfer()
 #include "sprng_f.h"
 
   integer :: lambda_threshold
-  integer, target :: lambda, lambda0
-  integer, pointer :: p_lambda
+  integer :: lambda, lambda0, p_lambda
   integer :: i, p_icell
   logical :: laffichage, lcompute_dust_prop
   real, allocatable, dimension(:) :: extra_heating
@@ -281,6 +280,11 @@ subroutine init_dust_transfer()
         else
            if (lapprox_diffusion) then
               if (lcylindrical) then
+                 if (lscattering_method1 .or. (p_n_lambda_pos == n_lambda)) then
+                    p_lambda = lambda_threshold
+                 else
+                    p_lambda = 1
+                 endif
                  call define_dark_zone(lambda_threshold,p_lambda,tau_dark_zone_eq_th,.true.) ! BUG avec 1 cell
               else
                  write(*,*) "No dark zone"
@@ -410,7 +414,7 @@ end subroutine dust_transfer_sub
 
 !***********************************************************
 
-subroutine mc_photon_loop(lambda_in, p_lambda_in, n_photons2, n_phot_lim, nnfot1_start, laffichage)
+subroutine mc_photon_loop(lambda_in, n_photons2, n_phot_lim, nnfot1_start, laffichage)
   ! Monte Carlo photon loop — shared kernel used by thermal, image, and SED modes.
   ! The mode-dependent behaviour is controlled by module-level flags:
   !   letape_th  -> thermal structure (multi-wavelength, re-emission)
@@ -423,7 +427,7 @@ subroutine mc_photon_loop(lambda_in, p_lambda_in, n_photons2, n_phot_lim, nnfot1
 
 #include "sprng_f.h"
 
-  integer, intent(in) :: lambda_in, p_lambda_in, n_photons2, nnfot1_start
+  integer, intent(in) :: lambda_in, n_photons2, nnfot1_start
   real, intent(in) :: n_phot_lim
   logical, intent(in) :: laffichage
 
@@ -436,44 +440,22 @@ subroutine mc_photon_loop(lambda_in, p_lambda_in, n_photons2, n_phot_lim, nnfot1
   real(kind=dp), target :: nnfot2, n_phot_sed2
   real(kind=dp), pointer :: p_nnfot2
   real(kind=dp) :: n_phot_envoyes_in_loop
-  integer, target :: lambda_local
-  integer, target :: p_lambda_local
-  integer, pointer :: p_lambda_ptr
+  integer :: lambda, p_lambda
 
-  ! Copy intent(in) arguments to local targets for OMP firstprivate
-  lambda_local = lambda_in
-  n_photons2_local = n_photons2
   ibar = 1
   n_photons1_cumul = 0
-  ! Note: p_lambda_local and p_lambda_ptr are private (not firstprivate) because
-  ! pointer association must be established inside the parallel region on each
-  ! thread's own private targets. A firstprivate pointer would still point to the
-  ! master thread's stack frame, causing cross-thread data races.
 
   ! OMP parallel photon transport loop
   !$omp parallel &
   !$omp default(none) &
-  !$omp firstprivate(lambda_local, n_photons2_local) &
-  !$omp private(p_lambda_local, p_lambda_ptr) &
+  !$omp private(lambda, p_lambda, n_photons2_local) &
   !$omp private(id,icell,lpacket_alive,lintersect,p_nnfot2,nnfot2,n_phot_sed2,n_phot_envoyes_in_loop,rand) &
   !$omp private(x,y,z,u,v,w,Stokes,flag_star,flag_ISM,flag_scatt,capt,nnfot1) &
-  !$omp shared(lambda_in, p_lambda_in, nnfot1_start,n_photons_loop,capt_sup,n_phot_lim,lscatt_ray_tracing1) &
-  !$omp shared(n_phot_envoyes,nb_proc,p_n_lambda_pos,n_lambda) &
+  !$omp shared(lambda_in, n_photons2, nnfot1_start,n_photons_loop,capt_sup,n_phot_lim,lscatt_ray_tracing1) &
+  !$omp shared(n_phot_envoyes,nb_proc,p_n_lambda_pos,n_lambda,lscattering_method1) &
   !$omp shared(stream,laffichage,lmono,lmono0,lProDiMo,lML,letape_th,tab_lambda,n_photons_lambda, n_photons1_cumul,ibar) &
   !$omp reduction(+:E_abs_nRE)
-  ! Establish thread-private pointer association inside the parallel region.
-  ! p_lambda_ptr is always fixed at p_lambda_in (the scattering grid index set by the
-  ! caller). This matches main's effective behavior: in main, firstprivate(p_lambda)
-  ! copied the pointer association to each thread, but the target (master's lambda)
-  ! was never modified inside the parallel region, so p_lambda was effectively
-  ! constant at its pre-parallel value in all threads.
-  ! - Thermal MC: p_lambda_in = 1 (from lambda0), stays fixed even as lambda_local
-  !   changes per photon via select_wl_em. Correct for scattering method 2 (p_lambda
-  !   indexes the wavelength-averaged scattering matrix).
-  ! - SED/image (lmono=.true.): lambda_local never changes, so p_lambda_ptr stays
-  !   correctly at p_lambda_in (either current lambda or 1 for sub-sampled grid).
-  p_lambda_local = p_lambda_in
-  p_lambda_ptr => p_lambda_local
+  n_photons2_local = n_photons2
   if (letape_th) then
      p_nnfot2 => nnfot2
      E_abs_nRE = 0.0
@@ -486,13 +468,15 @@ subroutine mc_photon_loop(lambda_in, p_lambda_in, n_photons2, n_phot_lim, nnfot1
         if (lProDiMo.or.lML)  then
            p_nnfot2 => nnfot2  ! Constant number of packets per wavelength
            ! Increase number of packets in the UV
-           if (tab_lambda(lambda_local) < 0.5) n_photons2_local = n_photons_lambda * 10
+           if (tab_lambda(lambda_in) < 0.5) n_photons2_local = n_photons_lambda * 10
         endif
      endif
   endif
 
   id = 1 ! For sequential code
   !$ id = omp_get_thread_num() + 1
+
+  lambda=1
 
   !$omp do schedule(dynamic,1)
   do nnfot1=nnfot1_start,n_photons_loop
@@ -502,26 +486,39 @@ subroutine mc_photon_loop(lambda_in, p_lambda_in, n_photons2, n_phot_lim, nnfot1
      n_phot_sed2 = 0.0_dp
      photon : do while ((p_nnfot2 < n_photons2_local).and.(n_phot_envoyes_in_loop < n_phot_lim))
         nnfot2=nnfot2+1.0_dp
-        n_phot_envoyes(lambda_local,id) = n_phot_envoyes(lambda_local,id) + 1.0_dp
         n_phot_envoyes_in_loop = n_phot_envoyes_in_loop + 1.0_dp
+
+
+        n_phot_envoyes(lambda,id) = n_phot_envoyes(lambda,id) + 1.0_dp
 
         ! Wavelength choice
         if (.not.lmono) then
            rand = sprng(stream(id))
-           call select_wl_em(rand,lambda_local)
+           call select_wl_em(rand,lambda)
+        else
+           lambda = lambda_in
         endif
 
+
+
+        if (lscattering_method1 .or. (p_n_lambda_pos == n_lambda)) then
+           p_lambda = lambda
+        else
+           p_lambda = 1
+        endif
+
+
         ! Packet emission
-        call emit_packet(id,lambda_local, icell,x,y,z,u,v,w,stokes,flag_star,flag_ISM,lintersect)
+        call emit_packet(id,lambda, icell,x,y,z,u,v,w,stokes,flag_star,flag_ISM,lintersect)
         lpacket_alive = .true.
 
         ! Packet propagation
-        if (lintersect) call propagate_packet(id,lambda_local,p_lambda_ptr,icell,x,y,z,u,v,w,stokes, &
+        if (lintersect) call propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes, &
              flag_star,flag_ISM,flag_scatt,lpacket_alive)
 
         ! The packet has now exited : on le met dans le bon capteur
         if (lpacket_alive.and.(.not.flag_ISM)) then
-           call capteur(id,lambda_local,icell,x,y,z,u,v,w,Stokes,flag_star,flag_scatt,capt)
+           call capteur(id,lambda,icell,x,y,z,u,v,w,Stokes,flag_star,flag_scatt,capt)
            if (capt == capt_sup) n_phot_sed2 = n_phot_sed2 + 1.0_dp ! number of photons received for step 2
         endif
      enddo photon !nnfot2
@@ -557,11 +554,9 @@ subroutine run_thermal_mc()
   use radiation_field, only : reset_radiation_field
   implicit none
 
-  integer :: n_photons2, nnfot1_start, n_iter, itime
+  integer :: n_photons2, nnfot1_start, n_iter, itime, lambda
   real :: n_phot_lim, time
   logical :: flag_em_nRE, laffichage
-  integer, target :: lambda, lambda0
-  integer, pointer :: p_lambda
   real(kind=dp) :: n_phot_sed2
 
   ! Reset energy and temperature arrays for clean iteration state
@@ -575,8 +570,6 @@ subroutine run_thermal_mc()
   n_phot_sed2 = 0.0_dp
 
   lambda = 1
-  lambda0 = 1
-  p_lambda => lambda
 
   letape_th = .true.
 
@@ -588,7 +581,7 @@ subroutine run_thermal_mc()
      n_photons2 = n_photons_eq_th
 
      ! Todo : we do no need to pass lambda here
-     call mc_photon_loop(lambda, p_lambda, n_photons2, n_phot_lim, nnfot1_start, laffichage)
+     call mc_photon_loop(lambda, n_photons2, n_phot_lim, nnfot1_start, laffichage)
 
      letape_th = .false. ! A priori, on a calcule la temperature
      if (lRE_LTE) then
@@ -670,9 +663,8 @@ subroutine run_image_mc()
 
   implicit none
 
-  integer, target :: lambda, lambda0
+  integer :: lambda, p_lambda
   integer :: ibin, iaz, itime, i
-  integer, pointer :: p_lambda
   integer :: nnfot1_start, n_photons2
   real :: n_phot_lim, time
   integer :: time_1, time_2, time_RT, time_source_fct
@@ -686,17 +678,11 @@ subroutine run_image_mc()
   n_photons2 = n_photons_image
   n_phot_lim = 1.0e30
 
-  if (lscattering_method1) then
-     lambda = 1
-     p_lambda => lambda
+  lambda = 1
+  if (lscattering_method1 .or. (p_n_lambda_pos == n_lambda)) then
+     p_lambda = lambda
   else
-     if (p_n_lambda_pos == n_lambda) then
-        lambda = 1
-        p_lambda => lambda
-     else
-        lambda0 = 1
-        p_lambda => lambda0
-     endif
+     p_lambda = 1
   endif
 
   ! lambda and p_lambda are always 1 here
@@ -729,7 +715,7 @@ subroutine run_image_mc()
   ! MC photon loop
 
   ! todo : lambda and p_lambda are always 1 here : it does not look like we need to pass lambda as input here
-  call mc_photon_loop(lambda, p_lambda, n_photons2, n_phot_lim, nnfot1_start, laffichage)
+  call mc_photon_loop(lambda, n_photons2, n_phot_lim, nnfot1_start, laffichage)
 
   ! Stokes FITS output from MC packets
   if (loutput_mc) call write_stokes_fits()
@@ -807,9 +793,8 @@ subroutine run_sed_mc()
 
   implicit none
 
-  integer, target :: lambda_target, lambda0_target, p_lambda_local
-  integer, pointer :: p_lambda, p_lambda_ptr
-  integer :: lambda, lambda_local, ibin, iaz, itime, nnfot1_start, n_photons2, nnfot1, n_lambda_sed, id, icell
+  integer :: lambda, p_lambda, lambda_tmp, p_lambda_tmp
+  integer :: ibin, iaz, itime, nnfot1_start, n_photons2, nnfot1, n_lambda_sed, id, icell
   real :: n_phot_lim, time, tau
   real(kind=dp) :: x, y, z, u, v, w, nnfot2, lmin, lmax
   real(kind=dp), dimension(4) :: Stokes
@@ -827,13 +812,6 @@ subroutine run_sed_mc()
 
   ! Setup step 2 for non-complete SED (separate wavelength grid)
   if (.not.lsed_complete) then
-     lambda_target = 1
-     if (ldust_prop) then
-        p_lambda => lambda_target
-     else
-        lambda0_target = 1 ; p_lambda => lambda0_target
-     endif
-
      call setup_scattering()
      call realloc_step2()
      call init_lambda2()
@@ -854,7 +832,6 @@ subroutine run_sed_mc()
      endif
      do lambda=1,n_lambda2
         if (lcompute_dust_prop) call prop_grains(lambda)
-        lambda_target = lambda
         call opacity(lambda)
      enddo
      if (lcompute_dust_prop) call save_dust_prop(letape_th)
@@ -871,16 +848,10 @@ subroutine run_sed_mc()
 
   ! Loop over SED wavelengths
   do lambda = 1, n_lambda_sed
-     lambda_target = lambda
-     if (lscattering_method1) then
-        p_lambda => lambda_target
+     if (lscattering_method1 .or. (p_n_lambda_pos == n_lambda)) then
+        p_lambda = lambda
      else
-        if (p_n_lambda_pos == n_lambda) then
-           p_lambda => lambda_target
-        else
-           lambda0_target = 1
-           p_lambda => lambda0_target
-        endif
+        p_lambda = 1
      endif
 
      if (.not.lMueller_pos_multi .and. lscatt_ray_tracing) then
@@ -910,7 +881,7 @@ subroutine run_sed_mc()
      write(*,*) "", real(tab_lambda(lambda)) ,"  ", real(frac_E_stars(lambda)), "  ", tau
 
      ! MC photon loop
-     call mc_photon_loop(lambda, p_lambda, n_photons2, n_phot_lim, nnfot1_start, laffichage)
+     call mc_photon_loop(lambda, n_photons2, n_phot_lim, nnfot1_start, laffichage)
 
      ! Interstellar radiation field
      if ((.not.letape_th).and.(lProDiMo.or.lML)) then
@@ -926,10 +897,7 @@ subroutine run_sed_mc()
         !$omp default(none) &
         !$omp shared(lambda,p_lambda,n_photons_lambda,n_photons_loop,n_phot_envoyes_ISM) &
         !$omp private(id, flag_star,flag_ISM,flag_scatt,nnfot1,x,y,z,u,v,w,stokes) &
-        !$omp private(lintersect,icell,lpacket_alive,nnfot2,lambda_local,p_lambda_local,p_lambda_ptr)
-
-        p_lambda_local = p_lambda
-        p_lambda_ptr => p_lambda_local
+        !$omp private(lintersect,icell,lpacket_alive,nnfot2, lambda_tmp, p_lambda_tmp)
 
         !$omp do schedule(dynamic,1)
         do nnfot1=1,n_photons_loop
@@ -947,8 +915,9 @@ subroutine run_sed_mc()
                  cycle photon_ISM
               else
                  nnfot2 = nnfot2 + 1.0_dp
-                 lambda_local = lambda
-                 call propagate_packet(id,lambda_local,p_lambda_ptr,icell,x,y,z,u,v,w,stokes, &
+                 lambda_tmp = lambda
+                 p_lambda_tmp = p_lambda
+                 call propagate_packet(id,lambda_tmp,p_lambda_tmp,icell,x,y,z,u,v,w,stokes, &
                       flag_star,flag_ISM,flag_scatt,lpacket_alive)
               endif
            enddo photon_ISM
@@ -1367,6 +1336,12 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
               call im_reemission_qRE(id,icell,p_icell,rand,rand2,lambda)
            endif
         endif ! only_LTE
+
+        if (lscattering_method1 .or. (p_n_lambda_pos == n_lambda)) then
+           p_lambda = lambda
+        else
+           p_lambda = 1
+        endif
 
         ! New packet direction: isotropic emission
         call random_isotropic_direction(id, u, v, w)

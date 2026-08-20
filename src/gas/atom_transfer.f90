@@ -1538,7 +1538,7 @@ module atom_transfer
             !$ id = omp_get_thread_num() + 1
             r = tab_r(ri_RT)
             taille_pix =  fact_A * r ! racine carree de l'aire du pixel
-            do phi_RT=1,n_phi_RT ! from 0  eps   2pi - eps eps  pi/n_phi_RT)
+            do phi_RT=1,n_phi_RT
                phi = cst_phi * (real(phi_RT,kind=dp) -0.5_dp)
 
                pixelcorner(:,id) = center(:) + r * sin(phi) * x_plan_image + r * cos(phi) * y_plan_image
