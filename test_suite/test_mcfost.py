@@ -272,6 +272,8 @@ def test_contrib(model_name, wl):
 
     if model_name == "ref3.0_multi":
         mask_threshold=1e-19
+    elif (model_name == "ref4.1_PAH"):
+        mask_threshold=1e-22
     else:
         mask_threshold=1e-23
 
