@@ -8,8 +8,11 @@ import os
 
 _mcfost_bin = "../src/mcfost"
 
-# Get list of models using directory names
-model_list = os.listdir("test_data/")
+# Get list of models using directory names (filtering out hidden and AppleDouble files)
+model_list = [
+    d for d in os.listdir("test_data/")
+    if not d.startswith(".") and os.path.isdir(os.path.join("test_data", d))
+]
 
 # If running on CI, only run some of the tests
 #if os.environ.get('CI', None) == 'true':
