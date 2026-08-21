@@ -476,8 +476,6 @@ subroutine mc_photon_loop(lambda_in, n_photons2, n_phot_lim, nnfot1_start, laffi
   id = 1 ! For sequential code
   !$ id = omp_get_thread_num() + 1
 
-  lambda=1
-
   !$omp do schedule(dynamic,1)
   do nnfot1=nnfot1_start,n_photons_loop
      nnfot2 = 0.0_dp
@@ -488,9 +486,6 @@ subroutine mc_photon_loop(lambda_in, n_photons2, n_phot_lim, nnfot1_start, laffi
         nnfot2=nnfot2+1.0_dp
         n_phot_envoyes_in_loop = n_phot_envoyes_in_loop + 1.0_dp
 
-
-        n_phot_envoyes(lambda,id) = n_phot_envoyes(lambda,id) + 1.0_dp
-
         ! Wavelength choice
         if (.not.lmono) then
            rand = sprng(stream(id))
@@ -498,8 +493,7 @@ subroutine mc_photon_loop(lambda_in, n_photons2, n_phot_lim, nnfot1_start, laffi
         else
            lambda = lambda_in
         endif
-
-
+        n_phot_envoyes(lambda,id) = n_phot_envoyes(lambda,id) + 1.0_dp
 
         if (lscattering_method1 .or. (p_n_lambda_pos == n_lambda)) then
            p_lambda = lambda
