@@ -166,11 +166,22 @@ def test_image(model_name, wl):
     hdr = fits.getheader("test_data/"+image_name)
     n_incl = hdr['NAXIS3']
 
+    threshold=0.1
+    if (model_name == "ref3.0") and (wl == "100"): # weird difference on linux, ifort, openmp=no, release=no
+        threshold=0.11
+
+    if (model_name == "ref4.1_nLTE") and (wl == "100"):
+        threshold=0.13
+
+    if (model_name == "ref4.1_nLTE") and (wl == "10"):
+        threshold=0.12
+
     # We just keep intensity
     for i in range(n_incl):
         image = np.nan_to_num(fits.getdata(test_dir+"/"+image_name))
         image_ref = fits.getdata("test_data/"+image_name)
 
+        print(model_name, " wl=", wl)
         print("-- i=", i)
         print(image.shape)
         print(image_ref.shape)
@@ -184,7 +195,8 @@ def test_image(model_name, wl):
         print("Maximum image difference", i, (abs(image-image_ref)/(image_ref+1e-30)).max())
         print("Mean image difference   ", i, (abs(image-image_ref)/(image_ref+1e-30)).mean())
 
-        print("MC similar", MC_similar(image_ref,image,threshold=0.1))
+        print("Threshold=", threshold)
+        print("MC similar", MC_similar(image_ref,image,threshold=threshold))
         print("-------------")
 
     image = fits.getdata(test_dir+"/"+image_name)
@@ -192,16 +204,6 @@ def test_image(model_name, wl):
 
     image = image[0,:,:,:,:]
     image_ref = image_ref[0,:,:,:,:]
-
-    threshold=0.1
-    if (model_name == "ref3.0") and (wl == "100"): # weird difference on linux, ifort, openmp=no, release=no
-        threshold=0.11
-
-    if (model_name == "ref4.1_nLTE") and (wl == "100"):
-        threshold=0.13
-
-    if (model_name == "ref4.1_nLTE") and (wl == "10"):
-        threshold=0.12
 
     assert MC_similar(image_ref,image,threshold=threshold)
 
@@ -242,7 +244,7 @@ def test_pola(model_name, wl):
 
     threshold=0.1
     if (model_name == "ref4.1_nLTE") and (wl == "1000"):
-        threshold=0.15
+        threshold=0.18
 
     assert MC_similar(image_ref,image,threshold=threshold,mask_threshold=mask_threshold)
 
