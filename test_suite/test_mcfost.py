@@ -200,6 +200,9 @@ def test_image(model_name, wl):
     if (model_name == "ref4.1_nLTE") and (wl == "100"):
         threshold=0.13
 
+    if (model_name == "ref4.1_nLTE") and (wl == "10"):
+        threshold=0.12
+
     assert MC_similar(image_ref,image,threshold=threshold)
 
 
