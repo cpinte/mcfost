@@ -27,8 +27,7 @@ contains
     integer, intent(out) :: ierr
     real, intent(in), optional :: keep_particles
     logical, intent(in), optional :: fix_star, turn_on_Lacc, turn_on_dust_subl, use_ISM_heating
-    integer, target :: lambda, lambda0
-    integer, pointer, save :: p_lambda
+    integer :: lambda
 
     write(*,*)
     write(*,*) "------------------------------"
@@ -221,8 +220,7 @@ contains
     integer :: n_SPH, icell, n_photons2, ibar, id, n_photons1_cumul, i_SPH, i, lambda_threshold
     integer :: itime, ieos, alloc_status
     logical :: lpacket_alive, lintersect, laffichage, flag_star, flag_scatt, flag_ISM, ldust_moments
-    integer, target :: lambda, lambda0
-    integer, pointer, save :: p_lambda
+    integer :: lambda
 
     logical, save :: lfirst_time = .true.
 
