@@ -117,18 +117,6 @@ contains
     call order_zones()
     call define_physical_zones()
 
-    if (lscattering_method1) then
-       lambda = 1
-       p_lambda => lambda
-    else
-       if (p_n_lambda_pos == n_lambda) then
-          lambda = 1
-          p_lambda => lambda
-       else
-          lambda0 = 1
-          p_lambda => lambda0
-       endif
-    endif
 
     ! Dust properties
     write(*,'(a30, $)') "Computing dust properties ..."
@@ -295,22 +283,10 @@ contains
        stream(i) = init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
     enddo
 
-    if (lscattering_method1) then
-       lambda = 1
-       p_lambda => lambda
-    else
-       if (p_n_lambda_pos == n_lambda) then
-          lambda = 1
-          p_lambda => lambda
-       else
-          lambda0 = 1
-          p_lambda => lambda0
-       endif
-    endif
 
     ! ToDo : needs to be made parallel
     do lambda=1,n_lambda
-       call opacity(lambda, p_lambda)
+       call opacity(lambda)
     enddo !n
 
     call star_energy_distribution()
