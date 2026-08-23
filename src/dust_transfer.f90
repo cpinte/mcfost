@@ -280,7 +280,7 @@ subroutine init_dust_transfer()
         else
            if (lapprox_diffusion) then
               if (lcylindrical) then
-                 if (lscattering_method1 .or. (p_n_lambda_pos == n_lambda)) then
+                 if (lMueller_pos_multi) then
                     p_lambda = lambda_threshold
                  else
                     p_lambda = 1
@@ -452,7 +452,7 @@ subroutine mc_photon_loop(lambda_in, n_photons2, n_phot_lim, nnfot1_start, laffi
   !$omp private(id,icell,lpacket_alive,lintersect,p_nnfot2,nnfot2,n_phot_sed2,n_phot_envoyes_in_loop,rand) &
   !$omp private(x,y,z,u,v,w,Stokes,flag_star,flag_ISM,flag_scatt,capt,nnfot1) &
   !$omp shared(lambda_in, n_photons2, nnfot1_start,n_photons_loop,capt_sup,n_phot_lim,lscatt_ray_tracing1) &
-  !$omp shared(n_phot_envoyes,nb_proc,p_n_lambda_pos,n_lambda,lscattering_method1) &
+  !$omp shared(n_phot_envoyes,nb_proc,p_n_lambda_pos,n_lambda,lMueller_pos_multi) &
   !$omp shared(stream,laffichage,lmono,lmono0,lProDiMo,lML,letape_th,tab_lambda,n_photons_lambda, n_photons1_cumul,ibar) &
   !$omp reduction(+:E_abs_nRE)
   n_photons2_local = n_photons2
@@ -495,7 +495,7 @@ subroutine mc_photon_loop(lambda_in, n_photons2, n_phot_lim, nnfot1_start, laffi
         endif
         n_phot_envoyes(lambda,id) = n_phot_envoyes(lambda,id) + 1.0_dp
 
-        if (lscattering_method1 .or. (p_n_lambda_pos == n_lambda)) then
+        if (lMueller_pos_multi) then
            p_lambda = lambda
         else
            p_lambda = 1
@@ -673,13 +673,13 @@ subroutine run_image_mc()
   n_phot_lim = 1.0e30
 
   lambda = 1
-  if (lscattering_method1 .or. (p_n_lambda_pos == n_lambda)) then
+  if (lMueller_pos_multi) then
      p_lambda = lambda
   else
      p_lambda = 1
   endif
 
-  ! lambda and p_lambda are always 1 here
+  ! lambda = 1 and p_lambda = 1 here (lmono initialisation)
 
   if (.not.lMueller_pos_multi .and. lscatt_ray_tracing) then
      call calc_local_scattering_matrices(lambda)
@@ -842,7 +842,7 @@ subroutine run_sed_mc()
 
   ! Loop over SED wavelengths
   do lambda = 1, n_lambda_sed
-     if (lscattering_method1 .or. (p_n_lambda_pos == n_lambda)) then
+     if (lMueller_pos_multi) then
         p_lambda = lambda
      else
         p_lambda = 1
@@ -1331,7 +1331,7 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
            endif
         endif ! only_LTE
 
-        if (lscattering_method1 .or. (p_n_lambda_pos == n_lambda)) then
+        if (lMueller_pos_multi) then
            p_lambda = lambda
         else
            p_lambda = 1

@@ -809,9 +809,8 @@ subroutine opacity(lambda, no_scatt)
   logical :: lcompute_obs,  ldens0, compute_scatt
 
   ! Compute p_lambda: index into the scattering position arrays (ksca_CDF, tab_s11_pos, etc.)
-  ! When using method 1, or when the position grid matches the full wavelength grid,
-  ! the index tracks the current wavelength; otherwise it is always 1.
-  if (lscattering_method1 .or. (p_n_lambda_pos == n_lambda)) then
+  ! lMueller_pos_multi is true for both method 1 (per grain) and method 2 (per cell, n_lambda grids)
+  if (lMueller_pos_multi) then
      p_lambda = lambda
   else
      p_lambda = 1
@@ -1061,7 +1060,7 @@ subroutine calc_local_scattering_matrices(lambda)
   !write(*,*) "Computing local scattering properties", lambda
 
   ! See opacity() for the p_lambda logic
-  if (lscattering_method1 .or. (p_n_lambda_pos == n_lambda)) then
+  if (lMueller_pos_multi) then
      p_lambda = lambda
   else
      p_lambda = 1

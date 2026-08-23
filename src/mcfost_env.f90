@@ -12,10 +12,10 @@ module mcfost_env
   character(len=128) :: webpage       = "https://github.com/cpinte/mcfost/releases/latest/download/"
   character(len=128) :: utils_webpage = "https://ipag.osug.fr/public/pintec/mcfost_utils/"
   character(len=128) :: doc_webpage   = "https://mcfost.readthedocs.io/"
-  character(len=128) :: raw_webpage  = "https://raw.githubusercontent.com/cpinte/mcfost/master/src/"
+  character(len=128) :: raw_webpage   = "https://raw.githubusercontent.com/cpinte/mcfost/master/src/"
   character(len=32)  :: version_file  = "mcfost_env.f90"
 
-  ! SystÃ¨me
+  ! System
   integer :: nb_proc
   integer, parameter :: cache_line_size = 64 ! 64 bytes = 16 floats = 8 double, from Core 2 Duo to i7 + Xeon Phi
 
