@@ -27,8 +27,7 @@ contains
     integer, intent(out) :: ierr
     real, intent(in), optional :: keep_particles
     logical, intent(in), optional :: fix_star, turn_on_Lacc, turn_on_dust_subl, use_ISM_heating
-    integer, target :: lambda, lambda0
-    integer, pointer, save :: p_lambda
+    integer :: lambda
 
     write(*,*)
     write(*,*) "------------------------------"
@@ -117,18 +116,6 @@ contains
     call order_zones()
     call define_physical_zones()
 
-    if (lscattering_method1) then
-       lambda = 1
-       p_lambda => lambda
-    else
-       if (p_n_lambda_pos == n_lambda) then
-          lambda = 1
-          p_lambda => lambda
-       else
-          lambda0 = 1
-          p_lambda => lambda0
-       endif
-    endif
 
     ! Dust properties
     write(*,'(a30, $)') "Computing dust properties ..."
@@ -233,8 +220,7 @@ contains
     integer :: n_SPH, icell, n_photons2, ibar, id, n_photons1_cumul, i_SPH, i, lambda_threshold
     integer :: itime, ieos, alloc_status
     logical :: lpacket_alive, lintersect, laffichage, flag_star, flag_scatt, flag_ISM, ldust_moments
-    integer, target :: lambda, lambda0
-    integer, pointer, save :: p_lambda
+    integer :: lambda
 
     logical, save :: lfirst_time = .true.
 
@@ -295,22 +281,10 @@ contains
        stream(i) = init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
     enddo
 
-    if (lscattering_method1) then
-       lambda = 1
-       p_lambda => lambda
-    else
-       if (p_n_lambda_pos == n_lambda) then
-          lambda = 1
-          p_lambda => lambda
-       else
-          lambda0 = 1
-          p_lambda => lambda0
-       endif
-    endif
 
     ! ToDo : needs to be made parallel
     do lambda=1,n_lambda
-       call opacity(lambda, p_lambda)
+       call opacity(lambda)
     enddo !n
 
     call star_energy_distribution()

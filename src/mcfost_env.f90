@@ -12,10 +12,10 @@ module mcfost_env
   character(len=128) :: webpage       = "https://github.com/cpinte/mcfost/releases/latest/download/"
   character(len=128) :: utils_webpage = "https://ipag.osug.fr/public/pintec/mcfost_utils/"
   character(len=128) :: doc_webpage   = "https://mcfost.readthedocs.io/"
-  character(len=128) :: raw_webpage  = "https://raw.githubusercontent.com/cpinte/mcfost/master/src/"
+  character(len=128) :: raw_webpage   = "https://raw.githubusercontent.com/cpinte/mcfost/master/src/"
   character(len=32)  :: version_file  = "mcfost_env.f90"
 
-  ! SystÃ¨me
+  ! System
   integer :: nb_proc
   integer, parameter :: cache_line_size = 64 ! 64 bytes = 16 floats = 8 double, from Core 2 Duo to i7 + Xeon Phi
 
@@ -25,7 +25,7 @@ module mcfost_env
   integer, parameter :: limite_stack = 5000000
 
   real :: max_mem = 4. ! GBytes maximum size for 1 array (mcfost can have 2 arrays of this size)
-  logical :: low_mem_scattering, low_mem_th_emission, low_mem_th_emission_nLTE, lMueller_pos_multi
+  logical :: low_mem_scattering, low_mem_th_emission, low_mem_th_emission_nLTE, l_p_lambda_is_lambda
 
   character(len=512) :: mcfost_utils, my_mcfost_utils, data_dir, root_dir, tmp_dir, basename_data_dir, seed_dir
   character(len=512) :: lambda_filename, band, model_pah, pah_grain, cmd_opt

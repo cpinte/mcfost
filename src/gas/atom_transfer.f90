@@ -1311,7 +1311,7 @@ module atom_transfer
       write(*,*) " *** Computing dust properties for", n_lambda, "wavelengths..."
       do la=1, n_lambda !works also for ray-traced lines
          call prop_grains(la)
-         call opacity(la, la, no_scatt=.true.)
+         call opacity(la, no_scatt=.true.)
       enddo
 
       do icell=1, n_cells

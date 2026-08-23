@@ -20,15 +20,15 @@ subroutine setup_scattering()
   ! 2 : per cell
   call select_scattering_method(p_n_cells)
 
-  lMueller_pos_multi = .false.
   if (lmono) then
+     l_p_lambda_is_lambda = .false.
      p_n_lambda_pos = 1
   else
-     if (scattering_method==1) then
+     l_p_lambda_is_lambda = .true.
+     if (scattering_method==1) then ! scattering matrix per grain: p_lambda tracks wavelength
         p_n_lambda_pos = 1
      else
         p_n_lambda_pos = n_lambda
-        lMueller_pos_multi = .true.
      endif
   endif
 
@@ -43,19 +43,14 @@ subroutine select_scattering_method(p_n_cells)
   real :: mem_size
 
   if (scattering_method0 == 0) then
-     if (.not.lmono) then
+     if (lmono) then
+        scattering_method = 2 ! Mueller matrix per cell
+     else
         mem_size = (1.0*p_n_cells) * (nang_scatt+1) * n_lambda * 4 / 1024**3
         if (mem_size > max_mem) then
-           scattering_method = 1
+           scattering_method = 1 ! Mueller matrix per grain
         else
-           scattering_method = 2
-        endif
-     else
-        if (lscatt_ray_tracing) then
-           scattering_method = 2 ! it needs to be 2 for ray-tracing
-        else
-           ! ??? TODO + + TODO en realloc lscatt_ray_tracing = .false, en mode ML 3D ???
-           scattering_method = 2
+           scattering_method = 2 ! Mueller matrix per cell
         endif
      endif
   endif

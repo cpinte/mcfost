@@ -788,7 +788,7 @@ end subroutine read_saved_dust_prop
 
 !******************************************************************************
 
-subroutine opacity(lambda, p_lambda, no_scatt)
+subroutine opacity(lambda, no_scatt)
 ! Calculates the opacity table and ksca_CDF
 ! Includes empirical stratification
 ! Uses results from density and prop_grains routines
@@ -800,13 +800,17 @@ subroutine opacity(lambda, p_lambda, no_scatt)
 
   implicit none
 
-  integer, intent(in) :: lambda, p_lambda
+  integer, intent(in) :: lambda
   logical, intent(in), optional :: no_scatt
 
-  integer :: icell, k
+  integer :: icell, k, p_lambda
   integer, dimension(n_grains_tot) :: p_k_arr
   real(kind=dp) ::  density, fact, k_abs_RE, k_abs_LTE, k_abs_tot, k_sca_tot, rho0, d1, d_k
   logical :: lcompute_obs,  ldens0, compute_scatt
+
+  ! Compute p_lambda: index into the scattering position arrays (ksca_CDF, tab_s11_pos, etc.)
+  ! l_p_lambda_is_lambda is true for both method 1 (per grain) and method 2 (per cell, n_lambda grids)
+  p_lambda = merge(lambda, 1, l_p_lambda_is_lambda)
 
   if (lvariable_dust) then
      do k=1, n_grains_tot
@@ -971,7 +975,7 @@ subroutine opacity(lambda, p_lambda, no_scatt)
 
   if (compute_scatt) then
      if (scattering_method==2) then
-        call calc_local_scattering_matrices(lambda, p_lambda)
+        call calc_local_scattering_matrices(lambda)
      else ! scattering_method ==1
         if (.not.low_mem_scattering) then ! we precompute the CDF (otherwise, we recalculate it live)
            do icell=1, p_n_cells
@@ -1034,9 +1038,10 @@ end subroutine opacity
 
 !******************************************************************************
 
-subroutine calc_local_scattering_matrices(lambda, p_lambda)
+subroutine calc_local_scattering_matrices(lambda)
 
-  integer, intent(in) :: lambda, p_lambda
+  integer, intent(in) :: lambda
+  integer :: p_lambda
 
   real(kind=dp), parameter :: dtheta = pi/real(nang_scatt)
   real(kind=dp) :: density, theta, norm, fact, k_sca_tot, d1
@@ -1048,7 +1053,10 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
   logical :: ldens0
 
   fact = AU_to_cm * mum_to_cm**2
-  !write(*,*) "Computing local scattering properties", lambda, p_lambda
+  !write(*,*) "Computing local scattering properties", lambda
+
+  ! See opacity() for the p_lambda logic
+  p_lambda = merge(lambda, 1, l_p_lambda_is_lambda)
 
   ! see opacity()
   ! Warning: in the no_strat case, the cell (1,1,1) must not be empty.
@@ -1076,7 +1084,8 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
   !$omp parallel &
   !$omp default(none) &
   !$omp shared(tab_s11_pos,tab_s12_o_s11_pos,tab_s22_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos,tab_s44_o_s11_pos) &
-  !$omp shared(tab_s11,tab_s12,tab_s22,tab_s33,tab_s34,tab_s44,lambda,p_lambda,n_grains_tot,tab_albedo_pos,prob_s11_pos,p_k_arr) &
+  !$omp shared(tab_s11,tab_s12,tab_s22,tab_s33,tab_s34,tab_s44,lambda,n_grains_tot,tab_albedo_pos,prob_s11_pos,p_k_arr) &
+  !$omp shared(p_lambda) &
   !$omp shared(zmax,kappa,kappa_abs_LTE,ksca_CDF,p_n_cells,fact,lvariable_dust,n_grains) &
   !$omp shared(C_ext,C_sca,dust_density_o_n_grains,S_grain,scattering_method, &
   !$omp&       tab_g_pos,aniso_method,tab_g,lisotropic,low_mem_scattering) &

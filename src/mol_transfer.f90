@@ -946,7 +946,7 @@ subroutine init_dust_mol(imol)
         write(*,*) "Computing dust properties for", nTrans_tot, "wavelength"
         do iTrans=iTrans_min,iTrans_max
            call prop_grains(iTrans)
-           call opacity(iTrans, iTrans, no_scatt=.true.)
+           call opacity(iTrans, no_scatt=.true.)
         enddo
      endif
 
