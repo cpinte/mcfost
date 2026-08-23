@@ -280,11 +280,7 @@ subroutine init_dust_transfer()
         else
            if (lapprox_diffusion) then
               if (lcylindrical) then
-                 if (lMueller_pos_multi) then
-                    p_lambda = lambda_threshold
-                 else
-                    p_lambda = 1
-                 endif
+                 p_lambda = merge(lambda_threshold, 1, l_p_lambda_is_lambda)
                  call define_dark_zone(lambda_threshold,p_lambda,tau_dark_zone_eq_th,.true.) ! BUG avec 1 cell
               else
                  write(*,*) "No dark zone"
@@ -452,7 +448,7 @@ subroutine mc_photon_loop(lambda_in, n_photons2, n_phot_lim, nnfot1_start, laffi
   !$omp private(id,icell,lpacket_alive,lintersect,p_nnfot2,nnfot2,n_phot_sed2,n_phot_envoyes_in_loop,rand) &
   !$omp private(x,y,z,u,v,w,Stokes,flag_star,flag_ISM,flag_scatt,capt,nnfot1) &
   !$omp shared(lambda_in, n_photons2, nnfot1_start,n_photons_loop,capt_sup,n_phot_lim,lscatt_ray_tracing1) &
-  !$omp shared(n_phot_envoyes,nb_proc,p_n_lambda_pos,n_lambda,lMueller_pos_multi) &
+  !$omp shared(n_phot_envoyes,nb_proc,p_n_lambda_pos,n_lambda,l_p_lambda_is_lambda) &
   !$omp shared(stream,laffichage,lmono,lmono0,lProDiMo,lML,letape_th,tab_lambda,n_photons_lambda, n_photons1_cumul,ibar) &
   !$omp reduction(+:E_abs_nRE)
   n_photons2_local = n_photons2
@@ -495,12 +491,7 @@ subroutine mc_photon_loop(lambda_in, n_photons2, n_phot_lim, nnfot1_start, laffi
         endif
         n_phot_envoyes(lambda,id) = n_phot_envoyes(lambda,id) + 1.0_dp
 
-        if (lMueller_pos_multi) then
-           p_lambda = lambda
-        else
-           p_lambda = 1
-        endif
-
+        p_lambda = merge(lambda, 1, l_p_lambda_is_lambda)
 
         ! Packet emission
         call emit_packet(id,lambda, icell,x,y,z,u,v,w,stokes,flag_star,flag_ISM,lintersect)
@@ -673,15 +664,9 @@ subroutine run_image_mc()
   n_phot_lim = 1.0e30
 
   lambda = 1
-  if (lMueller_pos_multi) then
-     p_lambda = lambda
-  else
-     p_lambda = 1
-  endif
+  p_lambda = 1
 
-  ! lambda = 1 and p_lambda = 1 here (lmono initialisation)
-
-  if (.not.lMueller_pos_multi .and. lscatt_ray_tracing) then
+  if (.not.l_p_lambda_is_lambda .and. lscatt_ray_tracing) then
      call calc_local_scattering_matrices(lambda)
   endif
 
@@ -833,7 +818,7 @@ subroutine run_sed_mc()
 
      n_lambda_sed = n_lambda2
   else
-     if (.not.lMueller_pos_multi .and. lscatt_ray_tracing) then
+     if (.not.l_p_lambda_is_lambda .and. lscatt_ray_tracing) then
         call realloc_ray_tracing_scattering_matrix()
      endif
 
@@ -842,13 +827,9 @@ subroutine run_sed_mc()
 
   ! Loop over SED wavelengths
   do lambda = 1, n_lambda_sed
-     if (lMueller_pos_multi) then
-        p_lambda = lambda
-     else
-        p_lambda = 1
-     endif
+     p_lambda = merge(lambda, 1, l_p_lambda_is_lambda)
 
-     if (.not.lMueller_pos_multi .and. lscatt_ray_tracing) then
+     if (.not.l_p_lambda_is_lambda .and. lscatt_ray_tracing) then
         call calc_local_scattering_matrices(lambda)
      endif
 
@@ -1330,12 +1311,7 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
               call im_reemission_qRE(id,icell,p_icell,rand,rand2,lambda)
            endif
         endif ! only_LTE
-
-        if (lMueller_pos_multi) then
-           p_lambda = lambda
-        else
-           p_lambda = 1
-        endif
+        p_lambda = merge(lambda, 1, l_p_lambda_is_lambda)
 
         ! New packet direction: isotropic emission
         call random_isotropic_direction(id, u, v, w)

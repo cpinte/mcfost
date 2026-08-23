@@ -21,10 +21,10 @@ subroutine setup_scattering()
   call select_scattering_method(p_n_cells)
 
   if (lmono) then
-     lMueller_pos_multi = .false.
+     l_p_lambda_is_lambda = .false.
      p_n_lambda_pos = 1
   else
-     lMueller_pos_multi = .true.
+     l_p_lambda_is_lambda = .true.
      if (scattering_method==1) then ! scattering matrix per grain: p_lambda tracks wavelength
         p_n_lambda_pos = 1
      else

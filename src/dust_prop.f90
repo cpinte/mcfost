@@ -809,12 +809,8 @@ subroutine opacity(lambda, no_scatt)
   logical :: lcompute_obs,  ldens0, compute_scatt
 
   ! Compute p_lambda: index into the scattering position arrays (ksca_CDF, tab_s11_pos, etc.)
-  ! lMueller_pos_multi is true for both method 1 (per grain) and method 2 (per cell, n_lambda grids)
-  if (lMueller_pos_multi) then
-     p_lambda = lambda
-  else
-     p_lambda = 1
-  endif
+  ! l_p_lambda_is_lambda is true for both method 1 (per grain) and method 2 (per cell, n_lambda grids)
+  p_lambda = merge(lambda, 1, l_p_lambda_is_lambda)
 
   if (lvariable_dust) then
      do k=1, n_grains_tot
@@ -1060,11 +1056,7 @@ subroutine calc_local_scattering_matrices(lambda)
   !write(*,*) "Computing local scattering properties", lambda
 
   ! See opacity() for the p_lambda logic
-  if (lMueller_pos_multi) then
-     p_lambda = lambda
-  else
-     p_lambda = 1
-  endif
+  p_lambda = merge(lambda, 1, l_p_lambda_is_lambda)
 
   ! see opacity()
   ! Warning: in the no_strat case, the cell (1,1,1) must not be empty.

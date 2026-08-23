@@ -25,7 +25,7 @@ module mcfost_env
   integer, parameter :: limite_stack = 5000000
 
   real :: max_mem = 4. ! GBytes maximum size for 1 array (mcfost can have 2 arrays of this size)
-  logical :: low_mem_scattering, low_mem_th_emission, low_mem_th_emission_nLTE, lMueller_pos_multi
+  logical :: low_mem_scattering, low_mem_th_emission, low_mem_th_emission_nLTE, l_p_lambda_is_lambda
 
   character(len=512) :: mcfost_utils, my_mcfost_utils, data_dir, root_dir, tmp_dir, basename_data_dir, seed_dir
   character(len=512) :: lambda_filename, band, model_pah, pah_grain, cmd_opt
