@@ -3,7 +3,8 @@ module disk_physics
   use grains
   use mcfost_env
   use dust_prop
-  use density, only : dust_density_o_n_grains, dust_mass, find_non_empty_cell
+  use density, only : dust_density_o_n_grains, dust_mass, find_non_empty_cell, &
+       gas_density, gas_mass, gas_density_midplane, redistribute_dust_hydrostatic
   use constants
   use stars, only : star_spectrum, prob_E_star
   use messages
@@ -248,51 +249,137 @@ end subroutine sublimate_dust
 !**********************************************************
 
 subroutine equilibre_hydrostatique()
-  ! Compute hydrostatic equilibrium for each radius
+  ! Compute hydrostatic equilibrium for the gas, then re-derive the dust
+  ! vertical distribution consistently with the new gas structure
+  ! (see redistribute_dust_hydrostatic in density.f90).
+  !
   ! Equation 2.4.3 of the thesis (page 38, 52 of the PDF)
-  ! Valid for a geometrically thin, non-self-gravitating perfect gas disk
+  ! Valid for a geometrically thin, non-self-gravitating perfect gas disk.
+  !
+  ! Restrictions :
+  !  - cylindrical grid only, and symmetric about the midplane (j_start=1) :
+  !    guarded against below (Voronoi/spherical/3D grids are rejected)
+  !  - if several disk zones overlap radially, the solve works on the
+  !    combined gas density, not zone by zone
   !
   ! C. Pinte
   ! 25/09/07
+  ! Fixed the vertical step bug, made it actually update the density
+  ! (conserving the surface density of each column), and coupled the
+  ! dust settling to the new structure : C. Pinte, 08/2026
 
-  real, dimension(nz) :: rho, ln_rho
-  real :: dz, dz_m1, dTdz, fac1, fac2, M_stars, M_mol, total_sum, cst
-  integer :: i,j, k, icell, icell_m1
+  real(kind=dp), dimension(nz) :: rho, ln_rho, Tsmooth
+  real(kind=dp) :: dz_local, dTdz, fac1, fac2, M_stars, M_mol, total_sum, cst
+  real(kind=dp), save, allocatable, dimension(:,:) :: Sigma_gas_target
+  integer :: i,j, k, icell, alloc_status
 
-  real, parameter :: gas_dust = 100
+  real(kind=dp), parameter :: hydro_relax = 0.3_dp ! under-relaxation factor for the gas density update
+  real(kind=dp), parameter :: min_decline_fraction = 0.3_dp ! floor on the vertical decline rate, as a fraction of the gravity-only rate
+
+  if (lVoronoi.or.lspherical.or.l3D) then
+     call error("Hydrostatic equilibrium is only implemented for a cylindrical grid", &
+          msg2="symmetric about the midplane (not a Voronoi, spherical or 3D grid)")
+  endif
 
   M_stars = sum(star(:)%M) * Msun_to_kg
   M_mol = mu_mH * g_to_kg
 
-  cst = Ggrav * M_stars * M_mol / (kb * AU_to_m**2)
+  ! cst converts G*M*mu_mH/kb (SI) into a rate per AU, matching dTdz which is
+  ! computed as delta-T per AU (cell_height is in AU) : z_m/r_m**3 introduces
+  ! one power of 1/AU_to_m**2 (SI/AU**2), and expressing the whole rate per AU
+  ! rather than per metre reintroduces one power of AU_to_m, leaving a single
+  ! power of AU_to_m overall.
+  ! NB: the previous AU_to_m**2 here made fac1 (the stellar tidal/gravity
+  ! term) about 1e11x too small -- effectively inert -- so the density
+  ! profile was driven almost entirely by noisy dTdz, with nothing to force
+  ! it back down at large z. This routine was dormant (never called) until
+  ! it was wired into dust_transfer.f90's hydrostatic iteration in 08/2026,
+  ! which is presumably why this had never been caught.
+  cst = Ggrav * M_stars * M_mol / (kb * AU_to_m)
+
+  if (.not.allocated(Sigma_gas_target)) then
+     ! Snapshot the surface density of each column the first time we are
+     ! called : every hydrostatic iteration afterwards redistributes this
+     ! same mass vertically, it never changes the radial (Sigma) structure.
+     allocate(Sigma_gas_target(n_rad,n_az), stat=alloc_status)
+     if (alloc_status > 0) call error("Allocation error Sigma_gas_target")
+     do k=1, n_az
+        do i=1, n_rad
+           total_sum = 0.0_dp
+           do j=1, nz
+              total_sum = total_sum + gas_density(cell_map(i,j,k)) * cell_height(i,j)
+           enddo
+           Sigma_gas_target(i,k) = total_sum
+        enddo
+     enddo
+  endif
 
   do k=1, n_az
      do i=1, n_rad
-        ln_rho(1) = 0.
-        rho(1) = 1.
-        dz_m1 = 1.0/dz
-        total_sum = rho(1)
-        do j = 2, nz
-           dz = cell_height(i,j)
+        ! Smooth Tdust vertically before differentiating it : dTdz feeds an
+        ! exponential, cumulative integral, so raw MC noise in Tdust (cells
+        ! high in the disk atmosphere receive very few photons) gets
+        ! amplified into spurious density structure -- in the worst case a
+        ! noise-driven upward blip that the monotonic gas_shape floor below
+        ! then freezes in place for the rest of the column, leaving an
+        ! unphysically puffy, optically-thin "shelf" exposed to direct
+        ! starlight. A 5-cell running mean suppresses this without
+        ! affecting genuine, well-resolved vertical structure.
+        do j=1, nz
            icell = cell_map(i,j,k)
-           icell_m1 = cell_map(i,j-1,k)
-           dTdz = (Tdust(icell)-Tdust(icell_m1)) * dz_m1
+           Tsmooth(j) = sum(Tdust(cell_map(i,max(1,j-2):min(nz,j+2),k))) / real(min(nz,j+2)-max(1,j-2)+1,dp)
+        enddo
+
+        ln_rho(1) = 0.0_dp
+        rho(1) = 1.0_dp
+
+        do j = 2, nz
+           dz_local = cell_height(i,j)
+           icell = cell_map(i,j,k)
+           dTdz = (Tsmooth(j)-Tsmooth(j-1)) / dz_local
            fac1 = cst * z_grid(icell)/ (r_grid(icell)**3)
-           fac2 = -1.0 * (dTdz + fac1) / Tdust(icell)
-           ln_rho(j) = ln_rho(j-1) + fac2 * dz
+           fac2 = -1.0_dp * (dTdz + fac1) / Tsmooth(j)
+           ! A bound disk always settles under its own gravity, so fac2 must
+           ! stay negative even where a noisy dTdz partially offsets fac1 :
+           ! floor the decline rate at a fraction of the noise-free,
+           ! gravity-only (isothermal) rate rather than letting it approach
+           ! zero or flip sign, which would freeze or invert the column.
+           fac2 = min(fac2, -min_decline_fraction * fac1 / Tsmooth(j))
+           ln_rho(j) = ln_rho(j-1) + fac2 * dz_local
            rho(j) = exp(ln_rho(j))
-           total_sum = total_sum + rho(j)
         enddo !j
 
-        ! Renormalisation
-        do j = 1, nz
-          ! icell = cell_map(i,j,k)
-          ! fac = gas_dust * masse_rayon(i,k) / (volume(icell) * total_sum) ! TODO : densite est en particule, non ???
-          ! gas_density(icell) =  rho(j) * fac
+        ! Renormalisation : conserve the surface density of the column
+        total_sum = 0.0_dp
+        do j=1, nz
+           total_sum = total_sum + rho(j) * cell_height(i,j)
         enddo
+
+        if (total_sum > tiny_dp) then
+           ! Under-relaxation : Tdust is only known from a noisy MC estimate,
+           ! and dTdz feeds into an exponential, cumulative integral, so a
+           ! small temperature fluctuation (worst near the inner edge, where
+           ! the stellar gravity term fac1 is largest) can otherwise produce
+           ! a wildly wrong density jump on a single iteration. Blending with
+           ! the previous profile damps this without biasing the converged
+           ! solution : both profiles integrate to the same Sigma_gas_target,
+           ! so the blend does too.
+           do j = 1, nz
+              icell = cell_map(i,j,k)
+              gas_density(icell) = (1.0_dp-hydro_relax) * gas_density(icell) + &
+                   hydro_relax * (rho(j) * Sigma_gas_target(i,k) / total_sum)
+           enddo
+           gas_density_midplane(i,k) = gas_density(cell_map(i,1,k))
+        endif
 
      enddo !i
   enddo !k
+
+  do icell=1, n_cells
+     gas_mass(icell) = gas_density(icell) * volume(icell) * mu_mH * AU3_to_m3
+  enddo
+
+  call redistribute_dust_hydrostatic()
 
   return
 

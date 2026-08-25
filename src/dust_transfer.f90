@@ -358,8 +358,10 @@ subroutine dust_transfer_sub()
 
   implicit none
 
-  integer :: iter, n_iter_physics
+  integer :: iter, n_iter_physics, icell
   logical :: lconverged
+  real, allocatable, dimension(:) :: Tdust_hydro_prev
+  real, parameter :: hydrostatic_precision = 5.e-2 ! relative Tdust tolerance, same as the nRE convergence check (Temp_nRE)
 
   call init_dust_transfer()
   if (lonly_diff_approx) return
@@ -367,7 +369,10 @@ subroutine dust_transfer_sub()
   ! ── Thermal structure & Physics Iteration Loop ──
   if (letape_th) then
      n_iter_physics = 1
-     if (lhydrostatic) n_iter_physics = 10 ! Max iterations for physics convergence
+     if (lhydrostatic) then
+        n_iter_physics = 10 ! Max iterations for physics convergence
+        allocate(Tdust_hydro_prev(n_cells))
+     endif
 
      physics_loop : do iter = 1, n_iter_physics
         call run_thermal_mc()
@@ -376,10 +381,34 @@ subroutine dust_transfer_sub()
 
         ! Physics iteration hook: Hydrostatic equilibrium
         if (lhydrostatic) then
-           write(*,*) "Updating hydrostatic equilibrium (iteration", iter, ")"
-           call equilibre_hydrostatique()
-           call recompute_opacities()
-           lconverged = .false. ! Architectural hook for convergence criteria
+           if (iter == 1) then
+              lconverged = .false. ! always perform at least one hydrostatic update
+           else
+              ! Converged once Tdust has stopped moving between successive
+              ! MC realisations of the (now self-consistent) density structure.
+              ! Cells never illuminated stay at the reset_temperature() value
+              ! of 1 K and are excluded from the test.
+              lconverged = .true.
+              do icell=1, n_cells
+                 if (Tdust_hydro_prev(icell) > 1.0) then
+                    if (abs(Tdust(icell)-Tdust_hydro_prev(icell)) > hydrostatic_precision*Tdust_hydro_prev(icell)) &
+                         lconverged = .false.
+                 endif
+              enddo
+           endif
+
+           if (lconverged) then
+              write(*,*) "Hydrostatic equilibrium converged after", iter, "iteration(s)"
+           else
+              Tdust_hydro_prev(:) = Tdust(:)
+              if (iter < n_iter_physics) then
+                 write(*,*) "Updating hydrostatic equilibrium (iteration", iter, ")"
+                 call equilibre_hydrostatique()
+                 call recompute_opacities()
+              else
+                 write(*,*) "WARNING: hydrostatic equilibrium did not converge after", n_iter_physics, "iterations"
+              endif
+           endif
         endif
 
         ! Additional physics iteration hooks can be added here
@@ -387,6 +416,8 @@ subroutine dust_transfer_sub()
 
         if (lconverged) exit physics_loop
      enddo physics_loop
+
+     if (allocated(Tdust_hydro_prev)) deallocate(Tdust_hydro_prev)
   endif
 
   ! ── Dust Species Removal ──
@@ -448,7 +479,7 @@ subroutine mc_photon_loop(lambda_in, n_photons2, n_phot_lim, nnfot1_start, laffi
   !$omp private(id,icell,lpacket_alive,lintersect,p_nnfot2,nnfot2,n_phot_sed2,n_phot_envoyes_in_loop,rand) &
   !$omp private(x,y,z,u,v,w,Stokes,flag_star,flag_ISM,flag_scatt,capt,nnfot1) &
   !$omp shared(lambda_in, n_photons2, nnfot1_start,n_photons_loop,capt_sup,n_phot_lim,lscatt_ray_tracing1) &
-  !$omp shared(n_phot_envoyes,nb_proc,p_n_lambda_pos,n_lambda,l_p_lambda_is_lambda) &
+  !$omp shared(n_phot_envoyes,nb_proc,l_p_lambda_is_lambda) &
   !$omp shared(stream,laffichage,lmono,lmono0,lProDiMo,lML,letape_th,tab_lambda,n_photons_lambda, n_photons1_cumul,ibar) &
   !$omp reduction(+:E_abs_nRE)
   n_photons2_local = n_photons2
