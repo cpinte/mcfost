@@ -1066,7 +1066,7 @@ subroutine get_gas_shape(i,k,gas_ref,gas_shape)
 
   gas_shape(1) = 1.0_dp
   do j=2, nz
-     gas_shape(j) = min(gas_density(cell_map(i,j,k)) / gas_ref, gas_shape(j-1))
+     gas_shape(j) = max(0.0_dp, min(gas_density(cell_map(i,j,k)) / gas_ref, gas_shape(j-1)))
   enddo
 
   return

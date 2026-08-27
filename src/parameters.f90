@@ -31,6 +31,7 @@ module parameters
   ! lvariable_dust = true if the dust properties are variable in each cell
   logical :: lvariable_dust, lmigration, lhydrostatic, ldust_sublimation
   integer :: settling_type ! 1 = Parametric, 2 = Dubrulle or 3 = Fromang
+  integer :: n_iter_physics = 100 ! Maximum iterations for physics loops (e.g. hydrostatic equilibrium)
 
   logical :: lRE_LTE, lRE_nLTE, lnRE, lonly_LTE, lonly_nLTE
   logical :: loutput_J, loutput_J_step1, loutput_UV_field, lxJ_abs, lxJ_abs_step1

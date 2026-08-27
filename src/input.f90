@@ -10,7 +10,8 @@ module input
   use messages
   use wavelengths
   use temperature
-  use density, only : dust_density_o_n_grains
+  use density, only : dust_density_o_n_grains, gas_density, gas_mass, gas_density_midplane
+  use grid, only : cell_map, volume
 
   implicit none
 
@@ -430,6 +431,177 @@ subroutine lect_Temperature()
   return
 
 end subroutine lect_Temperature
+
+!**********************************************************************
+
+function find_latest_hydro_iteration() result(latest)
+  ! Scans for existing Temperature_iterNNNN.fits.gz files in data_th/
+  ! and returns the highest iteration number found, or 0 if none exist.
+
+  implicit none
+
+  integer :: latest
+  integer :: iter
+  logical :: lexist, lexist_dens
+  character(len=512) :: filename, filename_dens
+  character(len=4) :: iter_str
+
+  latest = 0
+  do iter = 1, 9999
+     write(iter_str, '(i4.4)') iter
+     filename = trim(root_dir)//"/"//trim(seed_dir)//"/data_th/Temperature_iter"//trim(iter_str)//".fits.gz"
+     filename_dens = trim(root_dir)//"/data_disk/gas_density_iter"//trim(iter_str)//".fits.gz"
+     inquire(file=trim(filename), exist=lexist)
+     inquire(file=trim(filename_dens), exist=lexist_dens)
+     ! Both temperature and density files must exist for an iteration to be valid
+     if (lexist .and. lexist_dens) then
+        latest = iter
+     else
+        exit
+     endif
+  enddo
+
+end function find_latest_hydro_iteration
+
+!**********************************************************************
+
+subroutine read_gas_density_hydro_iter(iter)
+  ! Reads gas density from data_disk/gas_density_iterNNNN.fits.gz
+  ! (written by ecriture_gas_density_hydro_iter in output.f90).
+  ! Converts from g/cm^3 back to the internal unit (nH2/m^3) and
+  ! recomputes gas_mass and gas_density_midplane.
+
+  implicit none
+
+  integer, intent(in) :: iter
+
+  integer :: status, readwrite, unit, blocksize, nfound, group, firstpix, nbuffer, npixels
+  real :: nullval
+  integer, dimension(3) :: naxes
+  logical :: anynull
+  character(len=512) :: filename
+  character(len=4) :: iter_str
+
+  real, dimension(:), allocatable :: dens
+  integer :: i, k, icell
+
+  write(iter_str, '(i4.4)') iter
+  filename = trim(root_dir)//"/data_disk/gas_density_iter"//trim(iter_str)//".fits.gz"
+  write(*,*) "Reading gas density from: "//trim(filename)
+
+  status = 0
+  call ftgiou(unit, status)
+
+  readwrite = 0
+  call ftopen(unit, trim(filename), readwrite, blocksize, status)
+  if (status /= 0) call error("Cannot open gas density file: "//trim(filename))
+
+  group = 1
+  firstpix = 1
+  nullval = -999
+
+  call ftgknj(unit, 'NAXIS', 1, 10, naxes, nfound, status)
+
+  if (lVoronoi) then
+     npixels = naxes(1)
+  else
+     if (l3D) then
+        npixels = naxes(1)*naxes(2)*naxes(3)
+     else
+        npixels = naxes(1)*naxes(2)
+     endif
+  endif
+
+  if (npixels /= n_cells) then
+     call error("gas_density_iter file dimensions do not match the current grid")
+  endif
+
+  allocate(dens(npixels))
+  nbuffer = npixels
+  call ftgpve(unit, group, firstpix, nbuffer, nullval, dens, anynull, status)
+
+  call ftclos(unit, status)
+  call ftfiou(unit, status)
+
+  ! Convert g/cm^3 --> nH2/m^3 (inverse of the write conversion)
+  gas_density(1:n_cells) = real(dens(1:npixels), kind=dp) * m3_to_cm3 / mu_mH
+  deallocate(dens)
+
+  ! Recompute derived quantities
+  do icell = 1, n_cells
+     gas_mass(icell) = gas_density(icell) * volume(icell) * mu_mH * AU3_to_m3
+  enddo
+
+  if (.not.lVoronoi) then
+     do k = 1, n_az
+        do i = 1, n_rad
+           gas_density_midplane(i,k) = gas_density(cell_map(i,1,k))
+        enddo
+     enddo
+  endif
+
+  write(*,*) "Gas density restored from iteration ", iter
+
+end subroutine read_gas_density_hydro_iter
+
+!**********************************************************************
+
+subroutine read_Tdust_hydro_iter(iter)
+  ! Reads LTE dust temperature from data_th/Temperature_iterNNNN.fits.gz
+  ! into the global Tdust array. Used during hydrostatic restart to
+  ! populate Tdust_hydro_prev for the convergence check.
+
+  implicit none
+
+  integer, intent(in) :: iter
+
+  integer :: status, readwrite, unit, blocksize, nfound, group, firstpix, nbuffer, npixels
+  real :: nullval
+  integer, dimension(3) :: naxes
+  logical :: anynull
+  character(len=512) :: filename
+  character(len=4) :: iter_str
+
+  write(iter_str, '(i4.4)') iter
+  filename = trim(root_dir)//"/"//trim(seed_dir)//"/data_th/Temperature_iter"//trim(iter_str)//".fits.gz"
+  write(*,*) "Reading temperature from: "//trim(filename)
+
+  status = 0
+  call ftgiou(unit, status)
+
+  readwrite = 0
+  call ftopen(unit, trim(filename), readwrite, blocksize, status)
+  if (status /= 0) call error("Cannot open temperature file: "//trim(filename))
+
+  group = 1
+  firstpix = 1
+  nullval = -999
+
+  call ftgknj(unit, 'NAXIS', 1, 10, naxes, nfound, status)
+
+  if (lVoronoi) then
+     npixels = naxes(1)
+  else
+     if (l3D) then
+        npixels = naxes(1)*naxes(2)*naxes(3)
+     else
+        npixels = naxes(1)*naxes(2)
+     endif
+  endif
+
+  if (npixels /= n_cells) then
+     call error("Temperature_iter file dimensions do not match the current grid")
+  endif
+
+  nbuffer = npixels
+  call ftgpve(unit, group, firstpix, nbuffer, nullval, Tdust, anynull, status)
+
+  call ftclos(unit, status)
+  call ftfiou(unit, status)
+
+  write(*,*) "Temperature restored from iteration ", iter
+
+end subroutine read_Tdust_hydro_iter
 
 !**********************************************************************
 

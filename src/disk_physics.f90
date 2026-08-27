@@ -334,8 +334,8 @@ subroutine equilibre_hydrostatique()
         rho(1) = 1.0_dp
 
         do j = 2, nz
-           dz_local = cell_height(i,j)
            icell = cell_map(i,j,k)
+           dz_local = z_grid(icell) - z_grid(cell_map(i,j-1,k)) ! Distance between cell centers (exact for both constant and variable dz)
            dTdz = (Tsmooth(j)-Tsmooth(j-1)) / dz_local
            fac1 = cst * z_grid(icell)/ (r_grid(icell)**3)
            fac2 = -1.0_dp * (dTdz + fac1) / Tsmooth(j)
@@ -381,9 +381,204 @@ subroutine equilibre_hydrostatique()
 
   call redistribute_dust_hydrostatic()
 
+  call print_hydrostatic_scale_height()
+
   return
 
 end subroutine equilibre_hydrostatique
+
+
+!**********************************************************
+
+subroutine compute_column_scale_heights(i, H68, Hrms, Hmid, Hth, r_col)
+  ! Computes vertical scale heights for radial column i:
+  !   H68  : height enclosing 68.27% of the mass column
+  !   Hrms : root-mean-square height sqrt(<z^2>)
+  !   Hmid : isothermal sound speed scale height cs(Tmid)/OmegaK
+  !   Hth  : sound speed scale height from column mass-weighted temperature cs(<T>)/OmegaK
+  ! C. Pinte, 08/2026
+
+  integer, intent(in) :: i
+  real(kind=dp), intent(out) :: H68, Hrms, Hmid, Hth, r_col
+
+  real(kind=dp) :: total_mass, target_mass, cum_mass, prev_mass
+  real(kind=dp) :: sum_z2, sum_rho_T, z_cell, rho_val, T_val, T_mid
+  real(kind=dp) :: cst, M_stars, M_mol
+  integer :: j, icell
+
+  r_col = r_grid(cell_map(i,1,1))
+  total_mass = 0.0_dp
+  sum_z2 = 0.0_dp
+  sum_rho_T = 0.0_dp
+
+  do j = 1, nz
+     icell = cell_map(i,j,1)
+     rho_val = gas_density(icell)
+     T_val = Tdust(icell)
+     total_mass = total_mass + rho_val * cell_height(i,j)
+     z_cell = z_grid(icell)
+     sum_z2 = sum_z2 + rho_val * cell_height(i,j) * z_cell**2
+     sum_rho_T = sum_rho_T + rho_val * cell_height(i,j) * T_val
+  enddo
+
+  if (total_mass <= 0.0_dp) then
+     H68 = 0.0_dp
+     Hrms = 0.0_dp
+     Hmid = 0.0_dp
+     Hth = 0.0_dp
+     return
+  endif
+
+  ! 1. H_68: height enclosing 68.27% of the mass column
+  target_mass = 0.682689492_dp * total_mass
+  cum_mass = 0.0_dp
+  H68 = z_lim(i,nz+1)
+  do j = 1, nz
+     icell = cell_map(i,j,1)
+     rho_val = gas_density(icell)
+     prev_mass = cum_mass
+     cum_mass = cum_mass + rho_val * cell_height(i,j)
+     if (cum_mass >= target_mass) then
+        if (rho_val > 0.0_dp) then
+           H68 = z_lim(i,j) + (target_mass - prev_mass) / rho_val
+        else
+           H68 = z_lim(i,j)
+        endif
+        exit
+     endif
+  enddo
+
+  ! 2. H_rms: second moment
+  Hrms = sqrt(sum_z2 / total_mass)
+
+  ! 3. Physical constants for thermal scale heights
+  M_stars = sum(star(:)%M) * Msun_to_kg
+  M_mol = mu_mH * g_to_kg
+  cst = Ggrav * M_stars * M_mol / (kb * AU_to_m)
+
+  ! 4. H_mid: isothermal scale height from midplane temperature
+  T_mid = Tdust(cell_map(i,1,1))
+  if (cst > 0.0_dp .and. T_mid > 0.0_dp) then
+     Hmid = sqrt(T_mid * r_col**3 / cst)
+  else
+     Hmid = 0.0_dp
+  endif
+
+  ! 5. H_th: sound-speed scale height from mass-weighted temperature
+  if (cst > 0.0_dp .and. sum_rho_T > 0.0_dp) then
+     Hth = sqrt((sum_rho_T / total_mass) * r_col**3 / cst)
+  else
+     Hth = 0.0_dp
+  endif
+end subroutine compute_column_scale_heights
+
+
+!**********************************************************
+
+subroutine get_interpolated_scale_heights(R_target, H68, Hrms, Hmid, Hth)
+  ! Radial interpolation of scale heights to an arbitrary radius R_target
+  ! C. Pinte, 08/2026
+
+  real(kind=dp), intent(in) :: R_target
+  real(kind=dp), intent(out) :: H68, Hrms, Hmid, Hth
+
+  real(kind=dp) :: r1, r2, w, r_dummy
+  real(kind=dp) :: H68_1, Hrms_1, Hmid_1, Hth_1
+  real(kind=dp) :: H68_2, Hrms_2, Hmid_2, Hth_2
+  integer :: i
+
+  if (R_target <= r_grid(cell_map(1,1,1))) then
+     call compute_column_scale_heights(1, H68, Hrms, Hmid, Hth, r_dummy)
+     return
+  else if (R_target >= r_grid(cell_map(n_rad,1,1))) then
+     call compute_column_scale_heights(n_rad, H68, Hrms, Hmid, Hth, r_dummy)
+     return
+  endif
+
+  ! Find radial index i such that r(i) <= R_target <= r(i+1)
+  do i = 1, n_rad - 1
+     r1 = r_grid(cell_map(i,1,1))
+     r2 = r_grid(cell_map(i+1,1,1))
+     if (R_target >= r1 .and. R_target <= r2) exit
+  enddo
+
+  call compute_column_scale_heights(i, H68_1, Hrms_1, Hmid_1, Hth_1, r1)
+  call compute_column_scale_heights(i+1, H68_2, Hrms_2, Hmid_2, Hth_2, r2)
+
+  if (r2 > r1) then
+     w = (log(R_target) - log(r1)) / (log(r2) - log(r1))
+  else
+     w = 0.5_dp
+  endif
+
+  H68 = exp((1.0_dp - w) * log(max(1.0e-30_dp, H68_1)) + w * log(max(1.0e-30_dp, H68_2)))
+  Hrms = exp((1.0_dp - w) * log(max(1.0e-30_dp, Hrms_1)) + w * log(max(1.0e-30_dp, Hrms_2)))
+  Hmid = exp((1.0_dp - w) * log(max(1.0e-30_dp, Hmid_1)) + w * log(max(1.0e-30_dp, Hmid_2)))
+  Hth = exp((1.0_dp - w) * log(max(1.0e-30_dp, Hth_1)) + w * log(max(1.0e-30_dp, Hth_2)))
+end subroutine get_interpolated_scale_heights
+
+
+!**********************************************************
+
+subroutine print_hydrostatic_scale_height()
+  ! Prints hydrostatic scale heights at Rref and the local flaring index
+  ! C. Pinte, 08/2026
+
+  real(kind=dp) :: Rref, H0_init, R1, R2
+  real(kind=dp) :: H68, Hrms, Hmid, Hth
+  real(kind=dp) :: H68_R1, Hrms_R1, Hmid_R1, Hth_R1
+  real(kind=dp) :: H68_R2, Hrms_R2, Hmid_R2, Hth_R2
+  real(kind=dp) :: beta_local, diff_pct
+  real(kind=dp) :: r_min_grid, r_max_grid
+
+  if (lVoronoi .or. lspherical .or. l3D) return
+  if (.not. allocated(disk_zone)) return
+  if (n_zones < 1) return
+
+  Rref = disk_zone(1)%Rref
+  H0_init = disk_zone(1)%sclht
+
+  if (Rref <= 0.0_dp) Rref = 100.0_dp
+
+  ! 1. Scale heights at Rref
+  call get_interpolated_scale_heights(Rref, H68, Hrms, Hmid, Hth)
+
+  ! 2. Local flaring index between ~ 0.9 Rref and 1.1 Rref
+  r_min_grid = r_grid(cell_map(1,1,1))
+  r_max_grid = r_grid(cell_map(n_rad,1,1))
+  R1 = max(r_min_grid, 0.9_dp * Rref)
+  R2 = min(r_max_grid, 1.1_dp * Rref)
+
+  if (R2 > R1) then
+     call get_interpolated_scale_heights(R1, H68_R1, Hrms_R1, Hmid_R1, Hth_R1)
+     call get_interpolated_scale_heights(R2, H68_R2, Hrms_R2, Hmid_R2, Hth_R2)
+     if (H68_R1 > 0.0_dp .and. H68_R2 > 0.0_dp) then
+        beta_local = (log(H68_R2) - log(H68_R1)) / (log(R2) - log(R1))
+     else
+        beta_local = 0.0_dp
+     endif
+  else
+     beta_local = 0.0_dp
+  endif
+
+  ! 3. Difference percentage between H_rms and H_thermal
+  if (Hrms > 0.0_dp) then
+     diff_pct = abs(Hrms - Hth) / Hrms * 100.0_dp
+  else
+     diff_pct = 0.0_dp
+  endif
+
+  ! 4. Display 2-line summary requested by user
+  write(*,'("  Scale height @ Rref (", f6.1, " AU): H_68 = ", f6.2, " AU, H_mid = ", f6.2, &
+       & " AU (initial H0 = ", f6.2, " AU), flaring beta = ", f5.2)') &
+       Rref, H68, Hmid, H0_init, beta_local
+
+  write(*,'("  Hydrostatic check: H_rms = ", f6.2, " AU, H_thermal(mean_T) = ", f6.2, &
+       & " AU (diff = ", f5.2, "%)")') &
+       Hrms, Hth, diff_pct
+
+end subroutine print_hydrostatic_scale_height
+
 
 !**********************************************************
 

@@ -2543,7 +2543,7 @@ subroutine ecriture_temperature(iTemperature)
      if (iTemperature == 2) then
         filename = "!"//trim(data_dir)//"/Temperature_DA.fits.gz" ! "!" to overwrite file if computing diffusion approx twice
      else
-        filename = trim(data_dir)//"/Temperature.fits.gz"
+        filename = "!"//trim(data_dir)//"/Temperature.fits.gz"
      endif
      !  Get an unused Logical Unit Number to use to open the FITS file.
      status=0
@@ -2829,6 +2829,168 @@ end subroutine ecriture_temperature
 
 !********************************************************************
 
+subroutine ecriture_temperature_hydro_iter(iter)
+  ! Writes a per-iteration copy of the LTE dust temperature:
+  !   data_th/Temperature_iterNNN.fits.gz
+  ! Called after each hydrostatic iteration so that the convergence
+  ! history is available for inspection and restart.
+
+  implicit none
+
+  integer, intent(in) :: iter
+
+  integer :: status, unit, blocksize, bitpix, naxis
+  integer, dimension(3) :: naxes
+  integer :: group, fpixel, nelements
+  logical :: simple, extend
+  character(len=512) :: filename
+  character(len=4) :: iter_str
+
+  if (.not. lRE_LTE) return
+
+  write(iter_str, '(i4.4)') iter
+
+  filename = "!"//trim(data_dir)//"/Temperature_iter"//trim(iter_str)//".fits.gz"
+
+  status = 0
+  call ftgiou(unit, status)
+
+  blocksize = 1
+  call ftinit(unit, trim(filename), blocksize, status)
+
+  simple = .true.
+  bitpix = -32
+  extend = .true.
+
+  if (lVoronoi) then
+     naxis = 1
+     naxes(1) = n_cells
+     nelements = naxes(1)
+  else
+     if (l3D) then
+        naxis = 3
+        naxes(1) = n_rad
+        naxes(2) = 2*nz
+        naxes(3) = n_az
+        nelements = naxes(1)*naxes(2)*naxes(3)
+     else
+        naxis = 2
+        naxes(1) = n_rad
+        naxes(2) = nz
+        nelements = naxes(1)*naxes(2)
+     endif
+  endif
+
+  call ftphpr(unit, simple, bitpix, naxis, naxes, 0, 1, extend, status)
+  call ftpkys(unit, 'UNIT', "K", ' ', status)
+  call ftpkyj(unit, 'ITER', iter, 'Hydrostatic iteration', status)
+
+  group = 1
+  fpixel = 1
+  call ftppre(unit, group, fpixel, nelements, Tdust(1:n_cells), status)
+
+  call ftclos(unit, status)
+  call ftfiou(unit, status)
+
+  if (status > 0) call print_error(status)
+
+end subroutine ecriture_temperature_hydro_iter
+
+!********************************************************************
+
+subroutine ecriture_gas_density_hydro_iter(iter)
+  ! Writes the gas density array to:
+  !   data_disk/gas_density_iterNNN.fits.gz
+  ! and also updates the canonical:
+  !   data_disk/gas_density.fits.gz
+  ! in g/cm^3, identical to the format used by write_disk_struct.
+  ! Called after each hydrostatic iteration.
+
+  implicit none
+
+  integer, intent(in) :: iter
+
+  integer :: status, unit, blocksize, bitpix, naxis, syst_status
+  integer, dimension(3) :: naxes
+  integer :: group, fpixel, nelements
+  logical :: simple, extend
+  character(len=512) :: filename, cmd
+  character(len=4) :: iter_str
+  real, dimension(:), allocatable :: dens
+
+  write(iter_str, '(i4.4)') iter
+
+  ! Ensure data_disk directory exists
+  if (.not. is_dir(trim(root_dir)//"/data_disk")) then
+     cmd = "mkdir -p "//trim(root_dir)//"/data_disk"
+     call system_call(cmd, syst_status)
+  endif
+
+  allocate(dens(n_cells))
+  dens(:) = gas_density(1:n_cells) * mu_mH / m3_to_cm3  ! nH2/m^3 --> g/cm^3
+
+  simple = .true.
+  bitpix = -32
+  extend = .true.
+  blocksize = 1
+
+  if (lVoronoi) then
+     naxis = 1
+     naxes(1) = n_cells
+     nelements = naxes(1)
+  else
+     if (l3D) then
+        naxis = 3
+        naxes(1) = n_rad
+        naxes(2) = 2*nz
+        naxes(3) = n_az
+        nelements = naxes(1)*naxes(2)*naxes(3)
+     else
+        naxis = 2
+        naxes(1) = n_rad
+        naxes(2) = nz
+        nelements = naxes(1)*naxes(2)
+     endif
+  endif
+
+  ! 1. Write per-iteration snapshot: gas_density_iterNNNN.fits.gz
+  filename = "!"//trim(root_dir)//"/data_disk/gas_density_iter"//trim(iter_str)//".fits.gz"
+  status = 0
+  call ftgiou(unit, status)
+  call ftinit(unit, trim(filename), blocksize, status)
+  call ftphpr(unit, simple, bitpix, naxis, naxes, 0, 1, extend, status)
+  call ftpkys(unit, 'UNIT', "g.cm^-3", ' ', status)
+  call ftpkyj(unit, 'ITER', iter, 'Hydrostatic iteration', status)
+  group = 1
+  fpixel = 1
+  call ftppre(unit, group, fpixel, nelements, dens, status)
+  call ftclos(unit, status)
+  call ftfiou(unit, status)
+  if (status > 0) call print_error(status)
+
+  ! 2. Update canonical file: gas_density.fits.gz
+  filename = "!"//trim(root_dir)//"/data_disk/gas_density.fits.gz"
+  status = 0
+  call ftgiou(unit, status)
+  call ftinit(unit, trim(filename), blocksize, status)
+  call ftphpr(unit, simple, bitpix, naxis, naxes, 0, 1, extend, status)
+  call ftpkys(unit, 'UNIT', "g.cm^-3", ' ', status)
+  call ftpkyj(unit, 'ITER', iter, 'Hydrostatic iteration', status)
+  group = 1
+  fpixel = 1
+  call ftppre(unit, group, fpixel, nelements, dens, status)
+  call ftclos(unit, status)
+  call ftfiou(unit, status)
+  if (status > 0) call print_error(status)
+
+  deallocate(dens)
+
+  write(*,*) "  Saved hydrostatic state: iteration ", iter
+
+end subroutine ecriture_gas_density_hydro_iter
+
+!********************************************************************
+
 subroutine ecriture_Tex(imol,ext)
 
   implicit none
@@ -3021,9 +3183,9 @@ subroutine ecriture_sed(ised)
 
   !! SED writing
   if (ised ==1) then
-     filename = trim(data_dir)//"/.sed_th.fits.gz"
+     filename = "!"//trim(data_dir)//"/.sed_th.fits.gz"
   else
-     filename = trim(data_dir)//"/sed_mc.fits.gz"
+     filename = "!"//trim(data_dir)//"/sed_mc.fits.gz"
      if (lProDiMo) write(*,*) "WARNING: sed_mc.fits.gz will be noisy due to the use of ProDiMo mode"
   endif
 
