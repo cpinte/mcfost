@@ -35,6 +35,7 @@ contains
     alloc_status=0
 
     athena%filename = filename
+    athena%cons_var = .false.
 
     call open_hdf5file(filename,file_id,ierr)
     if (ierr /= 0) call error("cannot open athena HDF file "//trim(filename))
@@ -48,7 +49,11 @@ contains
     if (trim(coord) /= "spherical_polar") call error("mcfost can only read spherical_polar athena++ grids for now")
 
     call hdf_read_attribute(group_id,"", "DatasetNames",DatasetNames)
-    if (trim(DatasetNames) /= "prim") call error("mcfost can only read prim athena++ grids for now")
+    if (trim(DatasetNames) /= "prim" .and. trim(DatasetNames) /= "cons") then
+       call error("mcfost can only read prim or cons athena++ grids for now")
+    else if (trim(DatasetNames) == "cons") then
+       athena%cons_var = .true.
+    endif
 
     call hdf_read_attribute(group_id,"", "MaxLevel",Maxlevel)
     if (MaxLevel > 0) call error("mcfost can only read athena++ grids with MaxLevel=0 for now")
@@ -288,10 +293,17 @@ contains
        ju = jl + bs2
        ku = kl + bs3
 
-       rho(il+1:iu,jl+1:ju,kl+1:ku) = data(:,:,:,iblock,1)
-       vx1(il+1:iu,jl+1:ju,kl+1:ku) = data(:,:,:,iblock,3) ! vr
-       vx2(il+1:iu,jl+1:ju,kl+1:ku) = data(:,:,:,iblock,4) ! vtheta
-       vx3(il+1:iu,jl+1:ju,kl+1:ku) = data(:,:,:,iblock,5) ! vphi
+       if (athena%cons_var) then
+          rho(il+1:iu,jl+1:ju,kl+1:ku) = data(:,:,:,iblock,1) ! rho
+          vx1(il+1:iu,jl+1:ju,kl+1:ku) = data(:,:,:,iblock,3)/data(:,:,:,iblock,1) ! vr
+          vx2(il+1:iu,jl+1:ju,kl+1:ku) = data(:,:,:,iblock,4)/data(:,:,:,iblock,1) ! vtheta
+          vx3(il+1:iu,jl+1:ju,kl+1:ku) = data(:,:,:,iblock,5)/data(:,:,:,iblock,1) ! vphi
+       else
+          rho(il+1:iu,jl+1:ju,kl+1:ku) = data(:,:,:,iblock,1)
+          vx1(il+1:iu,jl+1:ju,kl+1:ku) = data(:,:,:,iblock,3) ! vr
+          vx2(il+1:iu,jl+1:ju,kl+1:ku) = data(:,:,:,iblock,4) ! vtheta
+          vx3(il+1:iu,jl+1:ju,kl+1:ku) = data(:,:,:,iblock,5) ! vphi
+       endif
     enddo
     deallocate(data)
 
