@@ -293,10 +293,11 @@ module parameters
   type athena_model
      integer :: nx1, nx2, nx3
      real(kind=dp) :: x1_min,x1_max, x2_min,x2_max, x3_min,x3_max
-     logical :: log_spacing, corrotating_frame, cons_var
+     logical :: log_spacing, corrotating_frame
 
      real(kind=dp) :: time
      character(len=128) :: filename
+     character(len=32) :: dataset_name
   end type athena_model
 
   type(athena_model) :: athena
