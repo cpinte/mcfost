@@ -32,6 +32,7 @@ subroutine set_default_variables()
 
   n_zones=1
   lmcfost_lib = .false.
+  lsave_n_packet_per_cell = .false.
 
   ! For parallel code
   !$omp parallel default(none) &

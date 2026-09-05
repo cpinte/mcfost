@@ -138,6 +138,11 @@ subroutine init_dust_transfer()
   ! Dynamic allocation of all other tables
   call alloc_dust_prop()
 
+  ! Enable per-cell photon-packet counting (xN_abs, in radiation_field) so the
+  ! hydrostatic equilibrium convergence test can estimate the Monte Carlo noise
+  ! level on Tdust from photon-counting statistics (Min et al. 2009, A&A 497, 155).
+  if (lhydrostatic) lsave_n_packet_per_cell = .true.
+
   call alloc_dynamique()
 
   stream = 0.0
@@ -375,13 +380,25 @@ subroutine dust_transfer_sub()
   ! Main entry point for radiative transfer calculation
   ! C. Pinte
 
+  use radiation_field, only : xN_abs
   implicit none
 
   integer :: iter, n_iter_max, icell, start_iter, latest_iter, n_tested, icell_max, max_i, max_j
   logical :: lconverged
-  real :: max_dT_o_T, mean_dT_o_T, rel_diff
-  real, allocatable, dimension(:) :: Tdust_hydro_prev
+  real :: max_dT_o_T, mean_dT_o_T, mean_precision, rel_diff
+  real :: n_packets_cur, n_packets_prev, sigma_dT_o_T, effective_precision
+  real, allocatable, dimension(:) :: Tdust_hydro_prev, N_packets_hydro_prev
   real, parameter :: hydrostatic_precision = 5.e-2 ! relative Tdust tolerance, same as the nRE convergence check (Temp_nRE)
+  ! Monte Carlo photon-noise floor on the per-cell test (Min et al. 2009, A&A 497, 155): for a
+  ! grey/LTE radiative-equilibrium temperature, T ~ E^(1/4), so the relative statistical noise on
+  ! Tdust from Poisson photon-counting statistics is ~ (1/4) x the relative noise on the absorbed
+  ! energy, itself ~ 1/sqrt(N_packets). A cell's effective tolerance is relaxed to hydrostatic_n_sigma
+  ! times this estimate when that exceeds hydrostatic_precision, capped at hydrostatic_precision_max,
+  ! and only once both iterations being compared have at least min_packets_for_noise_estimate packets
+  ! (xN_abs, populated when lsave_n_packet_per_cell is set); otherwise hydrostatic_precision applies as before.
+  real, parameter :: hydrostatic_n_sigma = 3.0
+  real, parameter :: hydrostatic_precision_max = 0.3
+  real, parameter :: min_packets_for_noise_estimate = 10.0
 
   call init_dust_transfer()
   if (lonly_diff_approx) return
@@ -393,7 +410,8 @@ subroutine dust_transfer_sub()
 
      if (lhydrostatic) then
         n_iter_max = n_iter_physics ! Default 100 or set via -n_iter_physics command line option
-        allocate(Tdust_hydro_prev(n_cells))
+        allocate(Tdust_hydro_prev(n_cells), N_packets_hydro_prev(n_cells))
+        N_packets_hydro_prev = 0.0 ! no noise estimate available yet: falls back to hydrostatic_precision
 
         ! ── Restart detection: look for saved iterations ──
         latest_iter = find_latest_hydro_iteration()
@@ -406,6 +424,9 @@ subroutine dust_transfer_sub()
            ! Restore T for convergence check in the next iteration
            call read_Tdust_hydro_iter(latest_iter)
            Tdust_hydro_prev(:) = Tdust(:)
+           ! Packet counts from the restored iteration were not saved to disk, so
+           ! N_packets_hydro_prev stays at 0 and the noise floor falls back to
+           ! hydrostatic_precision for the first comparison after a restart.
            start_iter = latest_iter + 1
            if (start_iter <= n_iter_max) then
               write(*,*) "Continuing from iteration", start_iter
@@ -432,6 +453,7 @@ subroutine dust_transfer_sub()
               lconverged = .false. ! always perform at least one hydrostatic update on fresh run
               max_dT_o_T = 0.0
               mean_dT_o_T = 0.0
+              mean_precision = 0.0
               max_i = 0
               max_j = 0
            else
@@ -442,21 +464,40 @@ subroutine dust_transfer_sub()
               lconverged = .true.
               max_dT_o_T = 0.0
               mean_dT_o_T = 0.0
+              mean_precision = 0.0
               n_tested = 0
               icell_max = 1
               do icell=1, n_cells
                  if (Tdust_hydro_prev(icell) > 1.0) then
                     rel_diff = abs(Tdust(icell)-Tdust_hydro_prev(icell)) / Tdust_hydro_prev(icell)
+
+                    ! Estimate the Monte Carlo photon-noise floor for this cell and relax the
+                    ! tolerance up to it when it exceeds hydrostatic_precision (see declarations above).
+                    n_packets_cur  = sum(xN_abs(icell,1,:))
+                    n_packets_prev = N_packets_hydro_prev(icell)
+                    if (n_packets_cur >= min_packets_for_noise_estimate .and. &
+                         n_packets_prev >= min_packets_for_noise_estimate) then
+                       sigma_dT_o_T = 0.25 * sqrt(1.0/n_packets_cur + 1.0/n_packets_prev)
+                       effective_precision = min(max(hydrostatic_precision, hydrostatic_n_sigma * sigma_dT_o_T), &
+                            hydrostatic_precision_max)
+                    else ! not enough packets in one of the two iterations to trust a noise estimate
+                       effective_precision = hydrostatic_precision
+                    endif
+
                     if (rel_diff > max_dT_o_T) then
                        max_dT_o_T = rel_diff
                        icell_max = icell
                     endif
                     mean_dT_o_T = mean_dT_o_T + rel_diff
+                    mean_precision = mean_precision + effective_precision
                     n_tested = n_tested + 1
-                    if (rel_diff > hydrostatic_precision) lconverged = .false.
+                    if (rel_diff > effective_precision) lconverged = .false.
                  endif
               enddo
-              if (n_tested > 0) mean_dT_o_T = mean_dT_o_T / real(n_tested)
+              if (n_tested > 0) then
+                 mean_dT_o_T = mean_dT_o_T / real(n_tested)
+                 mean_precision = mean_precision / real(n_tested)
+              endif
               if (allocated(cell_map_i) .and. allocated(cell_map_j)) then
                  max_i = cell_map_i(icell_max)
                  max_j = cell_map_j(icell_max)
@@ -468,25 +509,29 @@ subroutine dust_transfer_sub()
 
            if (lconverged) then
               write(*,'(" Hydrostatic equilibrium converged after ", i0, " iteration(s): max |dT|/T = ", f7.4, &
-                   & " at (i=", i0, ", j=", i0, ") (target: ", f6.4, "), mean = ", f7.4)') &
-                   iter, max_dT_o_T, max_i, max_j, hydrostatic_precision, mean_dT_o_T
+                   & " at (i=", i0, ", j=", i0, ") (target: ", f6.4, ", noise-adjusted mean target: ", f6.4, &
+                   & "), mean = ", f7.4)') &
+                   iter, max_dT_o_T, max_i, max_j, hydrostatic_precision, mean_precision, mean_dT_o_T
            else
               Tdust_hydro_prev(:) = Tdust(:)
+              N_packets_hydro_prev(:) = sum(xN_abs(:,1,:), dim=2)
               if (iter < n_iter_max) then
                  if (iter == 1 .and. start_iter == 1) then
                     write(*,'(" Updating hydrostatic equilibrium (iteration ", i0, ")")') iter
                  else
                     write(*,'(" Updating hydrostatic equilibrium (iteration ", i0, ")'//new_line('A') &
                          //' max |dT|/T = ", f7.4, &
-                         & " at (i=", i0, ", j=", i0, ") (target: ", f6.4, "), mean = ", f7.4)') &
-                         iter, max_dT_o_T, max_i, max_j, hydrostatic_precision, mean_dT_o_T
+                         & " at (i=", i0, ", j=", i0, ") (target: ", f6.4, ", noise-adjusted mean target: ", f6.4, &
+                         & "), mean = ", f7.4)') &
+                         iter, max_dT_o_T, max_i, max_j, hydrostatic_precision, mean_precision, mean_dT_o_T
                  endif
                  call equilibre_hydrostatique()
                  call recompute_opacities()
               else
                  write(*,'(" WARNING: hydrostatic equilibrium did not converge after ", i0, " iterations: max |dT|/T = ", &
-                      & f7.4, " at (i=", i0, ", j=", i0, ") (target: ", f6.4, "), mean = ", f7.4)') &
-                      n_iter_max, max_dT_o_T, max_i, max_j, hydrostatic_precision, mean_dT_o_T
+                      & f7.4, " at (i=", i0, ", j=", i0, ") (target: ", f6.4, ", noise-adjusted mean target: ", f6.4, &
+                      & "), mean = ", f7.4)') &
+                      n_iter_max, max_dT_o_T, max_i, max_j, hydrostatic_precision, mean_precision, mean_dT_o_T
               endif
            endif
 
@@ -517,6 +562,7 @@ subroutine dust_transfer_sub()
      endif
 
      if (allocated(Tdust_hydro_prev)) deallocate(Tdust_hydro_prev)
+     if (allocated(N_packets_hydro_prev)) deallocate(N_packets_hydro_prev)
   endif
 
   ! ── Dust Species Removal ──

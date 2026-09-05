@@ -52,7 +52,7 @@ subroutine save_radiation_field(id,lambda,p_lambda,icell, Stokes, l,  x0,y0,z0, 
   if (letape_th) then
      if (lRE_LTE) xKJ_abs(icell,id) = xKJ_abs(icell,id) + kappa_abs_LTE(p_icell,lambda) * l * Stokes(1) ! kappa_factor(icell) is not included here
      if (lxJ_abs_step1) xJ_abs(icell,lambda,id) = xJ_abs(icell,lambda,id) + l * Stokes(1)
-     if (lmcfost_lib) xN_abs(icell,1,id) = xN_abs(icell,1,id) + 1.0 ! We do not store the wl dependence
+     if (lsave_n_packet_per_cell) xN_abs(icell,1,id) = xN_abs(icell,1,id) + 1.0 ! We do not store the wl dependence
   else
      if (lxJ_abs) then ! loutput_UV_field .or. loutput_J .or. lprodimo
         xJ_abs(icell,lambda,id) = xJ_abs(icell,lambda,id) + l * Stokes(1)
@@ -156,6 +156,14 @@ subroutine allocate_radiation_field_step1(Nc)
      xJ_abs=0.0 ; J0 = 0.0
   endif
 
+  ! In library mode, xN_abs is allocated (and sized) by mcfost2phantom itself, on the
+  ! SPH particle count rather than Nc, so it must not be re-allocated here.
+  if (lsave_n_packet_per_cell .and. .not. lmcfost_lib) then
+     allocate(xN_abs(Nc,1,nb_proc), stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error xN_abs')
+     xN_abs = 0.0
+  endif
+
   return
 
 end subroutine allocate_radiation_field_step1
@@ -184,6 +192,9 @@ subroutine deallocate_radiation_field()
 
   if (allocated(xKJ_abs)) deallocate(xKJ_abs,E0)
   if (allocated(xJ_abs)) deallocate(xJ_abs,J0)
+  ! xN_abs is left alone in library mode: it is owned by mcfost2phantom and must
+  ! survive across the repeated run_mcfost_phantom calls made from Phantom.
+  if (allocated(xN_abs) .and. .not. lmcfost_lib) deallocate(xN_abs)
 
   return
 
@@ -201,7 +212,7 @@ subroutine reset_radiation_field()
      xJ_abs(:,:,:) = 0.0_dp
      J0 = 0.0_dp
   endif
-  if (lmcfost_lib) xN_abs(:,:,:) = 0.0_dp
+  if (lsave_n_packet_per_cell) xN_abs(:,:,:) = 0.0_dp
 
 !  E_stars = 0.0 ; E_disk = 0.0 ; E_ISM = 0.0
 !
