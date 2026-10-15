@@ -272,6 +272,8 @@ def test_pola(model_name, wl):
         mask_threshold = 1e-32
     elif model_name == "ref4.1_PAH":
         mask_threshold = 1e-28
+    elif model_name == "ref4.1_hydrostatic":
+        mask_threshold = 1e-28
     else:
         mask_threshold = 1e-21
 
