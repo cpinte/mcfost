@@ -1097,7 +1097,18 @@ subroutine redistribute_dust_column(i,k,p_l,gas_shape,correct_strat_l,lwarned_un
 
   N_new = 0.0_dp
   do j=1, nz
-     new_density(j) = gas_shape(j)**correct_strat_l
+     ! Guard the zero-base case explicitly rather than relying on 0**y semantics :
+     ! correct_strat_l is always > 0 in practice (1 from the no-settling branches, or
+     ! >0 from the settling_type 1/2 formulas above), so 0**correct_strat_l is itself
+     ! well-defined (0.0) even under strict FPE trapping (ifort -fpe0 debug builds).
+     ! This guard instead protects against a pathological negative correct_strat_l
+     ! (e.g. a user-supplied negative alpha_viscosity in the settling_type 2 formula),
+     ! where 0**(negative) is a division by zero, and makes "no gas -> no dust" exact.
+     if (gas_shape(j) > 0.0_dp) then
+        new_density(j) = gas_shape(j)**correct_strat_l
+     else
+        new_density(j) = 0.0_dp
+     endif
      N_new = N_new + new_density(j) * cell_height(i,j)
   enddo
 

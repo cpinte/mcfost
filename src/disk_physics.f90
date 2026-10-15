@@ -18,6 +18,10 @@ module disk_physics
   character(len=32) :: sublimationFile = "sublimation_radius.txt"
   real(kind=dp), parameter :: sub_factor = 1.6_dp
 
+  ! Surface density snapshot taken on the first hydrostatic iteration,
+  ! freed by free_hydrostatic once the iterations are complete
+  real(kind=dp), allocatable, dimension(:,:), private :: Sigma_gas_target
+
 contains
 
 
@@ -270,7 +274,6 @@ subroutine equilibre_hydrostatique()
 
   real(kind=dp), dimension(nz) :: rho, ln_rho, Tsmooth
   real(kind=dp) :: dz_local, dTdz, fac1, fac2, M_stars, M_mol, total_sum, cst
-  real(kind=dp), save, allocatable, dimension(:,:) :: Sigma_gas_target
   integer :: i,j, k, icell, alloc_status
 
   real(kind=dp), parameter :: hydro_relax = 0.3_dp ! under-relaxation factor for the gas density update
@@ -386,6 +389,18 @@ subroutine equilibre_hydrostatique()
   return
 
 end subroutine equilibre_hydrostatique
+
+!**********************************************************
+
+subroutine free_hydrostatic()
+  ! Releases the hydrostatic state so that a subsequent run in the same
+  ! process takes a fresh surface density snapshot
+
+  if (allocated(Sigma_gas_target)) deallocate(Sigma_gas_target)
+
+  return
+
+end subroutine free_hydrostatic
 
 
 !**********************************************************

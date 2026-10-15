@@ -563,6 +563,7 @@ subroutine dust_transfer_sub()
      endif
 
      if (allocated(Tdust_hydro_prev)) deallocate(Tdust_hydro_prev)
+     call free_hydrostatic()
      if (allocated(N_packets_hydro_prev)) deallocate(N_packets_hydro_prev)
   endif
 
