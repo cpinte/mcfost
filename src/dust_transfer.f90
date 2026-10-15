@@ -387,6 +387,7 @@ subroutine dust_transfer_sub()
   logical :: lconverged
   real :: max_dT_o_T, mean_dT_o_T, mean_precision, rel_diff
   real :: n_packets_cur, n_packets_prev, sigma_dT_o_T, effective_precision
+  real(kind=dp) :: density_residual
   real, allocatable, dimension(:) :: Tdust_hydro_prev, N_packets_hydro_prev
   real, parameter :: hydrostatic_precision = 5.e-2 ! relative Tdust tolerance, same as the nRE convergence check (Temp_nRE)
   ! Monte Carlo photon-noise floor on the per-cell test (Min et al. 2009, A&A 497, 155): for a
@@ -451,6 +452,7 @@ subroutine dust_transfer_sub()
         if (lhydrostatic) then
            if (iter == 1 .and. start_iter == 1) then
               lconverged = .false. ! always perform at least one hydrostatic update on fresh run
+              density_residual = 0.0_dp
               max_dT_o_T = 0.0
               mean_dT_o_T = 0.0
               mean_precision = 0.0
@@ -505,13 +507,21 @@ subroutine dust_transfer_sub()
                  max_i = 0
                  max_j = 0
               endif
+
+              ! Tdust alone can settle while the density is still relaxing towards
+              ! its hydrostatic profile (the under-relaxed update only closes ~30%
+              ! of the gap per iteration), which would make the final structure
+              ! depend on the iteration at which the loop stops : also require the
+              ! density to match the profile implied by the current Tdust.
+              call equilibre_hydrostatique(density_residual, lapply=.false.)
+              if (density_residual > hydro_density_precision) lconverged = .false.
            endif
 
            if (lconverged) then
               write(*,'(" Hydrostatic equilibrium converged after ", i0, " iteration(s): max |dT|/T = ", f7.4, &
                    & " at (i=", i0, ", j=", i0, ") (target: ", f6.4, ", noise-adjusted mean target: ", f6.4, &
-                   & "), mean = ", f7.4)') &
-                   iter, max_dT_o_T, max_i, max_j, hydrostatic_precision, mean_precision, mean_dT_o_T
+                   & "), mean = ", f7.4, ", density residual = ", f7.4)') &
+                   iter, max_dT_o_T, max_i, max_j, hydrostatic_precision, mean_precision, mean_dT_o_T, density_residual
            else
               Tdust_hydro_prev(:) = Tdust(:)
               N_packets_hydro_prev(:) = sum(xN_abs(:,1,:), dim=2)
@@ -522,16 +532,16 @@ subroutine dust_transfer_sub()
                     write(*,'(" Updating hydrostatic equilibrium (iteration ", i0, ")'//new_line('A') &
                          //' max |dT|/T = ", f7.4, &
                          & " at (i=", i0, ", j=", i0, ") (target: ", f6.4, ", noise-adjusted mean target: ", f6.4, &
-                         & "), mean = ", f7.4)') &
-                         iter, max_dT_o_T, max_i, max_j, hydrostatic_precision, mean_precision, mean_dT_o_T
+                         & "), mean = ", f7.4, ", density residual = ", f7.4)') &
+                         iter, max_dT_o_T, max_i, max_j, hydrostatic_precision, mean_precision, mean_dT_o_T, density_residual
                  endif
                  call equilibre_hydrostatique()
                  call recompute_opacities()
               else
                  write(*,'(" WARNING: hydrostatic equilibrium did not converge after ", i0, " iterations: max |dT|/T = ", &
                       & f7.4, " at (i=", i0, ", j=", i0, ") (target: ", f6.4, ", noise-adjusted mean target: ", f6.4, &
-                      & "), mean = ", f7.4)') &
-                      n_iter_max, max_dT_o_T, max_i, max_j, hydrostatic_precision, mean_precision, mean_dT_o_T
+                      & "), mean = ", f7.4, ", density residual = ", f7.4)') &
+                      n_iter_max, max_dT_o_T, max_i, max_j, hydrostatic_precision, mean_precision, mean_dT_o_T, density_residual
               endif
            endif
 

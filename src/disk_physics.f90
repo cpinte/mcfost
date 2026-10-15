@@ -12,6 +12,7 @@ module disk_physics
   use temperature
   use cylindrical_grid
   use parameters
+  use sort, only : find_kth_smallest
 
   implicit none
 
@@ -21,6 +22,11 @@ module disk_physics
   ! Surface density snapshot taken on the first hydrostatic iteration,
   ! freed by free_hydrostatic once the iterations are complete
   real(kind=dp), allocatable, dimension(:,:), private :: Sigma_gas_target
+
+  ! Hydrostatic density convergence : cells below this fraction of their
+  ! column midplane density are excluded from the residual
+  real(kind=dp), parameter :: hydro_residual_floor = 1.0e-3_dp
+  real(kind=dp), parameter :: hydro_density_precision = 5.0e-2_dp
 
 contains
 
@@ -252,10 +258,16 @@ end subroutine sublimate_dust
 
 !**********************************************************
 
-subroutine equilibre_hydrostatique()
+subroutine equilibre_hydrostatique(density_residual, lapply)
   ! Compute hydrostatic equilibrium for the gas, then re-derive the dust
   ! vertical distribution consistently with the new gas structure
   ! (see redistribute_dust_hydrostatic in density.f90).
+  !
+  ! density_residual returns the 95th percentile of |ln(rho_target/rho)| over
+  ! the cells denser than hydro_residual_floor x their column midplane
+  ! density, ie how far the current density is from the hydrostatic profile
+  ! set by the current Tdust. With lapply=.false. the density is left
+  ! untouched and only the residual is computed (convergence test).
   !
   ! Equation 2.4.3 of the thesis (page 38, 52 of the PDF)
   ! Valid for a geometrically thin, non-self-gravitating perfect gas disk.
@@ -272,12 +284,20 @@ subroutine equilibre_hydrostatique()
   ! (conserving the surface density of each column), and coupled the
   ! dust settling to the new structure : C. Pinte, 08/2026
 
+  real(kind=dp), intent(out), optional :: density_residual
+  logical, intent(in), optional :: lapply
+
   real(kind=dp), dimension(nz) :: rho, ln_rho, Tsmooth
-  real(kind=dp) :: dz_local, dTdz, fac1, fac2, M_stars, M_mol, total_sum, cst
-  integer :: i,j, k, icell, alloc_status
+  real(kind=dp) :: dz_local, dTdz, fac1, fac2, M_stars, M_mol, total_sum, cst, rho_target, rho_mid
+  real(sp), dimension(:), allocatable :: residual
+  integer :: i,j, k, icell, alloc_status, n_res
+  logical :: lupdate
 
   real(kind=dp), parameter :: hydro_relax = 0.3_dp ! under-relaxation factor for the gas density update
   real(kind=dp), parameter :: min_decline_fraction = 0.3_dp ! floor on the vertical decline rate, as a fraction of the gravity-only rate
+
+  lupdate = .true.
+  if (present(lapply)) lupdate = lapply
 
   if (lVoronoi.or.lspherical.or.l3D) then
      call error("Hydrostatic equilibrium is only implemented for a cylindrical grid", &
@@ -316,6 +336,10 @@ subroutine equilibre_hydrostatique()
         enddo
      enddo
   endif
+
+  allocate(residual(n_cells), stat=alloc_status)
+  if (alloc_status > 0) call error("Allocation error residual")
+  n_res = 0
 
   do k=1, n_az
      do i=1, n_rad
@@ -359,6 +383,19 @@ subroutine equilibre_hydrostatique()
         enddo
 
         if (total_sum > tiny_dp) then
+           ! Distance to the hydrostatic profile, restricted to the cells
+           ! that carry the column's mass and optical depth : the tenuous
+           ! upper atmosphere is too noisy to converge cell by cell.
+           rho_mid = gas_density(cell_map(i,1,k))
+           do j = 1, nz
+              icell = cell_map(i,j,k)
+              rho_target = rho(j) * Sigma_gas_target(i,k) / total_sum
+              if ((gas_density(icell) > hydro_residual_floor * rho_mid) .and. (rho_target > 0.0_dp)) then
+                 n_res = n_res + 1
+                 residual(n_res) = real(abs(log(rho_target / gas_density(icell))), sp)
+              endif
+           enddo
+
            ! Under-relaxation : Tdust is only known from a noisy MC estimate,
            ! and dTdz feeds into an exponential, cumulative integral, so a
            ! small temperature fluctuation (worst near the inner edge, where
@@ -367,16 +404,29 @@ subroutine equilibre_hydrostatique()
            ! the previous profile damps this without biasing the converged
            ! solution : both profiles integrate to the same Sigma_gas_target,
            ! so the blend does too.
-           do j = 1, nz
-              icell = cell_map(i,j,k)
-              gas_density(icell) = (1.0_dp-hydro_relax) * gas_density(icell) + &
-                   hydro_relax * (rho(j) * Sigma_gas_target(i,k) / total_sum)
-           enddo
-           gas_density_midplane(i,k) = gas_density(cell_map(i,1,k))
+           if (lupdate) then
+              do j = 1, nz
+                 icell = cell_map(i,j,k)
+                 gas_density(icell) = (1.0_dp-hydro_relax) * gas_density(icell) + &
+                      hydro_relax * (rho(j) * Sigma_gas_target(i,k) / total_sum)
+              enddo
+              gas_density_midplane(i,k) = gas_density(cell_map(i,1,k))
+           endif
         endif
 
      enddo !i
   enddo !k
+
+  if (present(density_residual)) then
+     if (n_res > 0) then
+        density_residual = find_kth_smallest(max(1,nint(0.95*n_res)), residual(1:n_res))
+     else
+        density_residual = 0.0_dp
+     endif
+  endif
+  deallocate(residual)
+
+  if (.not.lupdate) return
 
   do icell=1, n_cells
      gas_mass(icell) = gas_density(icell) * volume(icell) * mu_mH * AU3_to_m3
