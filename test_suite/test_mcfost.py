@@ -112,6 +112,36 @@ def test_SED(model_name):
     assert MC_similar(SED_ref,SED,threshold=threshold)
 
 @pytest.mark.parametrize("model_name", model_list)
+def test_SED_mc(model_name):
+    # Re-use the previous mcfost model
+    # Step-2 MC SED: catches step-1 photons leaking into step 2 (lsed_complete)
+
+    # Read the results
+    SED_name = model_name+"/data_th/sed_mc.fits.gz"
+    if (not os.path.isfile("test_data/"+SED_name)):
+        pytest.skip("No reference MC SED found")
+    SED = fits.getdata(test_dir+"/"+SED_name)[0,:,:,:]
+    SED_ref = fits.getdata("test_data/"+SED_name)[0,:,:,:]
+
+    print("Maximum MC SED difference", (abs(SED-SED_ref)/(SED_ref+1e-30)).max())
+    print("Mean MC SED difference   ", (abs(SED-SED_ref)/(SED_ref+1e-30)).mean())
+
+    assert MC_similar(SED_ref,SED,threshold=0.15)
+
+@pytest.mark.parametrize("model_name", model_list)
+def test_SED_th(model_name):
+    # Re-use the previous mcfost model
+    # Step-1 SED must not be written empty (e.g. after hydrostatic iterations)
+
+    SED_name = model_name+"/data_th/.sed_th.fits.gz"
+    if (not os.path.isfile(test_dir+"/"+SED_name)):
+        pytest.skip("No step-1 SED found")
+    SED = fits.getdata(test_dir+"/"+SED_name)
+
+    assert np.isfinite(SED).all()
+    assert SED.max() > 0.0
+
+@pytest.mark.parametrize("model_name", model_list)
 def test_SED_contrib(model_name):
     # Re-use the previous mcfost model
 

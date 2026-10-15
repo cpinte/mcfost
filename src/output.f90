@@ -164,6 +164,21 @@ end subroutine deallocate_sed
 
 !**********************************************************************
 
+subroutine reset_sed()
+  ! SED arrays accumulate additively in capteur, so they must be zeroed
+  ! before each step-1 calculation and once step 1 has been written,
+  ! otherwise step 2 (lsed_complete) inherits the step-1 photons.
+
+  sed=0.0; sed_q=0.0 ; sed_u=0.0 ; sed_v=0.0
+  n_phot_sed=0.0; n_phot_envoyes=0.0
+  sed_star=0.0 ; sed_star_scat=0.0 ; sed_disk=0.0 ; sed_disk_scat=0.0
+
+  return
+
+end subroutine reset_sed
+
+!**********************************************************************
+
 subroutine allocate_mol_maps(imol)
 
   integer, intent(in) :: imol

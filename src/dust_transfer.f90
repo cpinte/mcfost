@@ -553,6 +553,7 @@ subroutine dust_transfer_sub()
            call ecriture_temperature(1)
            call ecriture_sed(1)
         endif
+        call reset_sed() ! for the next step
         if (lapprox_diffusion .and. l_is_dark_zone .and. &
            (lemission_mol .or. lprodimo .or. lML .or. lforce_diff_approx .or. lemission_atom)) then
            call Temp_approx_diffusion_vertical()
@@ -728,6 +729,10 @@ subroutine run_thermal_mc(lwrite_output)
   ! Reset energy and temperature arrays for clean iteration state
   call reset_radiation_field()
   call reset_temperature()
+  ! With lhydrostatic, run_thermal_mc is called once per iteration with
+  ! lwrite_output=.false.: the SED is reset here so iterations do not accumulate,
+  ! and kept at the end so dust_transfer_sub can write the converged one.
+  call reset_sed()
 
   laffichage = .true.
   n_photons2 = n_photons_eq_th
@@ -796,9 +801,7 @@ subroutine run_thermal_mc(lwrite_output)
   endif
 
   ! Reset for the next step
-  sed=0.0; sed_q=0.0 ; sed_u=0.0 ; sed_v=0.0
-  n_phot_sed=0.0;  n_phot_sed2=0.0; n_phot_envoyes=0.0
-  sed_star=0.0 ; sed_star_scat=0.0 ; sed_disk=0.0 ; sed_disk_scat=0.0
+  if (lwrite) call reset_sed()
 
   call system_clock(time_end)
   if (time_end < time_begin) then
