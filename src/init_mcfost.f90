@@ -1755,6 +1755,16 @@ subroutine initialisation_mcfost()
 
   if ((.not.lmono0).and.llimb_darkening) call error("Limb darkening only implementing in imaging mode")
 
+  ! Hydrostatic equilibrium : combinations that are not supported yet
+  if (lhydrostatic) then
+     ! the dust redistribution would refill the sublimated cells at every iteration
+     if (ldust_sublimation) call error("Hydrostatic equilibrium is not compatible with dust sublimation yet")
+     ! the gas of all zones is reshaped into a disk profile, but the dust of
+     ! envelope, debris and wall zones is left untouched
+     if (any(disk_zone(1:n_zones)%geometry > 2)) &
+          call error("Hydrostatic equilibrium only works with disk zones (power-law or tapered-edge)")
+  endif
+
   if ((ltemp.or.lsed.or.lsed_complete).and.(.not.lstop_after_init)) then
      write(*,*) "Thermal equilibrium calculation"
      if (lmono) then
@@ -2188,9 +2198,9 @@ subroutine save_data(para,base_para)
 
   if (lonly_diff_approx) return
 
-  if (lhydrostatic .and. (.not. is_dir(trim(root_dir)//"/data_disk"))) then
-     write (*,*) 'Creating directory '//trim(root_dir)//'/data_disk'
-     cmd = 'mkdir -p '//trim(root_dir)//'/data_disk'
+  if (lhydrostatic .and. (.not. is_dir(trim(root_dir)//"/"//trim(seed_dir)//"/data_disk"))) then
+     write (*,*) 'Creating directory '//trim(root_dir)//'/'//trim(seed_dir)//'/data_disk'
+     cmd = 'mkdir -p '//trim(root_dir)//'/'//trim(seed_dir)//'/data_disk'
      call system_call(cmd, syst_status)
   endif
 

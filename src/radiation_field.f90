@@ -194,7 +194,15 @@ subroutine deallocate_radiation_field()
   if (allocated(xJ_abs)) deallocate(xJ_abs,J0)
   ! xN_abs is left alone in library mode: it is owned by mcfost2phantom and must
   ! survive across the repeated run_mcfost_phantom calls made from Phantom.
-  if (allocated(xN_abs) .and. .not. lmcfost_lib) deallocate(xN_abs)
+  ! In ProDiMo mode it is owned by setup_ProDiMo and used in step 2 : only clear
+  ! the step-1 packet counts.
+  if (allocated(xN_abs) .and. .not. lmcfost_lib) then
+     if (lProDiMo) then
+        xN_abs = 0.0
+     else
+        deallocate(xN_abs)
+     endif
+  endif
 
   return
 

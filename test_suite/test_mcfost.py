@@ -325,3 +325,38 @@ def test_contrib(model_name, wl):
         threshold=0.13
 
     assert MC_similar(image_ref,image,threshold=threshold,mask_threshold=mask_threshold)
+
+
+def test_prodimo():
+    # ProDiMo mode must run through step 2 (xN_abs is owned by setup_ProDiMo)
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    root_dir = "ref3.0_prodimo"
+    clean_results(root_dir)
+    filename = "test_data/ref3.0/ref3.0.para"
+    result = subprocess.call((_mcfost_bin+" "+filename+" -prodimo -root_dir "+root_dir).split())
+    assert result == 0
+    assert len(glob.glob(root_dir+"/data_ProDiMo*/forProDiMo.fits.gz")) > 0
+
+
+def test_hydrostatic_restart():
+    # Restarting a hydrostatic model past n_iter_physics must still produce a
+    # temperature and step-1 SED, instead of writing empty arrays
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    model_name = "ref4.1_hydrostatic"
+    if (not os.path.isfile(model_name+"/data_th/Temperature_iter0001.fits.gz")):
+        pytest.skip("No hydrostatic run to restart from")
+    root_dir = model_name+"_restart"
+    clean_results(root_dir)
+    shutil.copytree(model_name, root_dir)
+    filename = "test_data/"+model_name+"/"+model_name+".para"
+    result = subprocess.call((_mcfost_bin+" "+filename+" -n_iter_physics 1 -root_dir "+root_dir).split())
+    assert result == 0
+
+    SED = fits.getdata(root_dir+"/data_th/.sed_th.fits.gz")
+    assert SED.max() > 0.0
+
+    T = fits.getdata(root_dir+"/data_th/Temperature.fits.gz")
+    T_ref = fits.getdata("test_data/"+model_name+"/data_th/Temperature.fits.gz")
+    assert MC_similar(T_ref,T,threshold=0.05)

@@ -450,7 +450,7 @@ function find_latest_hydro_iteration() result(latest)
   do iter = 1, 9999
      write(iter_str, '(i4.4)') iter
      filename = trim(root_dir)//"/"//trim(seed_dir)//"/data_th/Temperature_iter"//trim(iter_str)//".fits.gz"
-     filename_dens = trim(root_dir)//"/data_disk/gas_density_iter"//trim(iter_str)//".fits.gz"
+     filename_dens = trim(root_dir)//"/"//trim(seed_dir)//"/data_disk/gas_density_iter"//trim(iter_str)//".fits.gz"
      inquire(file=trim(filename), exist=lexist)
      inquire(file=trim(filename_dens), exist=lexist_dens)
      ! Both temperature and density files must exist for an iteration to be valid
@@ -486,7 +486,7 @@ subroutine read_gas_density_hydro_iter(iter)
   integer :: i, k, icell
 
   write(iter_str, '(i4.4)') iter
-  filename = trim(root_dir)//"/data_disk/gas_density_iter"//trim(iter_str)//".fits.gz"
+  filename = trim(root_dir)//"/"//trim(seed_dir)//"/data_disk/gas_density_iter"//trim(iter_str)//".fits.gz"
   write(*,*) "Reading gas density from: "//trim(filename)
 
   status = 0

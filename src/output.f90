@@ -2936,8 +2936,8 @@ subroutine ecriture_gas_density_hydro_iter(iter)
   write(iter_str, '(i4.4)') iter
 
   ! Ensure data_disk directory exists
-  if (.not. is_dir(trim(root_dir)//"/data_disk")) then
-     cmd = "mkdir -p "//trim(root_dir)//"/data_disk"
+  if (.not. is_dir(trim(root_dir)//"/"//trim(seed_dir)//"/data_disk")) then
+     cmd = "mkdir -p "//trim(root_dir)//"/"//trim(seed_dir)//"/data_disk"
      call system_call(cmd, syst_status)
   endif
 
@@ -2969,7 +2969,7 @@ subroutine ecriture_gas_density_hydro_iter(iter)
   endif
 
   ! 1. Write per-iteration snapshot: gas_density_iterNNNN.fits.gz
-  filename = "!"//trim(root_dir)//"/data_disk/gas_density_iter"//trim(iter_str)//".fits.gz"
+  filename = "!"//trim(root_dir)//"/"//trim(seed_dir)//"/data_disk/gas_density_iter"//trim(iter_str)//".fits.gz"
   status = 0
   call ftgiou(unit, status)
   call ftinit(unit, trim(filename), blocksize, status)
@@ -2984,7 +2984,7 @@ subroutine ecriture_gas_density_hydro_iter(iter)
   if (status > 0) call print_error(status)
 
   ! 2. Update canonical file: gas_density.fits.gz
-  filename = "!"//trim(root_dir)//"/data_disk/gas_density.fits.gz"
+  filename = "!"//trim(root_dir)//"/"//trim(seed_dir)//"/data_disk/gas_density.fits.gz"
   status = 0
   call ftgiou(unit, status)
   call ftinit(unit, trim(filename), blocksize, status)

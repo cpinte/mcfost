@@ -433,7 +433,11 @@ subroutine dust_transfer_sub()
               write(*,*) "Continuing from iteration", start_iter
            else
               write(*,*) "Maximum iterations (", n_iter_max, ") already reached in previous run."
-              write(*,*) "Thermal & density structure are converged/final."
+              write(*,*) "Computing temperature and SED on the saved structure (no density update)."
+              ! The loop must still run once : the outputs written after it (temperature,
+              ! SED, nLTE/nRE temperatures) need a thermal MC run on the restored structure.
+              ! With iter == n_iter_max, the density is not updated.
+              n_iter_max = start_iter
            endif
            write(*,*) ""
         endif
