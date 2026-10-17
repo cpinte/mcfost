@@ -165,8 +165,13 @@ contains
     fUV_ProDiMo = star(1)%fUV
     slope_UV_ProDiMo = star(1)%slope_UV
 
+    ! With lhydrostatic, xN_abs(Nc,1,nb_proc) has already been allocated for the
+    ! step-1 packet counts : replace it by the ProDiMo-sized array, which also
+    ! holds those counts in its first wavelength slot.
+    if (allocated(xN_abs)) deallocate(xN_abs)
     allocate(xN_abs(n_cells,n_lambda2,nb_proc),  stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error xN_abs')
+    xN_abs = 0.0
 
     allocate(J_ProDiMo(n_lambda2,n_rad,nz),  stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error J_ProDiMo')

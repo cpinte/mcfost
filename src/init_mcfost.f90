@@ -32,6 +32,7 @@ subroutine set_default_variables()
 
   n_zones=1
   lmcfost_lib = .false.
+  lsave_n_packet_per_cell = .false.
 
   ! For parallel code
   !$omp parallel default(none) &
@@ -1235,6 +1236,14 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*) n_T_opt
         i_arg = i_arg + 1
+     case("-n_iter_physics","-n_iter","-max_iter_physics")
+        i_arg = i_arg + 1
+        if (i_arg > n_args) call error("number of iterations needed for -n_iter_physics")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) n_iter_physics
+        if (ios /= 0 .or. n_iter_physics < 1) call error("invalid value for -n_iter_physics")
+        write(*,*) "Setting maximum physics iterations =", n_iter_physics
+        i_arg = i_arg + 1
      case("-limb_darkening")
         i_arg = i_arg + 1
         llimb_darkening = .true.
@@ -1746,6 +1755,16 @@ subroutine initialisation_mcfost()
 
   if ((.not.lmono0).and.llimb_darkening) call error("Limb darkening only implementing in imaging mode")
 
+  ! Hydrostatic equilibrium : combinations that are not supported yet
+  if (lhydrostatic) then
+     ! the dust redistribution would refill the sublimated cells at every iteration
+     if (ldust_sublimation) call error("Hydrostatic equilibrium is not compatible with dust sublimation yet")
+     ! the gas of all zones is reshaped into a disk profile, but the dust of
+     ! envelope, debris and wall zones is left untouched
+     if (any(disk_zone(1:n_zones)%geometry > 2)) &
+          call error("Hydrostatic equilibrium only works with disk zones (power-law or tapered-edge)")
+  endif
+
   if ((ltemp.or.lsed.or.lsed_complete).and.(.not.lstop_after_init)) then
      write(*,*) "Thermal equilibrium calculation"
      if (lmono) then
@@ -1984,6 +2003,7 @@ subroutine display_help()
   write(*,*) "        : -ISM_heating : includes heating by ISM radiation"
   write(*,*) "        : -chi_ISM <chi> : changes the chi of ISM radiation (default: 1)"
   write(*,*) "        : -no_internal_energy : ignoring internal energy in Phantom dumps"
+  write(*,*) "        : -n_iter_physics <n> : maximum number of iterations for physics loops (e.g. hydrostatic, default : 100)"
   write(*,*) " "
   write(*,*) " Options related to disk structure"
   write(*,*) "        : -disk_struct : computes the density structure and stops:"
@@ -2178,6 +2198,12 @@ subroutine save_data(para,base_para)
 
   if (lonly_diff_approx) return
 
+  if (lhydrostatic .and. (.not. is_dir(trim(root_dir)//"/"//trim(seed_dir)//"/data_disk"))) then
+     write (*,*) 'Creating directory '//trim(root_dir)//'/'//trim(seed_dir)//'/data_disk'
+     cmd = 'mkdir -p '//trim(root_dir)//'/'//trim(seed_dir)//'/data_disk'
+     call system_call(cmd, syst_status)
+  endif
+
   if (lmono0) then
      etape_start=1
      etape_end=1
@@ -2209,10 +2235,20 @@ subroutine save_data(para,base_para)
         if (is_dir(trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(local_basename_data_dir))) then
            ! the data folder exists
            lnew_run = .true.
-           lmove_data=.true.
+           lmove_data = .true.
+
+           ! If continuing hydrostatic iterations, do not back up / wipe data_th
+           if (lhydrostatic .and. (trim(local_basename_data_dir) == "data_th")) then
+              if (is_file(trim(local_data_dir)//"/Temperature_iter0001.fits.gz")) then
+                 lmove_data = .false.
+                 lnew_run = .false.
+                 write(*,*) "Detected existing hydrostatic iterations in "//trim(local_data_dir)
+                 write(*,*) "Continuing iterations without moving directory."
+              endif
+           endif
         else ! the data folder does not exist
-           lnew_run=.true.
-           lmove_data=.false.
+           lnew_run = .true.
+           lmove_data = .false.
         endif ! if there is a data folder
      else
         lnew_run = .true. ! the data folder does not exist

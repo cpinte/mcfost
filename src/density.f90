@@ -20,7 +20,7 @@ module density
   public :: gas_density, gas_mass, surface_density, gas_density_midplane, dust_density_o_n_grains, dust_mass, icell_not_empty, &
        define_density, define_density_wall3d, define_dust_density, read_density_file, check_density_file_Voronoi_variable_dust, &
        densite_seb_charnoz2, densite_seb_charnoz, remove_species, read_sigma_file, normalize_dust_density, &
-       reduce_density, read_Voronoi_fits_file, find_non_empty_cell
+       reduce_density, read_Voronoi_fits_file, find_non_empty_cell, redistribute_dust_hydrostatic
 
   private
 
@@ -918,6 +918,219 @@ subroutine define_dust_density()
   return
 
 end subroutine define_dust_density
+
+!*************************************************************
+
+subroutine redistribute_dust_hydrostatic()
+  ! Redistributes the dust density vertically to follow the current gas
+  ! density (gas_density), while keeping the dust mass in each radial
+  ! column (and for each grain size) unchanged. Called from
+  ! equilibre_hydrostatique() after the gas hydrostatic solve has updated
+  ! gas_density.
+  !
+  ! The vertical dust shape is generalised from the original
+  ! analytic_gaussian(z)**correct_strat(l) prescription used in
+  ! define_dust_density to gas_shape(z)**correct_strat(l), where gas_shape
+  ! is the (possibly non-Gaussian) numerical gas profile just computed, and
+  ! correct_strat(l) is the same per-grain settling factor as in
+  ! define_dust_density :
+  !  - settling_type = 1 (parametric power-law) : recomputed from grain size
+  !  - settling_type = 2 (Dubrulle) : recomputed from the updated gas density
+  !  - no settling (lvariable_dust with another settling_type, or
+  !    .not.lvariable_dust) : correct_strat = 1, dust simply follows the
+  !    new gas shape
+  ! settling_type = 3 (Fromang) has its own closed-form diffusion solution
+  ! that assumes an analytic Gaussian gas profile and cannot be generalised
+  ! this way : its dust is left unchanged here (a warning is issued once).
+  ! Only disk zones (geometry <= 2) are handled ; envelope/debris/wall
+  ! zones are left unchanged.
+  !
+  ! Limitation : if several zones overlap radially, the gas hydrostatic
+  ! solve (and hence this redistribution) works on the combined gas
+  ! density, not zone by zone.
+  !
+  ! C. Pinte, 08/2026
+
+  implicit none
+
+  integer :: i, k, l, pop, izone, icell_ref
+  real(kind=dp) :: rcyl, H, rho0, OmegaTau, gas_ref, h_H2, correct_strat_l
+  real(kind=dp), dimension(nz) :: gas_shape
+  type(disk_zone_type) :: dz
+  logical :: done_zone(n_zones)
+  logical, save :: lwarned_geom = .false., lwarned_type3 = .false., lwarned_unresolved = .false.
+
+  real(kind=dp), parameter :: gamma_settle = 2.0_dp ! turbulence exponent, 2 for compressible turbulence
+
+  done_zone(:) = .false.
+
+  do pop=1, n_pop
+     izone = dust_pop(pop)%zone
+     dz = disk_zone(izone)
+
+     if (dz%geometry > 2) then
+        if (.not.lwarned_geom) then
+           write(*,*) "WARNING: hydrostatic dust re-equilibration only supports disk zones (geometry <= 2)"
+           write(*,*) "Envelope/debris/wall zones are left unchanged"
+           lwarned_geom = .true.
+        endif
+        cycle
+     endif
+
+     if (lvariable_dust.and.(settling_type == 3)) then
+        if (.not.lwarned_type3) then
+           write(*,*) "WARNING: settling_type = 3 (Fromang) does not support hydrostatic dust re-equilibration"
+           write(*,*) "Only the gas density is updated ; the dust vertical profile is left unchanged"
+           lwarned_type3 = .true.
+        endif
+        cycle
+     endif
+
+     if (.not.lvariable_dust) then
+        if (done_zone(izone)) cycle
+        done_zone(izone) = .true.
+     endif
+
+     do i=1, n_rad
+        icell_ref = cell_map(i,1,1)
+        rcyl = r_grid(icell_ref)
+        H = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
+
+        do k=1, n_az
+           gas_ref = gas_density(cell_map(i,1,k))
+           if (gas_ref < tiny_dp) cycle ! outside the disk at this radius
+
+           call get_gas_shape(i,k,gas_ref,gas_shape)
+
+           if (lvariable_dust) then
+              do l=dust_pop(pop)%ind_debut, dust_pop(pop)%ind_fin
+
+                 if (settling_type == 1) then
+                    a_strat = max(a_strat,minval(r_grain))
+                    if (r_grain(l) > a_strat) then
+                       correct_strat_l = (r_grain(l)/a_strat)**exp_strat
+                    else
+                       correct_strat_l = 1.0_dp
+                    endif
+                 else if (settling_type == 2) then
+                    rho0 = gas_density_midplane(i,k)
+                    if (rho0 > tiny_dp) then
+                       OmegaTau = omega_tau(rho0,H,l)
+                       h_H2 = sqrt(1.0_dp/(1.0_dp+gamma_settle)) * alpha/OmegaTau
+                       correct_strat_l = (1.0_dp + h_H2) / h_H2
+                    else
+                       correct_strat_l = 1.0_dp
+                    endif
+                 else
+                    correct_strat_l = 1.0_dp
+                 endif
+
+                 call redistribute_dust_column(i,k,l,gas_shape,correct_strat_l,lwarned_unresolved)
+              enddo ! l
+           else
+              call redistribute_dust_column(i,k,izone,gas_shape,1.0_dp,lwarned_unresolved)
+           endif
+
+        enddo ! k
+     enddo ! i
+  enddo ! pop
+
+  ! Rescale back onto the exact target masses (dust_pop%mass), guards
+  ! against any floating-point drift accumulated over iterations, and
+  ! refreshes dust_mass and icell_not_empty.
+  call normalize_dust_density()
+
+  return
+
+end subroutine redistribute_dust_hydrostatic
+
+!*************************************************************
+
+subroutine get_gas_shape(i,k,gas_ref,gas_shape)
+  ! Normalised gas density profile along column (i,k), relative to the
+  ! innermost cell (j=1), used as the dust settling shape function.
+  !
+  ! Enforced to be monotonically non-increasing with height : a hydrostatic
+  ! passive disk is physically expected to be so, and this guards
+  ! gas_shape**correct_strat_l (used below for the more strongly settled
+  ! grains, where correct_strat_l can be large) against amplifying Monte
+  ! Carlo noise in the underlying Tdust field into a spurious density
+  ! spike -- raising even a small upward fluctuation to a large power can
+  ! otherwise dominate the column and starve every other cell of dust.
+
+  integer, intent(in) :: i, k
+  real(kind=dp), intent(in) :: gas_ref
+  real(kind=dp), dimension(nz), intent(out) :: gas_shape
+
+  integer :: j
+
+  gas_shape(1) = 1.0_dp
+  do j=2, nz
+     gas_shape(j) = max(0.0_dp, min(gas_density(cell_map(i,j,k)) / gas_ref, gas_shape(j-1)))
+  enddo
+
+  return
+
+end subroutine get_gas_shape
+
+!*************************************************************
+
+subroutine redistribute_dust_column(i,k,p_l,gas_shape,correct_strat_l,lwarned_unresolved)
+  ! Redistributes dust_density_o_n_grains(p_l,:) vertically within column
+  ! (i,k) to follow gas_shape(j)**correct_strat_l, keeping the
+  ! vertically-integrated dust mass in the column unchanged.
+
+  integer, intent(in) :: i, k, p_l
+  real(kind=dp), dimension(nz), intent(in) :: gas_shape
+  real(kind=dp), intent(in) :: correct_strat_l
+  logical, intent(inout) :: lwarned_unresolved
+
+  integer :: j
+  real(kind=dp) :: N_old, N_new
+  real(kind=dp), dimension(nz) :: new_density
+
+  N_old = 0.0_dp
+  do j=1, nz
+     N_old = N_old + dust_density_o_n_grains(p_l,cell_map(i,j,k)) * cell_height(i,j)
+  enddo
+  if (N_old < tiny_dp) return ! no dust of this species at this radius
+
+  N_new = 0.0_dp
+  do j=1, nz
+     ! Guard the zero-base case explicitly rather than relying on 0**y semantics :
+     ! correct_strat_l is always > 0 in practice (1 from the no-settling branches, or
+     ! >0 from the settling_type 1/2 formulas above), so 0**correct_strat_l is itself
+     ! well-defined (0.0) even under strict FPE trapping (ifort -fpe0 debug builds).
+     ! This guard instead protects against a pathological negative correct_strat_l
+     ! (e.g. a user-supplied negative alpha_viscosity in the settling_type 2 formula),
+     ! where 0**(negative) is a division by zero, and makes "no gas -> no dust" exact.
+     if (gas_shape(j) > 0.0_dp) then
+        new_density(j) = gas_shape(j)**correct_strat_l
+     else
+        new_density(j) = 0.0_dp
+     endif
+     N_new = N_new + new_density(j) * cell_height(i,j)
+  enddo
+
+  if (N_new > tiny_dp) then
+     do j=1, nz
+        dust_density_o_n_grains(p_l,cell_map(i,j,k)) = new_density(j) * N_old/N_new
+     enddo
+  else
+     ! Settling unresolved at this radius : put all the mass in the innermost cell
+     dust_density_o_n_grains(p_l,cell_map(i,1,k)) = N_old / cell_height(i,1)
+     do j=2, nz
+        dust_density_o_n_grains(p_l,cell_map(i,j,k)) = 0.0_dp
+     enddo
+     if (.not.lwarned_unresolved) then
+        write(*,*) "WARNING: vertical settling unresolved in hydrostatic dust update for some grains/radii"
+        lwarned_unresolved = .true.
+     endif
+  endif
+
+  return
+
+end subroutine redistribute_dust_column
 
 !*************************************************************
 

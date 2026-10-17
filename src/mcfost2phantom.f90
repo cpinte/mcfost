@@ -40,6 +40,7 @@ contains
     ! Global logical variables
     call set_default_variables()
     lmcfost_lib = .true.
+    lsave_n_packet_per_cell = .true. ! xN_abs is allocated below and used for n_packets(:) in run_mcfost_phantom
 
     if (present(keep_particles)) then
        SPH_keep_particles = keep_particles

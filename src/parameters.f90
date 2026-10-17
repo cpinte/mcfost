@@ -31,6 +31,7 @@ module parameters
   ! lvariable_dust = true if the dust properties are variable in each cell
   logical :: lvariable_dust, lmigration, lhydrostatic, ldust_sublimation
   integer :: settling_type ! 1 = Parametric, 2 = Dubrulle or 3 = Fromang
+  integer :: n_iter_physics = 100 ! Maximum iterations for physics loops (e.g. hydrostatic equilibrium)
 
   logical :: lRE_LTE, lRE_nLTE, lnRE, lonly_LTE, lonly_nLTE
   logical :: loutput_J, loutput_J_step1, loutput_UV_field, lxJ_abs, lxJ_abs_step1
@@ -133,6 +134,10 @@ module parameters
   logical :: laverage_grain_size, lisotropic, lno_scattering, lqsca_equal_qabs, lonly_diff_approx, lforce_diff_approx
   logical :: ldensity_file, lsigma_file, lvelocity_file, lphantom_file, lphantom_multi, lphantom_avg
   logical :: lgadget2_file, llimits_file, lforce_SPH_amin, lforce_SPH_amax, lmcfost_lib
+  ! Save the number of photon packets crossing each cell (xN_abs in radiation_field), so that
+  ! the Monte Carlo photon-counting noise on Tdust can be estimated (e.g. for the hydrostatic
+  ! equilibrium convergence test in dust_transfer_sub). Always on in library mode (lmcfost_lib).
+  logical :: lsave_n_packet_per_cell
   logical :: lweight_emission, lcorrect_density, lProDiMo2mcfost, lProDiMo2mcfost_test, lastrochem, lML
   logical :: lspot, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium, lchange_Tmax_PAH, lISM_heating, lcasa, lJy, lforce_Mgas
   integer :: ISR_model ! 0 : no ISM radiation field, 1 : ProDiMo, 2 : Bate & Keto

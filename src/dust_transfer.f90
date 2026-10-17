@@ -9,6 +9,7 @@ module dust_transfer
   use constants
   use scattering
   use grid
+  use cylindrical_grid, only : cell_map_i, cell_map_j
   use optical_depth
   use density
   use PAH
@@ -50,7 +51,7 @@ subroutine init_dust_transfer()
 
   integer :: lambda_threshold
   integer :: lambda, lambda0, p_lambda
-  integer :: i, p_icell
+  integer :: i, p_icell, latest_iter
   logical :: laffichage, lcompute_dust_prop
   real, allocatable, dimension(:) :: extra_heating
 
@@ -115,9 +116,32 @@ subroutine init_dust_transfer()
      if (lwall) call define_density_wall3D()
   endif
 
+  ! ── Restore hydrostatic density for post-processing (-img, -mol, SED) ──
+  ! When running in image/SED/mol mode on a hydrostatic model, the density
+  ! was just set from the parametric prescription. Override it with the
+  ! converged hydrostatic density so that post-processing is consistent.
+  if ((lmono .or. (.not.lTemp)) .and. lhydrostatic .and. (.not.lVoronoi)) then
+     latest_iter = find_latest_hydro_iteration()
+     if (latest_iter > 0) then
+        write(*,*) ""
+        write(*,*) "Restoring hydrostatic density from iteration", latest_iter, "for image/SED/mol"
+        call read_gas_density_hydro_iter(latest_iter)
+        call redistribute_dust_hydrostatic()
+        write(*,*) ""
+     else
+        call warning("lhydrostatic is set but no saved iteration found in data_th/")
+        call warning("Using parametric density for image/SED/mol calculation")
+     endif
+  endif
+
   call setup_scattering()
   ! Dynamic allocation of all other tables
   call alloc_dust_prop()
+
+  ! Enable per-cell photon-packet counting (xN_abs, in radiation_field) so the
+  ! hydrostatic equilibrium convergence test can estimate the Monte Carlo noise
+  ! level on Tdust from photon-counting statistics (Min et al. 2009, A&A 497, 155).
+  if (lhydrostatic) lsave_n_packet_per_cell = .true.
 
   call alloc_dynamique()
 
@@ -356,30 +380,178 @@ subroutine dust_transfer_sub()
   ! Main entry point for radiative transfer calculation
   ! C. Pinte
 
+  use radiation_field, only : xN_abs
   implicit none
 
-  integer :: iter, n_iter_physics
+  integer :: iter, n_iter_max, icell, start_iter, latest_iter, n_tested, icell_max, max_i, max_j
   logical :: lconverged
+  real :: max_dT_o_T, mean_dT_o_T, mean_precision, rel_diff
+  real :: n_packets_cur, n_packets_prev, sigma_dT_o_T, effective_precision
+  real(kind=dp) :: density_residual
+  real, allocatable, dimension(:) :: Tdust_hydro_prev, N_packets_hydro_prev
+  real, parameter :: hydrostatic_precision = 5.e-2 ! relative Tdust tolerance, same as the nRE convergence check (Temp_nRE)
+  ! Monte Carlo photon-noise floor on the per-cell test (Min et al. 2009, A&A 497, 155): for a
+  ! grey/LTE radiative-equilibrium temperature, T ~ E^(1/4), so the relative statistical noise on
+  ! Tdust from Poisson photon-counting statistics is ~ (1/4) x the relative noise on the absorbed
+  ! energy, itself ~ 1/sqrt(N_packets). A cell's effective tolerance is relaxed to hydrostatic_n_sigma
+  ! times this estimate when that exceeds hydrostatic_precision, capped at hydrostatic_precision_max,
+  ! and only once both iterations being compared have at least min_packets_for_noise_estimate packets
+  ! (xN_abs, populated when lsave_n_packet_per_cell is set); otherwise hydrostatic_precision applies as before.
+  real, parameter :: hydrostatic_n_sigma = 3.0
+  real, parameter :: hydrostatic_precision_max = 0.3
+  real, parameter :: min_packets_for_noise_estimate = 10.0
 
   call init_dust_transfer()
   if (lonly_diff_approx) return
 
   ! ── Thermal structure & Physics Iteration Loop ──
   if (letape_th) then
-     n_iter_physics = 1
-     if (lhydrostatic) n_iter_physics = 10 ! Max iterations for physics convergence
+     n_iter_max = 1
+     start_iter = 1
 
-     physics_loop : do iter = 1, n_iter_physics
-        call run_thermal_mc()
+     if (lhydrostatic) then
+        n_iter_max = n_iter_physics ! Default 100 or set via -n_iter_physics command line option
+        allocate(Tdust_hydro_prev(n_cells), N_packets_hydro_prev(n_cells))
+        N_packets_hydro_prev = 0.0 ! no noise estimate available yet: falls back to hydrostatic_precision
+
+        ! ── Restart detection: look for saved iterations ──
+        latest_iter = find_latest_hydro_iteration()
+        if (latest_iter > 0) then
+           write(*,*) ""
+           write(*,*) "Found previous hydrostatic state at iteration", latest_iter
+           call read_gas_density_hydro_iter(latest_iter)
+           call redistribute_dust_hydrostatic()
+           call recompute_opacities()
+           ! Restore T for convergence check in the next iteration
+           call read_Tdust_hydro_iter(latest_iter)
+           Tdust_hydro_prev(:) = Tdust(:)
+           ! Packet counts from the restored iteration were not saved to disk, so
+           ! N_packets_hydro_prev stays at 0 and the noise floor falls back to
+           ! hydrostatic_precision for the first comparison after a restart.
+           start_iter = latest_iter + 1
+           if (start_iter <= n_iter_max) then
+              write(*,*) "Continuing from iteration", start_iter
+           else
+              write(*,*) "Maximum iterations (", n_iter_max, ") already reached in previous run."
+              write(*,*) "Computing temperature and SED on the saved structure (no density update)."
+              ! The loop must still run once : the outputs written after it (temperature,
+              ! SED, nLTE/nRE temperatures) need a thermal MC run on the restored structure.
+              ! With iter == n_iter_max, the density is not updated.
+              n_iter_max = start_iter
+           endif
+           write(*,*) ""
+        endif
+     endif
+
+     physics_loop : do iter = start_iter, n_iter_max
+        if (lhydrostatic) then
+           call run_thermal_mc(lwrite_output=.false.)
+        else
+           call run_thermal_mc()
+        endif
 
         lconverged = .true.
 
         ! Physics iteration hook: Hydrostatic equilibrium
         if (lhydrostatic) then
-           write(*,*) "Updating hydrostatic equilibrium (iteration", iter, ")"
-           call equilibre_hydrostatique()
-           call recompute_opacities()
-           lconverged = .false. ! Architectural hook for convergence criteria
+           if (iter == 1 .and. start_iter == 1) then
+              lconverged = .false. ! always perform at least one hydrostatic update on fresh run
+              density_residual = 0.0_dp
+              max_dT_o_T = 0.0
+              mean_dT_o_T = 0.0
+              mean_precision = 0.0
+              max_i = 0
+              max_j = 0
+           else
+              ! Converged once Tdust has stopped moving between successive
+              ! MC realisations of the (now self-consistent) density structure.
+              ! Cells never illuminated stay at the reset_temperature() value
+              ! of 1 K and are excluded from the test.
+              lconverged = .true.
+              max_dT_o_T = 0.0
+              mean_dT_o_T = 0.0
+              mean_precision = 0.0
+              n_tested = 0
+              icell_max = 1
+              do icell=1, n_cells
+                 if (Tdust_hydro_prev(icell) > 1.0) then
+                    rel_diff = abs(Tdust(icell)-Tdust_hydro_prev(icell)) / Tdust_hydro_prev(icell)
+
+                    ! Estimate the Monte Carlo photon-noise floor for this cell and relax the
+                    ! tolerance up to it when it exceeds hydrostatic_precision (see declarations above).
+                    n_packets_cur  = sum(xN_abs(icell,1,:))
+                    n_packets_prev = N_packets_hydro_prev(icell)
+                    if (n_packets_cur >= min_packets_for_noise_estimate .and. &
+                         n_packets_prev >= min_packets_for_noise_estimate) then
+                       sigma_dT_o_T = 0.25 * sqrt(1.0/n_packets_cur + 1.0/n_packets_prev)
+                       effective_precision = min(max(hydrostatic_precision, hydrostatic_n_sigma * sigma_dT_o_T), &
+                            hydrostatic_precision_max)
+                    else ! not enough packets in one of the two iterations to trust a noise estimate
+                       effective_precision = hydrostatic_precision
+                    endif
+
+                    if (rel_diff > max_dT_o_T) then
+                       max_dT_o_T = rel_diff
+                       icell_max = icell
+                    endif
+                    mean_dT_o_T = mean_dT_o_T + rel_diff
+                    mean_precision = mean_precision + effective_precision
+                    n_tested = n_tested + 1
+                    if (rel_diff > effective_precision) lconverged = .false.
+                 endif
+              enddo
+              if (n_tested > 0) then
+                 mean_dT_o_T = mean_dT_o_T / real(n_tested)
+                 mean_precision = mean_precision / real(n_tested)
+              endif
+              if (allocated(cell_map_i) .and. allocated(cell_map_j)) then
+                 max_i = cell_map_i(icell_max)
+                 max_j = cell_map_j(icell_max)
+              else
+                 max_i = 0
+                 max_j = 0
+              endif
+
+              ! Tdust alone can settle while the density is still relaxing towards
+              ! its hydrostatic profile (the under-relaxed update only closes ~30%
+              ! of the gap per iteration), which would make the final structure
+              ! depend on the iteration at which the loop stops : also require the
+              ! density to match the profile implied by the current Tdust.
+              call equilibre_hydrostatique(density_residual, lapply=.false.)
+              if (density_residual > hydro_density_precision) lconverged = .false.
+           endif
+
+           if (lconverged) then
+              write(*,'(" Hydrostatic equilibrium converged after ", i0, " iteration(s): max |dT|/T = ", f7.4, &
+                   & " at (i=", i0, ", j=", i0, ") (target: ", f6.4, ", noise-adjusted mean target: ", f6.4, &
+                   & "), mean = ", f7.4, ", density residual = ", f7.4)') &
+                   iter, max_dT_o_T, max_i, max_j, hydrostatic_precision, mean_precision, mean_dT_o_T, density_residual
+           else
+              Tdust_hydro_prev(:) = Tdust(:)
+              N_packets_hydro_prev(:) = sum(xN_abs(:,1,:), dim=2)
+              if (iter < n_iter_max) then
+                 if (iter == 1 .and. start_iter == 1) then
+                    write(*,'(" Updating hydrostatic equilibrium (iteration ", i0, ")")') iter
+                 else
+                    write(*,'(" Updating hydrostatic equilibrium (iteration ", i0, ")'//new_line('A') &
+                         //' max |dT|/T = ", f7.4, &
+                         & " at (i=", i0, ", j=", i0, ") (target: ", f6.4, ", noise-adjusted mean target: ", f6.4, &
+                         & "), mean = ", f7.4, ", density residual = ", f7.4)') &
+                         iter, max_dT_o_T, max_i, max_j, hydrostatic_precision, mean_precision, mean_dT_o_T, density_residual
+                 endif
+                 call equilibre_hydrostatique()
+                 call recompute_opacities()
+              else
+                 write(*,'(" WARNING: hydrostatic equilibrium did not converge after ", i0, " iterations: max |dT|/T = ", &
+                      & f7.4, " at (i=", i0, ", j=", i0, ") (target: ", f6.4, ", noise-adjusted mean target: ", f6.4, &
+                      & "), mean = ", f7.4, ", density residual = ", f7.4)') &
+                      n_iter_max, max_dT_o_T, max_i, max_j, hydrostatic_precision, mean_precision, mean_dT_o_T, density_residual
+              endif
+           endif
+
+           ! Save per-iteration state for restart and inspection
+           call ecriture_temperature_hydro_iter(iter)
+           call ecriture_gas_density_hydro_iter(iter)
         endif
 
         ! Additional physics iteration hooks can be added here
@@ -387,6 +559,26 @@ subroutine dust_transfer_sub()
 
         if (lconverged) exit physics_loop
      enddo physics_loop
+
+     ! Write final converged temperature and SED once iterations are complete
+     if (lhydrostatic) then
+        call print_hydrostatic_scale_height()
+        if (.not. lmcfost_lib) then
+           call ecriture_temperature(1)
+           call ecriture_sed(1)
+        endif
+        call reset_sed() ! for the next step
+        if (lapprox_diffusion .and. l_is_dark_zone .and. &
+           (lemission_mol .or. lprodimo .or. lML .or. lforce_diff_approx .or. lemission_atom)) then
+           call Temp_approx_diffusion_vertical()
+           call diffusion_approx_nLTE_nRE()
+           if (.not. lmcfost_lib) call ecriture_temperature(2)
+        endif
+     endif
+
+     if (allocated(Tdust_hydro_prev)) deallocate(Tdust_hydro_prev)
+     call free_hydrostatic()
+     if (allocated(N_packets_hydro_prev)) deallocate(N_packets_hydro_prev)
   endif
 
   ! ── Dust Species Removal ──
@@ -448,7 +640,7 @@ subroutine mc_photon_loop(lambda_in, n_photons2, n_phot_lim, nnfot1_start, laffi
   !$omp private(id,icell,lpacket_alive,lintersect,p_nnfot2,nnfot2,n_phot_sed2,n_phot_envoyes_in_loop,rand) &
   !$omp private(x,y,z,u,v,w,Stokes,flag_star,flag_ISM,flag_scatt,capt,nnfot1) &
   !$omp shared(lambda_in, n_photons2, nnfot1_start,n_photons_loop,capt_sup,n_phot_lim,lscatt_ray_tracing1) &
-  !$omp shared(n_phot_envoyes,nb_proc,p_n_lambda_pos,n_lambda,l_p_lambda_is_lambda) &
+  !$omp shared(n_phot_envoyes,nb_proc,l_p_lambda_is_lambda) &
   !$omp shared(stream,laffichage,lmono,lmono0,lProDiMo,lML,letape_th,tab_lambda,n_photons_lambda, n_photons1_cumul,ibar) &
   !$omp reduction(+:E_abs_nRE)
   n_photons2_local = n_photons2
@@ -529,7 +721,7 @@ end subroutine mc_photon_loop
 
 !***********************************************************
 
-subroutine run_thermal_mc()
+subroutine run_thermal_mc(lwrite_output)
   ! Runs the thermal structure Monte Carlo calculation
   ! Iterates over non-equilibrium grains (nRE) if needed
   ! Calculates temperature structure and writes output
@@ -539,14 +731,23 @@ subroutine run_thermal_mc()
   use radiation_field, only : reset_radiation_field
   implicit none
 
+  logical, optional, intent(in) :: lwrite_output
+
   integer :: n_photons2, nnfot1_start, n_iter, itime, lambda
   real :: n_phot_lim, time
-  logical :: flag_em_nRE, laffichage
+  logical :: flag_em_nRE, laffichage, lwrite
   real(kind=dp) :: n_phot_sed2
+
+  lwrite = .true.
+  if (present(lwrite_output)) lwrite = lwrite_output
 
   ! Reset energy and temperature arrays for clean iteration state
   call reset_radiation_field()
   call reset_temperature()
+  ! With lhydrostatic, run_thermal_mc is called once per iteration with
+  ! lwrite_output=.false.: the SED is reset here so iterations do not accumulate,
+  ! and kept at the end so dust_transfer_sub can write the converged one.
+  call reset_sed()
 
   laffichage = .true.
   n_photons2 = n_photons_eq_th
@@ -601,13 +802,13 @@ subroutine run_thermal_mc()
      if (.not.letape_th) exit
   enddo
 
-  if (.not. lmcfost_lib) then
+  if ((.not. lmcfost_lib) .and. lwrite) then
      call ecriture_temperature(1)
      call ecriture_sed(1)
   endif
 
   if (lapprox_diffusion.and.l_is_dark_zone.and.&
-   (lemission_mol.or.lprodimo.or.lML.or.lforce_diff_approx.or.lemission_atom)) then
+   (lemission_mol.or.lprodimo.or.lML.or.lforce_diff_approx.or.lemission_atom).and.lwrite) then
      call Temp_approx_diffusion_vertical()
      ! call Temp_approx_diffusion()
      call diffusion_approx_nLTE_nRE()
@@ -615,9 +816,7 @@ subroutine run_thermal_mc()
   endif
 
   ! Reset for the next step
-  sed=0.0; sed_q=0.0 ; sed_u=0.0 ; sed_v=0.0
-  n_phot_sed=0.0;  n_phot_sed2=0.0; n_phot_envoyes=0.0
-  sed_star=0.0 ; sed_star_scat=0.0 ; sed_disk=0.0 ; sed_disk_scat=0.0
+  if (lwrite) call reset_sed()
 
   call system_clock(time_end)
   if (time_end < time_begin) then
