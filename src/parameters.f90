@@ -302,6 +302,7 @@ module parameters
 
      real(kind=dp) :: time
      character(len=128) :: filename
+     character(len=32) :: dataset_name
   end type athena_model
 
   type(athena_model) :: athena

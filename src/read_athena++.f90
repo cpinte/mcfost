@@ -35,6 +35,7 @@ contains
     alloc_status=0
 
     athena%filename = filename
+    athena%dataset_name = "prim"
 
     call open_hdf5file(filename,file_id,ierr)
     if (ierr /= 0) call error("cannot open athena HDF file "//trim(filename))
@@ -48,7 +49,11 @@ contains
     if (trim(coord) /= "spherical_polar") call error("mcfost can only read spherical_polar athena++ grids for now")
 
     call hdf_read_attribute(group_id,"", "DatasetNames",DatasetNames)
-    if (trim(DatasetNames) /= "prim") call error("mcfost can only read prim athena++ grids for now")
+    if (trim(DatasetNames) /= "prim" .and. trim(DatasetNames) /= "cons") then
+       call error("mcfost can only read prim or cons athena++ grids for now")
+    else
+       athena%dataset_name = trim(DatasetNames)
+    endif
 
     call hdf_read_attribute(group_id,"", "MaxLevel",Maxlevel)
     if (MaxLevel > 0) call error("mcfost can only read athena++ grids with MaxLevel=0 for now")
@@ -114,6 +119,7 @@ contains
     integer :: n_blocks
 
     integer :: ierr, alloc_status, n_variables, n_stars_old
+    integer :: var_offset, iv1, iv2, iv3
     integer(HID_T) :: file_id, group_id
 
     integer, dimension(3) :: block_size
@@ -238,8 +244,17 @@ contains
     call open_hdf5group(file_id,'/',group_id,ierr)
     if (ierr /= 0) call error("cannot open athena '/' group")
 
-    call hdf_read_attribute(group_id,"", "NumVariables",n_variables) ! rho, press, vel1, vel2, vel3
-    if (n_variables /= 5) call error("mcfost can only read athena++ grids with NumVariables=5 for now")
+    call hdf_read_attribute(group_id,"", "NumVariables",n_variables)
+    if (n_variables == 4) then
+       var_offset = 0
+    else if (n_variables == 5) then
+       var_offset = 1
+    else
+       call error("mcfost can only read athena++ grids with NumVariables=4 or 5")
+    endif
+    iv1 = 2 + var_offset
+    iv2 = 3 + var_offset
+    iv3 = 4 + var_offset
 
     call hdf_read_attribute(group_id,"", "MeshBlockSize",block_size)
     bs1 = block_size(1) ; bs2 = block_size(2) ; bs3 = block_size(3)
@@ -268,7 +283,7 @@ contains
     !write(*,*) logical_locations(:,n_blocks-1)
     !write(*,*) logical_locations(:,n_blocks)
 
-    call hdf_read_dataset(group_id,"prim",data)
+    call hdf_read_dataset(group_id,trim(athena%dataset_name),data)
     ! compare with python raw data --> ok
     !write(*,*) data(1,1,1,1,:)
     !write(*,*) data(2,1,1,1,:)
@@ -288,10 +303,17 @@ contains
        ju = jl + bs2
        ku = kl + bs3
 
-       rho(il+1:iu,jl+1:ju,kl+1:ku) = data(:,:,:,iblock,1)
-       vx1(il+1:iu,jl+1:ju,kl+1:ku) = data(:,:,:,iblock,3) ! vr
-       vx2(il+1:iu,jl+1:ju,kl+1:ku) = data(:,:,:,iblock,4) ! vtheta
-       vx3(il+1:iu,jl+1:ju,kl+1:ku) = data(:,:,:,iblock,5) ! vphi
+       if (trim(athena%dataset_name) == "cons") then
+          rho(il+1:iu,jl+1:ju,kl+1:ku) = data(:,:,:,iblock,1) ! rho
+          vx1(il+1:iu,jl+1:ju,kl+1:ku) = data(:,:,:,iblock,iv1)/data(:,:,:,iblock,1) ! vr
+          vx2(il+1:iu,jl+1:ju,kl+1:ku) = data(:,:,:,iblock,iv2)/data(:,:,:,iblock,1) ! vtheta
+          vx3(il+1:iu,jl+1:ju,kl+1:ku) = data(:,:,:,iblock,iv3)/data(:,:,:,iblock,1) ! vphi
+       else
+          rho(il+1:iu,jl+1:ju,kl+1:ku) = data(:,:,:,iblock,1)
+          vx1(il+1:iu,jl+1:ju,kl+1:ku) = data(:,:,:,iblock,iv1) ! vr
+          vx2(il+1:iu,jl+1:ju,kl+1:ku) = data(:,:,:,iblock,iv2) ! vtheta
+          vx3(il+1:iu,jl+1:ju,kl+1:ku) = data(:,:,:,iblock,iv3) ! vphi
+       endif
     enddo
     deallocate(data)
 
