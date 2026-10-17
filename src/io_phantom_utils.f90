@@ -20,6 +20,7 @@ module io_phantom_utils
 !
 ! :Dependencies: None
 !
+ use messages, only : error, warning
  implicit none
  public :: open_dumpfile_w, open_dumpfile_r, get_error_text
  public :: tag,check_tag,match_tag
@@ -257,7 +258,7 @@ subroutine check_tag(tag,expectedtag)
  character(len=*), intent(in) :: tag, expectedtag
 
  if (trim(tag)/=trim(expectedtag)) then
-    print "(a)",' ERROR reading file: expecting '//trim(expectedtag)//' but got '//trim(tag)
+    call error('reading file: expecting '//trim(expectedtag)//' but got '//trim(tag))
  endif
 
 end subroutine check_tag
@@ -534,7 +535,7 @@ subroutine extract_int4(tag,ival,intarr,tags,ntags,ierr,default,q)
  enddo over_tags
  if (matched) ierr = 0
  if (ierr /= 0 .and. .not.present(q)) then
-    print "(a)",' ERROR: could not find '//trim(adjustl(tag))//' in header'
+    call warning('could not find '//trim(adjustl(tag))//' in header')
  endif
 
 end subroutine extract_int4
@@ -573,7 +574,7 @@ subroutine extract_int8(tag,ival,intarr,tags,ntags,ierr,default,q)
  enddo over_tags
  if (matched) ierr = 0
  if (ierr /= 0 .and. .not.present(q)) then
-    print "(a)",' ERROR: could not find '//trim(adjustl(tag))//' in header'
+    call warning('could not find '//trim(adjustl(tag))//' in header')
  endif
 
 end subroutine extract_int8
@@ -611,7 +612,7 @@ subroutine extract_real8(tag,rval,r8arr,tags,ntags,ierr,default,q)
  enddo over_tags
  if (matched) ierr = 0
  if (ierr /= 0 .and. .not.present(q)) then
-    print "(a)",' ERROR: could not find '//trim(adjustl(tag))//' in header'
+    call warning('could not find '//trim(adjustl(tag))//' in header')
  endif
 
 end subroutine extract_real8
@@ -649,7 +650,7 @@ subroutine extract_real4(tag,rval,r4arr,tags,ntags,ierr,default,q)
  enddo over_tags
  if (matched) ierr = 0
  if (ierr /= 0 .and. .not.present(q)) then
-    print "(a)",' ERROR: could not find '//trim(adjustl(tag))//' in header'
+    call warning('could not find '//trim(adjustl(tag))//' in header')
  endif
 
 end subroutine extract_real4
@@ -680,7 +681,7 @@ subroutine extract_int4arr(tag,ival,intarr,tags,ntags,ierr,q)
  enddo over_tags
  if (nmatched==size(ival)) ierr = 0
  if (ierr /= 0 .and. .not.present(q)) then
-    print "(a)",' ERROR: could not find '//trim(adjustl(tag))//' in header'
+    call warning('could not find '//trim(adjustl(tag))//' in header')
  endif
 
 end subroutine extract_int4arr
@@ -711,7 +712,7 @@ subroutine extract_int8arr(tag,ival,intarr,tags,ntags,ierr,q)
  enddo over_tags
  if (nmatched==size(ival)) ierr = 0
  if (ierr /= 0 .and. .not.present(q)) then
-    print "(a)",' ERROR: could not find '//trim(adjustl(tag))//' in header'
+    call warning('could not find '//trim(adjustl(tag))//' in header')
  endif
 
 end subroutine extract_int8arr
@@ -746,7 +747,7 @@ subroutine extract_real8arr(tag,rval,r8arr,tags,ntags,ierr,q)
     ierr = ierr_notenough
  endif
  if (ierr /= 0 .and. .not.present(q)) then
-    print "(a)",' ERROR: could not find '//trim(adjustl(tag))//' in header'
+    call warning('could not find '//trim(adjustl(tag))//' in header')
  endif
 
 end subroutine extract_real8arr
@@ -777,7 +778,7 @@ subroutine extract_real4arr(tag,rval,r4arr,tags,ntags,ierr,q)
  enddo over_tags
  if (nmatched==size(rval)) ierr = 0
  if (ierr /= 0 .and. .not.present(q)) then
-    print "(a)",' ERROR: could not find '//trim(adjustl(tag))//' in header'
+    call warning('could not find '//trim(adjustl(tag))//' in header')
  endif
 
 end subroutine extract_real4arr
@@ -1960,8 +1961,8 @@ subroutine read_array_int1(iarr,arr_tag,got_arr,ikind,i1,i2,noffset,iunit,tag,ma
        got_arr = .true.
        read(iunit,iostat=ierr) (dum,i=1,noffset),iarr(i1:i2)
     else
-       print*,'ERROR: wrong datatype for '//trim(tag)//' (is not int1)'
        read(iunit,iostat=ierr)
+       call error('wrong datatype for '//trim(tag)//' (is not int1)',ierr=ierr)
     endif
  endif
 
@@ -1992,8 +1993,8 @@ subroutine read_array_int4(iarr,arr_tag,got_arr,ikind,i1,i2,noffset,iunit,tag,ma
        got_arr = .true.
        read(iunit,iostat=ierr) (dum,i=1,noffset),iarr(i1:i2)
     else
-       print*,'ERROR: wrong datatype for '//trim(tag)//' (is not int4)'
        read(iunit,iostat=ierr)
+       call error('wrong datatype for '//trim(tag)//' (is not int4)',ierr=ierr)
     endif
  endif
 
@@ -2024,8 +2025,8 @@ subroutine read_array_int8(iarr,arr_tag,got_arr,ikind,i1,i2,noffset,iunit,tag,ma
        got_arr = .true.
        read(iunit,iostat=ierr) (dum,i=1,noffset),iarr(i1:i2)
     else
-       print*,'ERROR: wrong datatype for '//trim(tag)//' (is not int8)'
        read(iunit,iostat=ierr)
+       call error('wrong datatype for '//trim(tag)//' (is not int8)',ierr=ierr)
     endif
  endif
 
@@ -2056,8 +2057,8 @@ subroutine read_array_real4(arr,arr_tag,got_arr,ikind,i1,i2,noffset,iunit,tag,ma
        got_arr = .true.
        read(iunit,iostat=ierr) (dum,i=1,noffset),arr(i1:i2)
     else
-       print*,'ERROR: wrong datatype for '//trim(tag)//' (is not real4)'
        read(iunit,iostat=ierr)
+       call error('wrong datatype for '//trim(tag)//' (is not real4)',ierr=ierr)
     endif
  endif
 
@@ -2091,7 +2092,7 @@ subroutine read_array_real4arr(arr,arr_tag,got_arr,ikind,i1,i2,noffset,iunit,tag
        if (match_datatype) then
           got_arr(j) = .true.
           if (i2 > size(arr)) then
-             print*,'ERROR: array size too small reading '//trim(tag)
+             call error('array size too small reading '//trim(tag),ierr=ierr)
              ierr = ierr_arraysize
              return
           endif
@@ -2103,15 +2104,15 @@ subroutine read_array_real4arr(arr,arr_tag,got_arr,ikind,i1,i2,noffset,iunit,tag
           allocate(dummyr8(nread))
           read(iunit,iostat=ierr) (dumr8,i=1,noffset),dummyr8(1:nread)
           if (i2 > size(arr)) then
-             print*,'ERROR: array size too small reading '//trim(tag)
+             call error('array size too small reading '//trim(tag),ierr=ierr)
              ierr = ierr_arraysize
              return
           endif
           arr(j,i1:i2) = real(dummyr8(:),kind=4)
           deallocate(dummyr8)
        else
-          print*,'ERROR: wrong datatype for '//trim(tag)//' (is not real4arr)'
           read(iunit,iostat=ierr)
+          call error('wrong datatype for '//trim(tag)//' (is not real4arr)',ierr=ierr)
        endif
     endif
  enddo
@@ -2135,6 +2136,7 @@ subroutine read_array_real8(arr,arr_tag,got_arr,ikind,i1,i2,noffset,iunit,tag,ma
  real(kind=4) :: dumr4
  real(kind=4), allocatable :: dummyr4(:)
  logical      :: match_datatype
+ character(len=64) :: sizes
 
  if (matched .or. ikind < i_real) return
  match_datatype = (ikind==i_real8 .or. (kind(0.)==8 .and. ikind==i_real))
@@ -2144,7 +2146,8 @@ subroutine read_array_real8(arr,arr_tag,got_arr,ikind,i1,i2,noffset,iunit,tag,ma
     if (match_datatype) then
        got_arr = .true.
        if (i2 > size(arr)) then
-          print*,'ERROR: array size too small reading '//trim(tag),i2,size(arr)
+          write(sizes,'("needed ",i0,", available ",i0)') i2,size(arr)
+          call error('array size too small reading '//trim(tag),sizes,ierr=ierr)
           ierr = ierr_arraysize
           return
        endif
@@ -2158,8 +2161,8 @@ subroutine read_array_real8(arr,arr_tag,got_arr,ikind,i1,i2,noffset,iunit,tag,ma
        arr(i1:i2) = real(dummyr4(1:nread),kind=8)
        deallocate(dummyr4)
     else
-       print*,'ERROR: wrong datatype for '//trim(tag)//' (is not real8)'
        read(iunit,iostat=ierr)
+       call error('wrong datatype for '//trim(tag)//' (is not real8)',ierr=ierr)
     endif
  endif
 
@@ -2208,8 +2211,8 @@ subroutine read_array_real8arr(arr,arr_tag,got_arr,ikind,i1,i2,noffset,iunit,tag
           arr(j,i1:i2) = real(dummyr4(:),kind=8)
           deallocate(dummyr4)
        else
-          print*,'ERROR: wrong datatype for '//trim(tag)//' (is not real8arr)'
           read(iunit,iostat=ierr)
+          call error('wrong datatype for '//trim(tag)//' (is not real8arr)',ierr=ierr)
        endif
     endif
  enddo
@@ -2263,7 +2266,7 @@ subroutine open_dumpfile_rh(iunit,filename,nblocks,narraylengths,ierr,singleprec
  ! no need to read rest of header
  do i=1,ndatatypes-1
     call skip_headerblock(iunit,ierr)
-    if (ierr /= 0) print*,' error skipping header block'
+    if (ierr /= 0) call warning('skipping header block')
     if (ierr /= 0) return
  enddo
 

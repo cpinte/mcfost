@@ -246,7 +246,7 @@ contains
     mu_gas = mu ! Molecular weight
 
     call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,ldust_moments,n_files,dustfluidtype,xyzh,&
-         vxyzu,T_gas,iphase,grainsize,dustfrac(1:ndusttypes,np),nucleation,massoftype2(1,1:ntypes),&
+         vxyzu,T_gas,iphase,grainsize,dustfrac,nucleation,massoftype2(1,1:ntypes),&
          xyzmh_ptmass,vxyz_ptmass,hfact,umass,utime,udist,graindens,ndudt,dudt,ifiles,&
          n_SPH,x_SPH,y_SPH,z_SPH,h_SPH,vx_SPH,vy_SPH,vz_SPH,Tgas_SPH,particle_id,&
          SPH_grainsizes,massgas,massdust,rhogas,rhodust,dust_moments,extra_heating,ieos,apr_level)
