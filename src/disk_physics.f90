@@ -119,14 +119,17 @@ subroutine read_sublimation_radius()
 
   real(kind=dp) :: sublimation_radius
   integer :: ios
+  character(len=512) :: filename
 
-  write(*,*) "Reading sublimation file : ./data_th/"//trim(sublimationfile)
+  filename = trim(root_dir)//"/"//trim(seed_dir)//"/data_th/"//trim(sublimationfile)
+  write(*,*) "Reading sublimation file : "//trim(filename)
 
-  open(unit=1,file=trim(root_dir)//"/"//trim(seed_dir)//"/data_th/"//trim(sublimationfile), status="old", iostat=ios)
+  open(unit=1,file=trim(filename), status="old", iostat=ios)
   if (ios /= 0) then
-     call error("read_sublimation_radius: cannot open "//trim(root_dir)//"/"//trim(seed_dir)//"/data_th/"//trim(sublimationfile))
+     call error("read_sublimation_radius: cannot open "//trim(filename))
   endif
-  read(1,*,iostat=ios) sublimation_radius
+  ! one optically thin sublimation radius per star, as written by compute_othin_sublimation_radius
+  read(1,*,iostat=ios) star(:)%othin_sublimation_radius
   close(unit=1)
   if (ios /= 0) then
      call error("read_sublimation_radius: error reading sublimation radius (file may be from an older run or have wrong format)")
