@@ -70,6 +70,9 @@ jobs:
         run: |
           [ ! "$SETVARS_COMPLETED" == 1 ] && test -f "$INTEL_PATH"/setvars.sh && . "$INTEL_PATH"/setvars.sh
           make release=${{ matrix.release }} static=yes all
+          # unit tests built here, with the compiler environment and the same flags as mcfost:
+          # test_unit.py then finds them up to date and only runs them
+          make release=${{ matrix.release }} static=yes unit_tests
 
       - name: test
         uses: ./.github/actions/test

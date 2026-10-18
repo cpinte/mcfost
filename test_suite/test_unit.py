@@ -4,6 +4,8 @@ import pytest
 
 # Fortran unit tests in test_suite/unit/, built by "make unit_tests" in src/
 # against libmcfost.a, i.e. with the same compiler (SYSTEM) and flags as mcfost.
+# In CI they are built in the compile step (where the compiler environment is
+# loaded), so the make call below has nothing to do; locally it builds them.
 
 _test_dir = os.path.dirname(os.path.abspath(__file__))
 _src_dir = os.path.join(_test_dir, "..", "src")
