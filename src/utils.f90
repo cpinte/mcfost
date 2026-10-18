@@ -1741,16 +1741,54 @@ subroutine read_line(unit,FMT,line,Nread,commentchar)
    return
 end subroutine read_line
 
+! NaN and infinity tests on the IEEE 754 bit pattern of a double.
+! Comparisons such as y /= y, and the ieee_is_nan / ieee_is_finite
+! intrinsics, are folded to constants under -ffinite-math-only (gfortran)
+! and -fp-model fast (ifort/ifx), which our release flags use. Integer
+! operations on the bits are not affected by these flags.
+
+elemental logical function is_nan_dp(y)
+   use, intrinsic :: iso_fortran_env, only : int64
+   real(kind=dp), intent(in) :: y
+   integer(int64) :: bits
+
+   bits = transfer(y, bits)
+   ! exponent bits all set and non-zero mantissa
+   is_nan_dp = (iand(shiftr(bits,52), 2047_int64) == 2047_int64) .and. &
+        (iand(bits, 4503599627370495_int64) /= 0_int64)
+end function is_nan_dp
+
+elemental logical function is_inf_dp(y)
+   use, intrinsic :: iso_fortran_env, only : int64
+   real(kind=dp), intent(in) :: y
+   integer(int64) :: bits
+
+   bits = transfer(y, bits)
+   ! exponent bits all set and zero mantissa (either sign)
+   is_inf_dp = (iand(shiftr(bits,52), 2047_int64) == 2047_int64) .and. &
+        (iand(bits, 4503599627370495_int64) == 0_int64)
+end function is_inf_dp
+
+elemental logical function is_finite_dp(y)
+   use, intrinsic :: iso_fortran_env, only : int64
+   real(kind=dp), intent(in) :: y
+   integer(int64) :: bits
+
+   bits = transfer(y, bits)
+   is_finite_dp = (iand(shiftr(bits,52), 2047_int64) /= 2047_int64)
+end function is_finite_dp
+
 function is_nan_infinity(y)
+   ! 0 : finite, 1 : NaN, 2 : +/- infinity
    real(kind=dp), intent(in) :: y
    integer :: is_nan_infinity
 
    is_nan_infinity = 0
-   if (y /= y) then
+   if (is_nan_dp(y)) then
       write(*,*) "(Nan):", y
       is_nan_infinity = 1
       return
-   else if (y > 0 .and. (y==y*10)) then
+   else if (is_inf_dp(y)) then
       write(*,*) "(infinity):", y
       is_nan_infinity = 2
       return
@@ -1760,18 +1798,19 @@ function is_nan_infinity(y)
 end function is_nan_infinity
 
 function is_nan_infinity_matrix(y)
+    ! 0 : all finite, 1 : NaN found, 2 : +/- infinity found (first offending element is printed)
     real(kind=dp), intent(in) :: y(:,:)
     integer :: is_nan_infinity_matrix, i, j
 
     is_nan_infinity_matrix = 0
     do i=1,size(y(:,1))
        do j=1, size(y(1,:))
-          if (y(i,j) /= y(i,j)) then
+          if (is_nan_dp(y(i,j))) then
              write(*,*) "(Nan):", y(i,j), " i=", i, " j=",j
              is_nan_infinity_matrix = 1
              return
-          else if (y(i,j) > 0 .and. (y(i,j)==y(i,j)*10)) then
-             write(*,*) "(infinity):", y(i,j), y(i,j)*(1+0.1), " i=", i, " j=",j
+          else if (is_inf_dp(y(i,j))) then
+             write(*,*) "(infinity):", y(i,j), " i=", i, " j=",j
              is_nan_infinity_matrix = 2
              return
           end if
@@ -1781,17 +1820,18 @@ function is_nan_infinity_matrix(y)
 end function is_nan_infinity_matrix
 
 function is_nan_infinity_vector(y)
+    ! 0 : all finite, 1 : NaN found, 2 : +/- infinity found (first offending element is printed)
     real(kind=dp), intent(in) :: y(:)
     integer :: is_nan_infinity_vector, i
 
     is_nan_infinity_vector = 0
     do i=1,size(y)
-       if (y(i) /= y(i)) then
-          write(*,*) "(Nan):", y(i), " i=", i, y(i)/=y(i)
+       if (is_nan_dp(y(i))) then
+          write(*,*) "(Nan):", y(i), " i=", i
           is_nan_infinity_vector = 1
           return
-       else if (y(i)>0 .and. (y(i)==y(i)*10)) then
-          write(*,*) "(infinity):", y(i), y(i)*(1+0.1), " i=", i, (y(i)==y(i)*10)
+       else if (is_inf_dp(y(i))) then
+          write(*,*) "(infinity):", y(i), " i=", i
           is_nan_infinity_vector = 2
           return
        end if
