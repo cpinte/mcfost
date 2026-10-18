@@ -360,3 +360,40 @@ def test_hydrostatic_restart():
     T = fits.getdata(root_dir+"/data_th/Temperature.fits.gz")
     T_ref = fits.getdata("test_data/"+model_name+"/data_th/Temperature.fits.gz")
     assert MC_similar(T_ref,T,threshold=0.05)
+
+
+def test_sublimation_image():
+    # An image run after a temperature run with dust sublimation must read back
+    # the sublimation radius and use the same inner radius as the temperature run
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    # ref4.1_hydrostatic with hydrostatic equilibrium turned off: a single-zone 4.1 disk
+    # (hydrostatic equilibrium is not compatible with sublimation)
+    root_dir = "ref4.1_sublimation"
+    clean_results(root_dir)
+    os.makedirs(root_dir, exist_ok=True)
+    para = root_dir+"/sublimation.para"
+    with open("test_data/ref4.1_hydrostatic/ref4.1_hydrostatic.para") as f_in, open(para, "w") as f_out:
+        for line in f_in:
+            if "sublimate dust" in line:
+                line = line.replace("F", "T", 1)
+            elif "hydostatic equilibrium" in line:
+                line = line.replace("T", "F", 1)
+            f_out.write(line)
+
+    # -no_diff_approx: with the default grid, the first cells are optically thick once rmin moves inwards
+    def run(opt):
+        result = subprocess.run((_mcfost_bin+" "+para+" -no_diff_approx -root_dir "+root_dir+" "+opt).split(),
+                                capture_output=True, text=True)
+        print(result.stdout)
+        assert result.returncode == 0, result.stdout[-2000:]
+        return [l for l in result.stdout.splitlines() if "New minimum radius" in l]
+
+    rmin_th = run("")
+    rmin_img = run("-img 1.0")
+    assert len(rmin_th) == 1 and len(rmin_img) == 1
+    rmin_th = float(rmin_th[0].split()[-2])
+    rmin_img = float(rmin_img[0].split()[-2])
+    assert rmin_th > 0.0
+    assert abs(rmin_img - rmin_th) < 1e-6 * rmin_th
+    assert os.path.isfile(root_dir+"/data_1.0/RT.fits.gz")
