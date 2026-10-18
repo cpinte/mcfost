@@ -282,6 +282,16 @@ libmcfost.a : $(OBJECTS) voro++_wrapper.o no_xgboost_wrapper.o mcfost2phantom.o
 	ar vr libmcfost.a *.o
 	ranlib libmcfost.a
 
+# Unit tests: built against libmcfost.a with the same compiler and flags as mcfost,
+# run by test_suite/test_unit.py
+UNIT_DIR = ../test_suite/unit
+UNIT_TESTS = $(UNIT_DIR)/test_nan_checks
+
+unit_tests : $(UNIT_TESTS)
+
+$(UNIT_DIR)/% : $(UNIT_DIR)/%.f90 libmcfost.a
+	$(FC) $(FFLAGS) -I. $< -o $@ libmcfost.a $(LDFLAGS)
+
 mcfost_env.o : .make_lastsystem mcfost_env.f90
 	mkdir -p ../utils ; rm -rf ../utils/Version ;
 	grep required_utils_version mcfost_env.f90 | awk '{print $$6}' > ../utils/Version
@@ -348,7 +358,7 @@ release_utils :
 .PHONY : clean cleandata cleandata_dust cleanall
 
 clean :
-	rm -rf *.o $(gdir)/*.o *.mod _dust_prop*.tmp _voronoi.tmp *.i90 operating_system.f90 system.o libmcfost.a
+	rm -rf *.o $(gdir)/*.o *.mod _dust_prop*.tmp _voronoi.tmp *.i90 operating_system.f90 system.o libmcfost.a $(UNIT_TESTS)
 	if test $(MCFOST_GIT) = 1 ; then rm -rf sha.f90; fi
 
 cleandata :

@@ -201,7 +201,6 @@ contains
     use disk_physics, only : compute_othin_sublimation_radius
     use mem
     use reconstruct_from_moments
-    use, intrinsic :: ieee_arithmetic
 
     integer, intent(in) :: n_SPH, ndusttypes
     real(dp), dimension(:), allocatable, intent(inout) :: x,y,z,h,massgas!,rho, !move rho to allocatable, assuming not always allocated
@@ -386,7 +385,7 @@ contains
 
              do i=1,n_grains_tot
                 rho_monomers(i) = gamma_func_from_moments(N_monomers(i),ki(1:2),lambsol(1:2))
-                if (.not. ieee_is_finite(rho_monomers(i))) then
+                if (.not. is_finite_dp(rho_monomers(i))) then
                    use_single_grain = .true.
                    exit
                 endif
