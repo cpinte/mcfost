@@ -1803,8 +1803,8 @@ function is_nan_infinity_matrix(y)
     integer :: is_nan_infinity_matrix, i, j
 
     is_nan_infinity_matrix = 0
-    do i=1,size(y(:,1))
-       do j=1, size(y(1,:))
+    do j=1, size(y,2)
+       do i=1, size(y,1)
           if (is_nan_dp(y(i,j))) then
              write(*,*) "(Nan):", y(i,j), " i=", i, " j=",j
              is_nan_infinity_matrix = 1
