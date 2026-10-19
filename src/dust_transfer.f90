@@ -354,8 +354,11 @@ end subroutine init_dust_transfer
 !***********************************************************
 
 subroutine recompute_opacities()
-  ! Recompute grain properties and opacity tables across all wavelengths.
-  ! Called when density structure or grain distribution changes during physics iterations.
+  ! Recompute the opacity tables across all wavelengths.
+  ! Called when the dust density changes during physics iterations (hydrostatic
+  ! equilibrium, species removal). The grain properties (prop_grains: Mie/DHS)
+  ! only depend on the grain sizes, optical indices and wavelengths, so they are
+  ! not recomputed.
   ! C. Pinte
   ! 07/2026
 
@@ -363,9 +366,8 @@ subroutine recompute_opacities()
 
   integer :: lambda
 
-  write(*,'(a30, $)') "Computing dust properties ..."
+  write(*,'(a30, $)') "Computing opacities ..."
   do lambda = 1, n_lambda
-     call prop_grains(lambda)
      call opacity(lambda)
   enddo
   write(*,*) "Done"
@@ -373,6 +375,49 @@ subroutine recompute_opacities()
   return
 
 end subroutine recompute_opacities
+
+!***********************************************************
+
+subroutine update_thermal_emission_tables()
+  ! Rebuild the tables used to convert absorbed energy into temperature and to
+  ! sample re-emission wavelengths (init_reemission), and the emission
+  ! repartition between star and disk (repartition_energie, repartition_wl_em),
+  ! after the dust density or opacities changed (hydrostatic iterations and
+  ! restart). They depend on kappa_abs_LTE per cell when the dust varies from
+  ! cell to cell.
+  ! Tdust is set to 0 while the tables are built, as at initialisation, so that
+  ! the disk does not emit at the start of the next temperature calculation.
+
+  implicit none
+
+  real, dimension(:), allocatable :: Tdust_save
+  integer :: lambda
+
+  ! extra heating (dudt) is only set for SPH models, which are not supported
+  ! with hydrostatic equilibrium
+  if (lextra_heating) call error("update_thermal_emission_tables: extra heating is not supported")
+
+  Tdust_save = Tdust
+  Tdust = 0.0
+
+  call init_reemission(lextra_heating)
+
+  !$omp parallel default(none) private(lambda) shared(n_lambda)
+  !$omp do schedule(static,1)
+  do lambda=1, n_lambda
+     call repartition_energie(lambda)
+  enddo
+  !$omp end do
+  !$omp end parallel
+
+  call repartition_wl_em()
+
+  Tdust = Tdust_save
+  deallocate(Tdust_save)
+
+  return
+
+end subroutine update_thermal_emission_tables
 
 !***********************************************************
 
@@ -422,6 +467,7 @@ subroutine dust_transfer_sub()
            call read_gas_density_hydro_iter(latest_iter)
            call redistribute_dust_hydrostatic()
            call recompute_opacities()
+           call update_thermal_emission_tables()
            ! Restore T for convergence check in the next iteration
            call read_Tdust_hydro_iter(latest_iter)
            Tdust_hydro_prev(:) = Tdust(:)
@@ -541,6 +587,7 @@ subroutine dust_transfer_sub()
                  endif
                  call equilibre_hydrostatique()
                  call recompute_opacities()
+                 call update_thermal_emission_tables()
               else
                  write(*,'(" WARNING: hydrostatic equilibrium did not converge after ", i0, " iterations: max |dT|/T = ", &
                       & f7.4, " at (i=", i0, ", j=", i0, ") (target: ", f6.4, ", noise-adjusted mean target: ", f6.4, &
