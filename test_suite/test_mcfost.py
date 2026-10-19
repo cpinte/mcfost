@@ -397,3 +397,9 @@ def test_sublimation_image():
     assert rmin_th > 0.0
     assert abs(rmin_img - rmin_th) < 1e-6 * rmin_th
     assert os.path.isfile(root_dir+"/data_1.0/RT.fits.gz")
+
+    # The radial grid must follow the inner radius moved by sublimation: otherwise the
+    # first radial cell spans from the sublimation radius to the original inner radius
+    # and reaches unphysical temperatures (~2e4 K). Silicates sublimate at 1500 K here.
+    T = fits.getdata(root_dir+"/data_th/Temperature.fits.gz")
+    assert T.max() < 2000.0

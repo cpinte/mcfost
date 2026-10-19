@@ -104,12 +104,16 @@ subroutine set_sublimation_radius(sublimation_radius)
         disk_zone(i)%edge = 0.0
      endif
   enddo !i
-  rmin = minval(disk_zone(:)%rmin)
-  write(*,*) "New minimum radius = ", rmin, "AU"
-
+  ! The radial grid is built from the regions (cylindrical_grid), with the first
+  ! cell starting at rmin : the regions must follow the zones, as in
+  ! define_physical_zones, otherwise the first radial cell spans from the new rmin
+  ! to the old inner radius of the region.
   do i = 1, n_regions
-     regions(i)%Rmin = max(regions(i)%Rmin,sublimation_radius)
+     regions(i)%Rmin = minval(disk_zone(:)%rmin, mask=(disk_zone(:)%region == i))
   enddo !i
+  if (z_scaling_env < 1.) regions(:)%Rmin = regions(:)%Rmin * z_scaling_env
+  rmin = minval(regions(:)%Rmin)
+  write(*,*) "New minimum radius = ", rmin, "AU"
 
 end subroutine set_sublimation_radius
 
