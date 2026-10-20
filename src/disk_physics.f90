@@ -221,58 +221,6 @@ end subroutine sublimate_dust_Voronoi_radius
 
 !**********************************************************************
 
-subroutine sublimate_dust()
-  ! Remove grains whose temperature exceeds the sublimation temperature
-  ! C. Pinte 07/08/12
-  ! D. Price 25/06/26: updated to work with all grid types (esp. Voronoi)
-
-  integer :: icell, k, ipop, p_k
-  real(kind=dp) :: mass
-  logical :: lchanged
-
-  write(*,*) "Sublimating dust"
-
-  do icell=1, n_cells
-     lchanged = .false.
-     do k=1, n_grains_tot
-        ipop = grain(k)%pop
-
-        if (.not.dust_pop(ipop)%is_PAH) then
-           if (Tdust(icell) > dust_pop(ipop)%T_sub) then
-              ! (n_grains_tot,n_cells) if lvariable_dust, else (n_zones,n_cells)
-              p_k = merge(k, grain(k)%zone, lvariable_dust)
-              dust_density_o_n_grains(p_k,icell) = 0.0
-              lchanged = .true.
-           endif
-        endif
-     enddo
-
-     ! Keep dust_mass consistent with density (needed for kappa_factor when .not.lvariable_dust)
-     if (lchanged) then
-        if (lvariable_dust) then
-           dust_mass(icell) = 0.0
-           do k=1, n_grains_tot
-              dust_mass(icell) = dust_mass(icell) + dust_density_o_n_grains(k,icell) * n_grains(k) &
-                   * M_grain(k) * volume(icell) * AU3_to_cm3
-           enddo
-        else
-           ! Zone-indexed density: if wiped, mass is zero (SPH and analytic single-zone)
-           if (maxval(dust_density_o_n_grains(:,icell)) <= 0.0) then
-              dust_mass(icell) = 0.0
-           endif
-        endif
-     endif
-  enddo
-
-  call find_non_empty_cell()
-  mass = real(sum(dust_mass) * g_to_Msun)
-  write(*,*) 'New total dust mass in model :', mass,' Msun'
-
-end subroutine sublimate_dust
-
-
-!**********************************************************
-
 subroutine equilibre_hydrostatique(density_residual, lapply)
   ! Compute hydrostatic equilibrium for the gas, then re-derive the dust
   ! vertical distribution consistently with the new gas structure
@@ -805,6 +753,8 @@ subroutine read_sublimation_mask()
   logical :: anynull
   real, dimension(:), allocatable :: mask
   character(len=512) :: filename
+
+  if (.not.allocated(lsublimated)) call error("read_sublimation_mask: init_sublimation must be called first")
 
   filename = trim(root_dir)//"/"//trim(seed_dir)//"/data_th/"//trim(sublimationMaskFile)//".fits.gz"
   write(*,*) "Reading sublimation mask : "//trim(filename)
