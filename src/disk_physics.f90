@@ -52,6 +52,10 @@ module disk_physics
   real, parameter :: sublimation_min_packets = 10.0
   ! a grain that changed state this many times keeps its current state (no oscillation)
   integer, parameter :: sublimation_max_flips = 4
+  ! The sublimation front is converged when fewer (grain or zone, cell) pairs than this
+  ! fraction of the sublimated ones would change state : the remaining changes are
+  ! Monte Carlo noise near T_sub (in particular with one temperature per grain size)
+  real, parameter :: sublimation_change_tolerance = 1.0e-3
   ! return values of sublimation_change
   integer, parameter :: sublimation_no_change = 0, sublimation_sublimates = 1, &
        sublimation_recondenses = -1, sublimation_frozen = 2
@@ -682,7 +686,8 @@ subroutine update_sublimation(n_new, n_recondensed, n_frozen, lapply)
   ! Grains that already changed state sublimation_max_flips times are frozen.
   ! n_new / n_recondensed return the number of changes, n_frozen the number of frozen
   ! grains that would otherwise change. With lapply=.false., the mask is not modified.
-  ! LTE only for now : one temperature per cell. PAHs are not sublimated.
+  ! LTE grains : one temperature per cell; nLTE grains and nRE grains at equilibrium :
+  ! one temperature per grain size. PAHs are not sublimated.
 
   use radiation_field, only : xN_abs
 
@@ -690,7 +695,7 @@ subroutine update_sublimation(n_new, n_recondensed, n_frozen, lapply)
   logical, intent(in) :: lapply
 
   integer :: icell, p_k, pop, change
-  real :: delta, n_packets
+  real :: delta, n_packets, T_grain
 
   n_new = 0 ; n_recondensed = 0 ; n_frozen = 0
   do icell=1, n_cells
@@ -704,7 +709,22 @@ subroutine update_sublimation(n_new, n_recondensed, n_frozen, lapply)
         if (dust_pop(pop)%is_PAH) cycle
         if (dust_density_pristine(p_k,icell) <= 0.0_dp) cycle
 
-        change = sublimation_change(lsublimated(p_k,icell), Tdust(icell), dust_pop(pop)%T_sub, delta, &
+        ! Temperature of the grain : one per cell for LTE grains, one per grain size for
+        ! nLTE grains and for nRE grains at equilibrium (p_k is the grain index, as
+        ! lvariable_dust is set for nLTE / nRE grains). Stochastically heated grains have
+        ! no single temperature : their state is not changed.
+        T_grain = Tdust(icell)
+        if (lvariable_dust) then
+           select case(dust_pop(pop)%methode_chauffage)
+           case(2)
+              T_grain = Tdust_1grain(p_k,icell)
+           case(3)
+              if (.not.l_RE(p_k,icell)) cycle
+              T_grain = Tdust_1grain_nRE(p_k,icell)
+           end select
+        endif
+
+        change = sublimation_change(lsublimated(p_k,icell), T_grain, dust_pop(pop)%T_sub, delta, &
              int(n_sublimation_flips(p_k,icell)))
         select case(change)
         case(sublimation_sublimates)

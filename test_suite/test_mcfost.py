@@ -527,3 +527,83 @@ def test_sublimation_hydrostatic():
     T, mask = read_sublimation(root_dir)
     assert np.isfinite(T).all()
     assert mask.any()
+
+
+def test_sublimation_per_grain_size():
+    # nLTE grains have one temperature per grain size: the small (hotter) ice-coated
+    # grains of ref3.0_multi sublimate over a larger region than the large ones, and
+    # some cells are only partially sublimated. PAHs (nRE) never sublimate.
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    root_dir = "ref3.0_multi_sublimation_nlte"
+    clean_results(root_dir)
+    os.makedirs(root_dir, exist_ok=True)
+    para = root_dir+"/multi_nlte.para"
+    make_para("test_data/ref3.0_multi/ref3.0_multi.para", para,
+              {"sublimate dust": set_first_value("T"),
+               "nbr_photons_eq_th": set_first_value("1.28e5"),
+               "Rin, edge, Rout": lambda line: set_first_value("0.03")(line) if line.split()[0] == "1." else line})
+
+    stdout = run_mcfost(para, root_dir, "-no_diff_approx -no_SED")
+    assert "Dust sublimation converged" in stdout
+
+    T, mask = read_sublimation(root_dir)
+    # grain sizes : 50 silicates (LTE), 50 silicate + ice (nLTE, T_sub = 100 K), 1 PAH (nRE)
+    ices, pah = mask[:,50:100], mask[:,100]
+    n_cells_per_size = ices.sum(axis=0)
+    assert n_cells_per_size[0] > 0
+    assert n_cells_per_size[0] > n_cells_per_size[-1]
+    assert (ices.any(axis=1) & ~ices.all(axis=1)).sum() > 0
+    assert not pah.any()
+
+
+def nre_absorbed_fractions(stdout):
+    # fraction of the energy absorbed by non-equilibrium grains, first nRE pass of each
+    # temperature calculation
+    values = [float(l.split()[-4]) for l in stdout.splitlines() if "Non equilibrium grains have absorbed" in l]
+    return values[0::2]
+
+
+def check_hydrostatic_temperature_stable(root_dir, tolerance=0.05):
+    T1 = fits.getdata(root_dir+"/data_th/Temperature_iter0001.fits.gz")
+    T2 = fits.getdata(root_dir+"/data_th/Temperature_iter0002.fits.gz")
+    mask = T1 > 2.0
+    assert abs(np.median(T2[mask]/T1[mask]) - 1.0) < tolerance
+
+
+def test_hydrostatic_nre():
+    # Hydrostatic iterations with non-equilibrium grains (PAHs): the packet budget,
+    # emissivities and equilibrium status modified during a temperature calculation are
+    # restored before the next one, and the split between equilibrium and
+    # non-equilibrium absorption is rebuilt with the new density. The energy absorbed
+    # by the PAHs and the temperature must stay consistent between iterations.
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    root_dir = "ref4.1_PAH_hydrostatic"
+    clean_results(root_dir)
+    os.makedirs(root_dir, exist_ok=True)
+    para = root_dir+"/pah_hydro.para"
+    make_para("test_data/ref4.1_PAH/ref4.1_PAH.para", para,
+              {"hydostatic equilibrium": set_first_value("T")})
+
+    stdout = run_mcfost(para, root_dir, "-n_iter_physics 3")
+    fractions = nre_absorbed_fractions(stdout)
+    assert len(fractions) == 3
+    for f in fractions[1:]:
+        assert abs(f/fractions[0] - 1.0) < 0.3
+    check_hydrostatic_temperature_stable(root_dir)
+
+
+def test_hydrostatic_nlte():
+    # Hydrostatic iterations with nLTE grains (one temperature per grain size)
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    root_dir = "ref4.1_nLTE_hydrostatic"
+    clean_results(root_dir)
+    os.makedirs(root_dir, exist_ok=True)
+    para = root_dir+"/nlte_hydro.para"
+    make_para("test_data/ref4.1_nLTE/ref4.1_nLTE.para", para,
+              {"hydostatic equilibrium": set_first_value("T")})
+
+    run_mcfost(para, root_dir, "-n_iter_physics 3")
+    check_hydrostatic_temperature_stable(root_dir)

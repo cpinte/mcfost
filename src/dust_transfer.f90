@@ -357,7 +357,7 @@ end subroutine init_dust_transfer
 
 !***********************************************************
 
-subroutine recompute_opacities()
+subroutine recompute_opacities(ltemperature_step)
   ! Recompute the opacity tables across all wavelengths.
   ! Called when the dust density changes during physics iterations (hydrostatic
   ! equilibrium, species removal). The grain properties (prop_grains: Mie/DHS)
@@ -368,7 +368,16 @@ subroutine recompute_opacities()
 
   implicit none
 
+  ! .true. : opacities for the next temperature calculation (physics loop). opacity
+  ! only rebuilds the split between equilibrium and non-equilibrium absorption
+  ! (kappa_abs_RE, proba_abs_RE, LTE/nLTE fractions) during the temperature step.
+  logical, intent(in), optional :: ltemperature_step
+
   integer :: lambda
+  logical :: letape_th_save
+
+  letape_th_save = letape_th
+  if (present(ltemperature_step)) letape_th = ltemperature_step
 
   write(*,'(a30, $)') "Computing opacities ..."
   do lambda = 1, n_lambda
@@ -376,13 +385,15 @@ subroutine recompute_opacities()
   enddo
   write(*,*) "Done"
 
+  letape_th = letape_th_save
+
   return
 
 end subroutine recompute_opacities
 
 !***********************************************************
 
-subroutine update_thermal_emission_tables()
+subroutine update_thermal_emission_tables(n_photons_eq_th_ini)
   ! Rebuild the tables used to convert absorbed energy into temperature and to
   ! sample re-emission wavelengths (init_reemission), and the emission
   ! repartition between star and disk (repartition_energie, repartition_wl_em),
@@ -391,11 +402,19 @@ subroutine update_thermal_emission_tables()
   ! cell to cell.
   ! Tdust is set to 0 while the tables are built, as at initialisation, so that
   ! the disk does not emit at the start of the next temperature calculation.
+  ! The state of non-LTE and non-equilibrium grains, and the packet budget and
+  ! emissivities modified by emission_nRE, are restored as at initialisation.
 
   implicit none
 
+  integer, intent(in) :: n_photons_eq_th_ini
+
   real, dimension(:), allocatable :: Tdust_save
   integer :: lambda
+
+  call reset_thermal_state()
+  n_photons_eq_th = n_photons_eq_th_ini
+  E_paquet = 1.0_dp
 
   ! extra heating (dudt) is only set for SPH models, which are not supported
   ! with hydrostatic equilibrium
@@ -416,6 +435,8 @@ subroutine update_thermal_emission_tables()
 
   call repartition_wl_em()
 
+  if (lnRE) call init_emissivite_nRE()
+
   Tdust = Tdust_save
   deallocate(Tdust_save)
 
@@ -434,7 +455,7 @@ subroutine dust_transfer_sub()
 
   integer :: iter, n_iter_max, icell, start_iter, latest_iter, n_tested, icell_max, max_i, max_j
   logical :: lconverged, lphysics_iter, lupdate_hydro
-  integer :: n_new_sublimated, n_recondensed, n_frozen
+  integer :: n_new_sublimated, n_recondensed, n_frozen, n_photons_eq_th_ini
   real :: max_dT_o_T, mean_dT_o_T, mean_precision, rel_diff
   real :: n_packets_cur, n_packets_prev, sigma_dT_o_T, effective_precision
   real(kind=dp) :: density_residual
@@ -461,6 +482,8 @@ subroutine dust_transfer_sub()
 
      ! Physics modules iterated with the temperature calculation
      lphysics_iter = lhydrostatic .or. ldust_sublimation
+     ! packet budget of the temperature calculation (modified by emission_nRE)
+     n_photons_eq_th_ini = n_photons_eq_th
      if (ldust_sublimation) then
         n_iter_max = n_iter_physics
         call init_sublimation()
@@ -478,8 +501,8 @@ subroutine dust_transfer_sub()
            write(*,*) "Found previous hydrostatic state at iteration", latest_iter
            call read_gas_density_hydro_iter(latest_iter)
            call redistribute_dust_hydrostatic()
-           call recompute_opacities()
-           call update_thermal_emission_tables()
+           call recompute_opacities(ltemperature_step=.true.)
+           call update_thermal_emission_tables(n_photons_eq_th_ini)
            ! Restore T for convergence check in the next iteration
            call read_Tdust_hydro_iter(latest_iter)
            Tdust_hydro_prev(:) = Tdust(:)
@@ -615,7 +638,7 @@ subroutine dust_transfer_sub()
         ! (outside the noise hysteresis band, frozen grains excluded)
         if (ldust_sublimation) then
            call update_sublimation(n_new_sublimated, n_recondensed, n_frozen, lapply=.false.)
-           if (n_new_sublimated + n_recondensed > 0) then
+           if (n_new_sublimated + n_recondensed > sublimation_change_tolerance * count(lsublimated)) then
               lconverged = .false.
               if (iter < n_iter_max) then
                  write(*,'(" Updating dust sublimation (iteration ", i0, "): ", i0, " sublimating, ", i0, &
@@ -627,8 +650,10 @@ subroutine dust_transfer_sub()
                       n_iter_max, n_new_sublimated, n_recondensed
               endif
            else
-              write(*,'(" Dust sublimation converged after ", i0, " iteration(s), ", i0, &
-                   & " frozen (grain or zone, cell) pairs")') iter, n_frozen
+              write(*,'(" Dust sublimation converged after ", i0, " iteration(s): ", i0, " sublimating, ", i0, &
+                   & " re-condensing (below tolerance), ", i0, " frozen (grain or zone, cell) pairs")') &
+                   iter, n_new_sublimated, n_recondensed, n_frozen
+              n_new_sublimated = 0 ; n_recondensed = 0 ! converged : the mask is not updated
            endif
         endif
 
@@ -643,8 +668,8 @@ subroutine dust_transfer_sub()
               if (lupdate_hydro .or. (n_new_sublimated + n_recondensed > 0)) call apply_sublimation()
            endif
            if (lupdate_hydro .or. (n_new_sublimated + n_recondensed > 0)) then
-              call recompute_opacities()
-              call update_thermal_emission_tables()
+              call recompute_opacities(ltemperature_step=.true.)
+              call update_thermal_emission_tables(n_photons_eq_th_ini)
            endif
         endif
 
