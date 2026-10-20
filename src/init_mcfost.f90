@@ -155,6 +155,7 @@ subroutine set_default_variables()
   lcorrect_Tgas = .false.
   lcorrect_density=.false.
   lremove = .false.
+  lforce_constant_sublimation = .false.
   lforce_PAH_equilibrium=.false.
   lforce_PAH_out_equilibrium=.false.
   lread_grain_size_distrib=.false.
@@ -1236,6 +1237,9 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*) n_T_opt
         i_arg = i_arg + 1
+     case("-constant_sublimation_temperature")
+        lforce_constant_sublimation = .true.
+        i_arg = i_arg + 1
      case("-n_iter_physics","-n_iter","-max_iter_physics")
         i_arg = i_arg + 1
         if (i_arg > n_args) call error("number of iterations needed for -n_iter_physics")
@@ -1981,7 +1985,7 @@ subroutine display_help()
   write(*,*) "                                           perform the dump rotation"
   write(*,*) "        : -turn-off_planets : sink particles with id > 1 will not emit"
   write(*,*) "        : -turn-off_Lacc : ignore accretion on sink particles"
-  write(*,*) "        : -turn-off_dust_subl : ignore dust sublimation"
+  write(*,*) "        : -constant_sublimation_temperature : ignore the .sub files, use T_sub from the dust files"
   write(*,*) "        : -img_offset <x0> <y0> <z0> : Centres the observer's los in (x0,y0,z0)"
   write(*,*) "        : -split_image : Split a fits image in a fits file for each orienation (incl,azim)"
   write(*,*) "        : -Pmax <calue> : force s12 to be a bell shape peaking at Pmax (between 0 and 1)"

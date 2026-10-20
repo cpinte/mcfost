@@ -56,6 +56,8 @@ module disk_physics
   ! fraction of the sublimated ones would change state : the remaining changes are
   ! Monte Carlo noise near T_sub (in particular with one temperature per grain size)
   real, parameter :: sublimation_change_tolerance = 1.0e-3
+  ! floor on the gas density in the power-law sublimation temperature [g/cm3]
+  real, parameter :: sublimation_rho_floor = 1.0e-30
   ! return values of sublimation_change
   integer, parameter :: sublimation_no_change = 0, sublimation_sublimates = 1, &
        sublimation_recondenses = -1, sublimation_frozen = 2
@@ -104,9 +106,12 @@ subroutine compute_othin_sublimation_radius()
           real(star(i)%othin_sublimation_radius), " AU"
   enddo
 
-  open(unit=1,file=trim(data_dir)//"/"//trim(sublimationFile),status="replace")
-  write(1,*) star(:)%othin_sublimation_radius
-  close(1)
+  ! data_dir is not created when the run stops after the initialisation (eg -disk_struct)
+  if (.not.lstop_after_init) then
+     open(unit=1,file=trim(data_dir)//"/"//trim(sublimationFile),status="replace")
+     write(1,*) star(:)%othin_sublimation_radius
+     close(1)
+  endif
 
   if (lVoronoi) then
      call sublimate_dust_Voronoi_radius(sub_factor)
@@ -695,13 +700,14 @@ subroutine update_sublimation(n_new, n_recondensed, n_frozen, lapply)
   logical, intent(in) :: lapply
 
   integer :: icell, p_k, pop, change
-  real :: delta, n_packets, T_grain
+  real :: delta, n_packets, T_grain, rho_gas
 
   n_new = 0 ; n_recondensed = 0 ; n_frozen = 0
   do icell=1, n_cells
      n_packets = 0.0
      if (allocated(xN_abs)) n_packets = sum(xN_abs(icell,1,:))
      delta = sublimation_band(n_packets)
+     rho_gas = real(gas_density(icell) * mu_mH / m3_to_cm3) ! g/cm3
 
      do p_k=1, size(lsublimated,1)
         pop = pop_of_pk(p_k)
@@ -724,7 +730,7 @@ subroutine update_sublimation(n_new, n_recondensed, n_frozen, lapply)
            end select
         endif
 
-        change = sublimation_change(lsublimated(p_k,icell), T_grain, dust_pop(pop)%T_sub, delta, &
+        change = sublimation_change(lsublimated(p_k,icell), T_grain, population_sublimation_temperature(pop, rho_gas), delta, &
              int(n_sublimation_flips(p_k,icell)))
         select case(change)
         case(sublimation_sublimates)
@@ -748,6 +754,52 @@ subroutine update_sublimation(n_new, n_recondensed, n_frozen, lapply)
   return
 
 end subroutine update_sublimation
+
+!**********************************************************
+
+pure real function sublimation_temperature(law, T_sub_constant, T0, rho0, gamma, rho_gas)
+  ! Sublimation temperature of a dust component [K] for a gas density rho_gas [g/cm3] :
+  !  - sublimation_law_constant  : T_sub_constant (from the optical indices file)
+  !  - sublimation_law_power_law : T0 (rho_gas / rho0)^gamma (Pollack et al. 1994,
+  !    Isella & Natta 2005), with rho_gas floored at sublimation_rho_floor
+
+  integer, intent(in) :: law
+  real, intent(in) :: T_sub_constant, T0, rho0, gamma, rho_gas
+
+  select case(law)
+  case(sublimation_law_power_law)
+     sublimation_temperature = T0 * (max(rho_gas, sublimation_rho_floor) / rho0)**gamma
+  case default
+     sublimation_temperature = T_sub_constant
+  end select
+
+end function sublimation_temperature
+
+!**********************************************************
+
+real function population_sublimation_temperature(pop, rho_gas)
+  ! Sublimation temperature of a population : the lowest one of its components
+  ! (as for the constant T_sub in dust_prop)
+
+  integer, intent(in) :: pop
+  real, intent(in) :: rho_gas
+
+  integer :: k
+
+  if (dust_pop(pop)%is_opacity_file) then
+     population_sublimation_temperature = dust_pop(pop)%T_sub
+     return
+  endif
+
+  population_sublimation_temperature = huge(1.0)
+  do k=1, dust_pop(pop)%n_components
+     population_sublimation_temperature = min(population_sublimation_temperature, &
+          sublimation_temperature(dust_pop(pop)%component_sub_law(k), dust_pop(pop)%component_T_sub(k), &
+          dust_pop(pop)%component_sub_T0(k), dust_pop(pop)%component_sub_rho0(k), &
+          dust_pop(pop)%component_sub_gamma(k), rho_gas))
+  enddo
+
+end function population_sublimation_temperature
 
 !**********************************************************
 

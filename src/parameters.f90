@@ -30,6 +30,7 @@ module parameters
 
   ! lvariable_dust = true if the dust properties are variable in each cell
   logical :: lvariable_dust, lmigration, lhydrostatic, ldust_sublimation
+  logical :: lforce_constant_sublimation ! ignore the .sub files (sublimation laws)
   integer :: settling_type ! 1 = Parametric, 2 = Dubrulle or 3 = Fromang
   integer :: n_iter_physics = 100 ! Maximum iterations for physics loops (e.g. hydrostatic equilibrium)
 

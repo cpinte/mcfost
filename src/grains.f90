@@ -12,6 +12,12 @@ module grains
 
   type(dust_grain_type), dimension(:), allocatable  :: grain
 
+  ! Sublimation laws (per component, read from an optional .sub file next to the
+  ! optical indices file) :
+  !  - constant  : T_sub from the optical indices file
+  !  - power_law : T_sub = T0 (rho_gas / rho0)^gamma (Pollack et al. 1994, Isella & Natta 2005)
+  integer, parameter :: sublimation_law_constant = 0, sublimation_law_power_law = 1
+
   type dust_pop_type
      integer :: n_grains, methode_chauffage, zone
      real :: amin, amax, aexp, frac_mass, porosity ! aexp is > 0
@@ -23,6 +29,8 @@ module grains
      ! mixing rule : 1 = EMT, 2 = coating
      character(len=512), dimension(10) :: indices
      real, dimension(10) :: component_rho1g, component_volume_fraction, component_T_sub
+     integer, dimension(10) :: component_sub_law = sublimation_law_constant
+     real, dimension(10) :: component_sub_T0 = 0.0, component_sub_rho0 = 1.0, component_sub_gamma = 0.0
 
      logical :: is_opacity_file, is_PAH, is_Misselt_opacity_file, is_DustEM_opacity_file, lcoating
      integer :: ind_debut, ind_fin

@@ -318,6 +318,7 @@ subroutine init_optical_indices()
            ! lecture density
            read(1,*) dust_pop(pop)%component_rho1g(k), dust_pop(pop)%component_T_sub(k)
            if (dust_pop(pop)%component_rho1g(k) > 10.) call error("optical indices file has the wrong format")
+           if (ldust_sublimation .and. (.not.lforce_constant_sublimation)) call set_sublimation_law(pop,k)
            ! empty line
            read(1,*)
 
@@ -1412,5 +1413,131 @@ subroutine write_dust_prop()
   return
 
 end subroutine write_dust_prop
+
+subroutine set_sublimation_law(pop,k)
+  ! Sublimation law of component k of population pop : read from the .sub file with
+  ! the same name as the optical indices file, if any (same search path), otherwise
+  ! T_sub from the optical indices file is used (constant law)
+
+  integer, intent(in) :: pop, k
+
+  character(len=512) :: sub_file, dir
+  integer :: i, ios
+
+  i = index(dust_pop(pop)%indices(k), ".", back=.true.)
+  if (i > 1) then
+     sub_file = dust_pop(pop)%indices(k)(1:i-1)//".sub"
+  else
+     sub_file = trim(dust_pop(pop)%indices(k))//".sub"
+  endif
+
+  dir = in_dir(sub_file, dust_dir, status=ios)
+  if (ios /= 0) return ! no .sub file : constant T_sub
+
+  call read_sublimation_law_file(trim(dir)//trim(sub_file), dust_pop(pop)%component_sub_law(k), &
+       dust_pop(pop)%component_sub_T0(k), dust_pop(pop)%component_sub_rho0(k), dust_pop(pop)%component_sub_gamma(k))
+
+  select case(dust_pop(pop)%component_sub_law(k))
+  case(sublimation_law_power_law)
+     write(*,'(" Sublimation law from ", a, ": T_sub = ", f7.1, " K (rho_gas / ", es9.2, " g/cm3)^", f7.4)') &
+          trim(sub_file), dust_pop(pop)%component_sub_T0(k), dust_pop(pop)%component_sub_rho0(k), &
+          dust_pop(pop)%component_sub_gamma(k)
+  case default
+     write(*,'(" Sublimation law from ", a, ": constant T_sub = ", f7.1, " K")') &
+          trim(sub_file), dust_pop(pop)%component_T_sub(k)
+  end select
+
+  return
+
+end subroutine set_sublimation_law
+
+!******************************************************************************
+
+subroutine read_sublimation_law_file(filename, law, T0, rho0, gamma)
+  ! Reads a sublimation file (.sub) : one "key = value" per line, "#" starts a comment.
+  ! Keys : format_version (1), law (constant | power_law), T0 [K], rho0 [g/cm3], gamma,
+  ! reference (ignored). Unknown keys and missing parameters are errors.
+
+  character(len=*), intent(in) :: filename
+  integer, intent(out) :: law
+  real, intent(out) :: T0, rho0, gamma
+
+  character(len=512) :: line, key, value
+  integer :: unit, ios, i, format_version, n
+  logical :: lT0, lrho0, lgamma
+
+  law = sublimation_law_constant ; T0 = 0.0 ; rho0 = 1.0 ; gamma = 0.0
+  format_version = 0 ; lT0 = .false. ; lrho0 = .false. ; lgamma = .false.
+
+  open(newunit=unit, file=trim(filename), status="old", iostat=ios)
+  if (ios /= 0) call error("cannot open sublimation file "//trim(filename))
+
+  n = 0
+  do
+     read(unit,'(a)',iostat=ios) line
+     if (ios /= 0) exit
+     n = n + 1
+     i = index(line,"#")
+     if (i > 0) line = line(1:i-1)
+     if (len_trim(line) == 0) cycle
+     i = index(line,"=")
+     if (i == 0) call error("sublimation file "//trim(filename)//": expected key = value", msg2=trim(line))
+     key = to_lower(adjustl(line(1:i-1)))
+     value = adjustl(line(i+1:))
+
+     select case(trim(key))
+     case("format_version")
+        read(value,*,iostat=ios) format_version
+     case("law")
+        select case(to_lower(trim(value)))
+        case("constant")
+           law = sublimation_law_constant
+        case("power_law")
+           law = sublimation_law_power_law
+        case default
+           call error("sublimation file "//trim(filename)//": unknown law "//trim(value), &
+                msg2="available laws: constant, power_law")
+        end select
+     case("t0")
+        read(value,*,iostat=ios) T0 ; lT0 = .true.
+     case("rho0")
+        read(value,*,iostat=ios) rho0 ; lrho0 = .true.
+     case("gamma")
+        read(value,*,iostat=ios) gamma ; lgamma = .true.
+     case("reference")
+        ios = 0
+     case default
+        call error("sublimation file "//trim(filename)//": unknown key "//trim(key))
+     end select
+     if (ios /= 0) call error("sublimation file "//trim(filename)//": cannot read the value of "//trim(key))
+  enddo
+  close(unit)
+
+  if (format_version /= 1) call error("sublimation file "//trim(filename)//": format_version = 1 is required")
+  if (law == sublimation_law_power_law) then
+     if (.not.(lT0 .and. lrho0 .and. lgamma)) &
+          call error("sublimation file "//trim(filename)//": power_law requires T0, rho0 and gamma")
+     if ((T0 <= 0.0) .or. (rho0 <= 0.0)) call error("sublimation file "//trim(filename)//": T0 and rho0 must be > 0")
+  endif
+
+  return
+
+contains
+
+  function to_lower(str) result(lower)
+    character(len=*), intent(in) :: str
+    character(len=len(str)) :: lower
+    integer :: j
+
+    lower = str
+    do j=1, len(str)
+       if ((iachar(str(j:j)) >= iachar("A")) .and. (iachar(str(j:j)) <= iachar("Z"))) &
+            lower(j:j) = achar(iachar(str(j:j)) + 32)
+    enddo
+  end function to_lower
+
+end subroutine read_sublimation_law_file
+
+!******************************************************************************
 
 end module dust_prop

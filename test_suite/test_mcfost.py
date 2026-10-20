@@ -420,9 +420,11 @@ def set_first_value(value):
     return lambda line: "  "+value+" "+" ".join(line.split()[1:])+"\n"
 
 
-def run_mcfost(para, root_dir, opt=""):
-    result = subprocess.run((_mcfost_bin+" "+para+" -root_dir "+root_dir+" "+opt).split(),
-                            capture_output=True, text=True)
+def run_mcfost(para, root_dir, opt="", cwd=None):
+    # cwd: directory to run from (para and root_dir are then relative to it), e.g. to
+    # pick up dust files placed in the run directory, which is searched first
+    result = subprocess.run((os.path.abspath(_mcfost_bin)+" "+para+" -root_dir "+root_dir+" "+opt).split(),
+                            capture_output=True, text=True, cwd=cwd)
     print(result.stdout)
     assert result.returncode == 0, result.stdout[-3000:]
     return result.stdout
@@ -555,6 +557,52 @@ def test_sublimation_per_grain_size():
     assert n_cells_per_size[0] > n_cells_per_size[-1]
     assert (ices.any(axis=1) & ~ices.all(axis=1)).sum() > 0
     assert not pah.any()
+
+
+def test_sublimation_power_law():
+    # Density-dependent sublimation temperature, read from a .sub file next to the
+    # optical indices file: T_sub = T0 (rho_gas / rho0)^gamma (Pollack et al. 1994).
+    # The .sub file is placed in the run directory (searched before the utils dust
+    # directory) so that it does not affect the other tests. At convergence, each cell
+    # is on the correct side of its own T_sub(rho), within the hysteresis band, and the
+    # sublimation temperature varies along the curved front (dense midplane hotter).
+    # -constant_sublimation_temperature ignores the .sub file.
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    T0, rho0, gamma = 2000.0, 1.0, 0.0195
+    root_dir = "ref4.1_sublimation_power_law"
+    clean_results(root_dir)
+    os.makedirs(root_dir, exist_ok=True)
+    make_para("test_data/ref4.1_hydrostatic/ref4.1_hydrostatic.para", root_dir+"/power_law.para",
+              {"sublimate dust": set_first_value("T"),
+               "hydostatic equilibrium": set_first_value("F"),
+               "Rin, edge, Rout": set_first_value("0.03")})
+    with open(root_dir+"/Draine_Si_sUV.sub", "w") as f:
+        f.write("# test sublimation law\n"
+                "format_version = 1\n"
+                "law = power_law\n"
+                f"T0 = {T0}\n"
+                f"rho0 = {rho0}\n"
+                f"gamma = {gamma}\n")
+
+    # the constant law is used when forced, even with a .sub file
+    stdout = run_mcfost("power_law.para", "constant", "-constant_sublimation_temperature -disk_struct", cwd=root_dir)
+    assert "Sublimation law from" not in stdout
+
+    # +disk_struct writes the gas density on the grid moved to the sublimation radius
+    stdout = run_mcfost("power_law.para", ".", "-no_diff_approx -no_SED +disk_struct", cwd=root_dir)
+    assert "Sublimation law from Draine_Si_sUV.sub" in stdout
+    assert "Dust sublimation converged" in stdout
+
+    T, mask = read_sublimation(root_dir)
+    sublimated = mask.any(axis=1)
+    rho = fits.getdata(root_dir+"/data_disk/gas_density.fits.gz").ravel() # g/cm3
+    assert rho.size == T.size
+    T_sub = T0 * (np.maximum(rho, 1e-30) / rho0)**gamma
+    assert sublimated.sum() > 100
+    assert (T / T_sub)[~sublimated].max() < 1.1
+    assert (T / T_sub)[sublimated].min() > 0.9
+    assert T_sub[sublimated].max() > 1.3 * T_sub[sublimated].min()
 
 
 def nre_absorbed_fractions(stdout):
