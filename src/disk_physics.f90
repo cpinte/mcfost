@@ -102,10 +102,14 @@ subroutine set_sublimation_radius(sublimation_radius)
   real(kind=dp), intent(in) :: sublimation_radius
 
   integer :: i
+  real(kind=dp) :: rmin_zones
 
+  ! Only the innermost zone(s) are extended inwards to the sublimation radius :
+  ! extending the other zones would spread their dust inside the inner zones
+  ! (and make the grid regions overlap)
+  rmin_zones = minval(disk_zone(:)%rmin)
   do i=1,n_zones
-     !write(*,*) "zone", i,sublimation_radius, disk_zone(i)%rmin, sublimation_radius > disk_zone(i)%rmin
-     if (sublimation_radius < disk_zone(i)%rmin) then
+     if ((disk_zone(i)%rmin <= rmin_zones) .and. (sublimation_radius < disk_zone(i)%rmin)) then
         !write(*,*) "SUBLIMATING DUST IN ZONE", i
         disk_zone(i)%rmin = sublimation_radius
         disk_zone(i)%rin = disk_zone(i)%rmin + 5* disk_zone(1)%edge
