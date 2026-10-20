@@ -1759,8 +1759,6 @@ subroutine initialisation_mcfost()
 
   ! Hydrostatic equilibrium : combinations that are not supported yet
   if (lhydrostatic) then
-     ! the dust redistribution would refill the sublimated cells at every iteration
-     if (ldust_sublimation) call error("Hydrostatic equilibrium is not compatible with dust sublimation yet")
      ! the state of non-LTE and non-equilibrium grains (emission tables, packet budget
      ! modified by emission_nRE) is not rebuilt between hydrostatic iterations
      if (lRE_nLTE .or. lnRE) call error("Hydrostatic equilibrium only works with grains in LTE (heating method 1)")

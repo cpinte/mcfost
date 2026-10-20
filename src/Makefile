@@ -285,7 +285,7 @@ libmcfost.a : $(OBJECTS) voro++_wrapper.o no_xgboost_wrapper.o mcfost2phantom.o
 # Unit tests: built against libmcfost.a with the same compiler and flags as mcfost,
 # run by test_suite/test_unit.py
 UNIT_DIR = ../test_suite/unit
-UNIT_TESTS = $(UNIT_DIR)/test_nan_checks
+UNIT_TESTS = $(patsubst %.f90,%,$(wildcard $(UNIT_DIR)/test_*.f90))
 
 unit_tests : $(UNIT_TESTS)
 

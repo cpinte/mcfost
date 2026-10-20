@@ -34,7 +34,27 @@ module disk_physics
   ! dust_density_o_n_grains : one flag per grain size (lvariable_dust) or per zone.
   real(kind=dp), allocatable, dimension(:,:), private :: dust_density_pristine
   logical, allocatable, dimension(:,:) :: lsublimated
+  integer(kind=1), allocatable, dimension(:,:), private :: n_sublimation_flips
+  integer, allocatable, dimension(:), private :: pop_of_pk ! population of each first index of dust_density_o_n_grains
   character(len=32), parameter :: sublimationMaskFile = "sublimation_mask"
+
+  ! A trace of the pristine dust is left in sublimated cells : negligible for the
+  ! transport and the observables, but the cell still records the radiation field,
+  ! giving the equilibrium ("test particle") temperature of its dust, which is
+  ! independent of the dust density. Sublimated dust can then re-condense.
+  real(kind=dp), parameter :: sublimation_trace = 1.0e-20_dp
+  ! Hysteresis band around T_sub : sublimation if T > T_sub (1+delta), re-condensation
+  ! if T < T_sub (1-delta), with delta from the Monte Carlo noise on T (as for the
+  ! hydrostatic convergence test), between sublimation_precision and sublimation_band_max
+  real, parameter :: sublimation_precision = 0.02
+  real, parameter :: sublimation_n_sigma = 3.0
+  real, parameter :: sublimation_band_max = 0.3
+  real, parameter :: sublimation_min_packets = 10.0
+  ! a grain that changed state this many times keeps its current state (no oscillation)
+  integer, parameter :: sublimation_max_flips = 4
+  ! return values of sublimation_change
+  integer, parameter :: sublimation_no_change = 0, sublimation_sublimates = 1, &
+       sublimation_recondenses = -1, sublimation_frozen = 2
 
 contains
 
@@ -616,13 +636,24 @@ end subroutine print_hydrostatic_scale_height
 subroutine init_sublimation()
   ! Takes the current dust density as the pristine (unsublimated) density
 
-  if (allocated(dust_density_pristine)) deallocate(dust_density_pristine)
-  if (allocated(lsublimated)) deallocate(lsublimated)
+  integer :: k
+
+  call free_sublimation()
 
   allocate(dust_density_pristine(size(dust_density_o_n_grains,1),n_cells), &
-       lsublimated(size(dust_density_o_n_grains,1),n_cells))
+       lsublimated(size(dust_density_o_n_grains,1),n_cells), &
+       n_sublimation_flips(size(dust_density_o_n_grains,1),n_cells), &
+       pop_of_pk(size(dust_density_o_n_grains,1)))
   dust_density_pristine(:,:) = dust_density_o_n_grains(:,1:n_cells)
   lsublimated(:,:) = .false.
+  n_sublimation_flips(:,:) = 0_1
+
+  ! first index of dust_density_o_n_grains : grain size (lvariable_dust) or zone.
+  ! In zone mode there is a single population per zone (lvariable_dust is set otherwise).
+  pop_of_pk(:) = 0
+  do k=1, n_grains_tot
+     pop_of_pk(merge(k, grain(k)%zone, lvariable_dust)) = grain(k)%pop
+  enddo
 
   return
 
@@ -642,36 +673,54 @@ end subroutine set_pristine_dust_density
 
 !**********************************************************
 
-subroutine update_sublimation(n_new, lapply)
-  ! Flags the grains whose temperature exceeds their sublimation temperature.
-  ! n_new returns the number of newly sublimated (grain or zone, cell) pairs.
-  ! With lapply=.false., the mask is not modified (convergence test only).
-  ! LTE only for now : one temperature per cell.
-  ! PAHs (non-equilibrium grains) are not sublimated.
+subroutine update_sublimation(n_new, n_recondensed, n_frozen, lapply)
+  ! Compares the temperature of each (grain size or zone, cell) with the sublimation
+  ! temperature of its population, with a hysteresis band set by the Monte Carlo noise :
+  !  - not sublimated and T > T_sub (1+delta) : sublimates
+  !  - sublimated and T < T_sub (1-delta) : re-condenses (T is then the test-particle
+  !    temperature of the trace dust left in the cell)
+  ! Grains that already changed state sublimation_max_flips times are frozen.
+  ! n_new / n_recondensed return the number of changes, n_frozen the number of frozen
+  ! grains that would otherwise change. With lapply=.false., the mask is not modified.
+  ! LTE only for now : one temperature per cell. PAHs are not sublimated.
 
-  integer, intent(out) :: n_new
+  use radiation_field, only : xN_abs
+
+  integer, intent(out) :: n_new, n_recondensed, n_frozen
   logical, intent(in) :: lapply
 
-  integer :: icell, k, p_k
+  integer :: icell, p_k, pop, change
+  real :: delta, n_packets
 
-  n_new = 0
+  n_new = 0 ; n_recondensed = 0 ; n_frozen = 0
   do icell=1, n_cells
-     do k=1, n_grains_tot
-        if (dust_pop(grain(k)%pop)%is_PAH) cycle
-        p_k = merge(k, grain(k)%zone, lvariable_dust)
-        if (lsublimated(p_k,icell)) cycle
+     n_packets = 0.0
+     if (allocated(xN_abs)) n_packets = sum(xN_abs(icell,1,:))
+     delta = sublimation_band(n_packets)
+
+     do p_k=1, size(lsublimated,1)
+        pop = pop_of_pk(p_k)
+        if (pop == 0) cycle
+        if (dust_pop(pop)%is_PAH) cycle
         if (dust_density_pristine(p_k,icell) <= 0.0_dp) cycle
-        if (Tdust(icell) > dust_pop(grain(k)%pop)%T_sub) then
-           ! in zone mode, several grains map onto the same p_k : count it once
-           if (lapply) then
-              lsublimated(p_k,icell) = .true.
-              n_new = n_new + 1
-           else if (.not.lvariable_dust) then
-              n_new = n_new + 1
-              exit
-           else
-              n_new = n_new + 1
-           endif
+
+        change = sublimation_change(lsublimated(p_k,icell), Tdust(icell), dust_pop(pop)%T_sub, delta, &
+             int(n_sublimation_flips(p_k,icell)))
+        select case(change)
+        case(sublimation_sublimates)
+           n_new = n_new + 1
+        case(sublimation_recondenses)
+           n_recondensed = n_recondensed + 1
+        case(sublimation_frozen)
+           n_frozen = n_frozen + 1
+           cycle
+        case default
+           cycle
+        end select
+
+        if (lapply) then
+           lsublimated(p_k,icell) = .not.lsublimated(p_k,icell)
+           n_sublimation_flips(p_k,icell) = n_sublimation_flips(p_k,icell) + 1_1
         endif
      enddo
   enddo
@@ -682,15 +731,68 @@ end subroutine update_sublimation
 
 !**********************************************************
 
+pure real function sublimation_band(n_packets)
+  ! Relative half-width delta of the hysteresis band around T_sub, from the Monte
+  ! Carlo noise on the temperature : T ~ E^(1/4), relative noise on E ~ 1/sqrt(N),
+  ! so sigma_T/T ~ 0.25/sqrt(N). Bounded by sublimation_precision and
+  ! sublimation_band_max; sublimation_band_max when there are too few packets.
+
+  real, intent(in) :: n_packets
+
+  if (n_packets >= sublimation_min_packets) then
+     sublimation_band = min(max(sublimation_precision, sublimation_n_sigma * 0.25 / sqrt(n_packets)), &
+          sublimation_band_max)
+  else
+     sublimation_band = sublimation_band_max
+  endif
+
+end function sublimation_band
+
+!**********************************************************
+
+pure integer function sublimation_change(lsublimated_in, T, T_sub, delta, n_flips)
+  ! State change of a grain (or zone) in a cell, given its temperature :
+  !  sublimation_sublimates  : not sublimated and T > T_sub (1+delta)
+  !  sublimation_recondenses : sublimated and T < T_sub (1-delta)
+  !  sublimation_frozen      : would change, but already changed sublimation_max_flips times
+  !  sublimation_no_change   : otherwise
+
+  logical, intent(in) :: lsublimated_in
+  real, intent(in) :: T, T_sub, delta
+  integer, intent(in) :: n_flips
+
+  logical :: lchange
+
+  if (lsublimated_in) then
+     lchange = (T < T_sub * (1.0 - delta))
+  else
+     lchange = (T > T_sub * (1.0 + delta))
+  endif
+
+  if (.not.lchange) then
+     sublimation_change = sublimation_no_change
+  else if (n_flips >= sublimation_max_flips) then
+     sublimation_change = sublimation_frozen
+  else if (lsublimated_in) then
+     sublimation_change = sublimation_recondenses
+  else
+     sublimation_change = sublimation_sublimates
+  endif
+
+end function sublimation_change
+
+!**********************************************************
+
 subroutine apply_sublimation()
-  ! dust density = pristine density where the grains have not sublimated, then
-  ! recomputes the dust mass of each cell and the reference (first non-empty) cell
+  ! dust density = pristine density where the grains have not sublimated, and a trace
+  ! (sublimation_trace) of it where they have; then recomputes the dust mass of each
+  ! cell and the reference (first non-empty) cell
 
   integer :: icell, k, pop
   real(kind=dp) :: mass
 
   where (lsublimated)
-     dust_density_o_n_grains(:,1:n_cells) = 0.0_dp
+     dust_density_o_n_grains(:,1:n_cells) = dust_density_pristine * sublimation_trace
   elsewhere
      dust_density_o_n_grains(:,1:n_cells) = dust_density_pristine
   end where
@@ -715,7 +817,7 @@ subroutine apply_sublimation()
   mass = sum(dust_mass) * g_to_Msun
   write(*,'(" Sublimation : ", i0, " sublimated (grain or zone, cell) pairs, dust mass = ", es10.3, " Msun")') &
        count(lsublimated), mass
-  if (mass < tiny_dp) call error("Sublimation : all the dust has sublimated")
+  if (all(lsublimated .or. (dust_density_pristine <= 0.0_dp))) call error("Sublimation : all the dust has sublimated")
 
   return
 
@@ -795,6 +897,8 @@ subroutine free_sublimation()
 
   if (allocated(dust_density_pristine)) deallocate(dust_density_pristine)
   if (allocated(lsublimated)) deallocate(lsublimated)
+  if (allocated(n_sublimation_flips)) deallocate(n_sublimation_flips)
+  if (allocated(pop_of_pk)) deallocate(pop_of_pk)
 
   return
 

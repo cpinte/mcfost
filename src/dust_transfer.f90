@@ -141,7 +141,8 @@ subroutine init_dust_transfer()
   ! Enable per-cell photon-packet counting (xN_abs, in radiation_field) so the
   ! hydrostatic equilibrium convergence test can estimate the Monte Carlo noise
   ! level on Tdust from photon-counting statistics (Min et al. 2009, A&A 497, 155).
-  if (lhydrostatic) lsave_n_packet_per_cell = .true.
+  ! packet counts per cell : noise estimate for the hydrostatic and sublimation convergence tests
+  if (lhydrostatic .or. ldust_sublimation) lsave_n_packet_per_cell = .true.
 
   call alloc_dynamique()
 
@@ -433,7 +434,7 @@ subroutine dust_transfer_sub()
 
   integer :: iter, n_iter_max, icell, start_iter, latest_iter, n_tested, icell_max, max_i, max_j
   logical :: lconverged, lphysics_iter, lupdate_hydro
-  integer :: n_new_sublimated
+  integer :: n_new_sublimated, n_recondensed, n_frozen
   real :: max_dT_o_T, mean_dT_o_T, mean_precision, rel_diff
   real :: n_packets_cur, n_packets_prev, sigma_dT_o_T, effective_precision
   real(kind=dp) :: density_residual
@@ -509,7 +510,7 @@ subroutine dust_transfer_sub()
 
         lconverged = .true.
         lupdate_hydro = .false.
-        n_new_sublimated = 0
+        n_new_sublimated = 0 ; n_recondensed = 0 ; n_frozen = 0
 
         ! Physics iteration hook: Hydrostatic equilibrium
         if (lhydrostatic) then
@@ -610,20 +611,24 @@ subroutine dust_transfer_sub()
         endif
 
         ! Physics iteration hook: dust sublimation
-        ! Converged once no new grains sublimate with the current temperature
+        ! Converged once no grain sublimates or re-condenses with the current temperature
+        ! (outside the noise hysteresis band, frozen grains excluded)
         if (ldust_sublimation) then
-           call update_sublimation(n_new_sublimated, lapply=.false.)
-           if (n_new_sublimated > 0) then
+           call update_sublimation(n_new_sublimated, n_recondensed, n_frozen, lapply=.false.)
+           if (n_new_sublimated + n_recondensed > 0) then
               lconverged = .false.
               if (iter < n_iter_max) then
-                 write(*,'(" Updating dust sublimation (iteration ", i0, "): ", i0, &
-                      & " newly sublimated (grain or zone, cell) pairs")') iter, n_new_sublimated
+                 write(*,'(" Updating dust sublimation (iteration ", i0, "): ", i0, " sublimating, ", i0, &
+                      & " re-condensing, ", i0, " frozen (grain or zone, cell) pairs")') &
+                      iter, n_new_sublimated, n_recondensed, n_frozen
               else
                  write(*,'(" WARNING: dust sublimation did not converge after ", i0, " iterations: ", i0, &
-                      & " newly sublimated (grain or zone, cell) pairs")') n_iter_max, n_new_sublimated
+                      & " sublimating, ", i0, " re-condensing (grain or zone, cell) pairs")') &
+                      n_iter_max, n_new_sublimated, n_recondensed
               endif
            else
-              write(*,'(" Dust sublimation converged after ", i0, " iteration(s)")') iter
+              write(*,'(" Dust sublimation converged after ", i0, " iteration(s), ", i0, &
+                   & " frozen (grain or zone, cell) pairs")') iter, n_frozen
            endif
         endif
 
@@ -633,10 +638,11 @@ subroutine dust_transfer_sub()
            if (lupdate_hydro) call equilibre_hydrostatique()
            if (ldust_sublimation) then
               if (lupdate_hydro) call set_pristine_dust_density()
-              if (n_new_sublimated > 0) call update_sublimation(n_new_sublimated, lapply=.true.)
-              if (lupdate_hydro .or. (n_new_sublimated > 0)) call apply_sublimation()
+              if (n_new_sublimated + n_recondensed > 0) &
+                   call update_sublimation(n_new_sublimated, n_recondensed, n_frozen, lapply=.true.)
+              if (lupdate_hydro .or. (n_new_sublimated + n_recondensed > 0)) call apply_sublimation()
            endif
-           if (lupdate_hydro .or. (n_new_sublimated > 0)) then
+           if (lupdate_hydro .or. (n_new_sublimated + n_recondensed > 0)) then
               call recompute_opacities()
               call update_thermal_emission_tables()
            endif
