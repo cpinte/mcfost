@@ -1759,6 +1759,9 @@ subroutine initialisation_mcfost()
   if (lhydrostatic) then
      ! the dust redistribution would refill the sublimated cells at every iteration
      if (ldust_sublimation) call error("Hydrostatic equilibrium is not compatible with dust sublimation yet")
+     ! the state of non-LTE and non-equilibrium grains (emission tables, packet budget
+     ! modified by emission_nRE) is not rebuilt between hydrostatic iterations
+     if (lRE_nLTE .or. lnRE) call error("Hydrostatic equilibrium only works with grains in LTE (heating method 1)")
      ! the gas of all zones is reshaped into a disk profile, but the dust of
      ! envelope, debris and wall zones is left untouched
      if (any(disk_zone(1:n_zones)%geometry > 2)) &
