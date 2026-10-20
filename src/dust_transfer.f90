@@ -214,9 +214,12 @@ subroutine init_dust_transfer()
         Tdust=0.0
      endif !l_em_disk_image
 
-     ! Re-apply T-based sublimation so -img matches the thermal-run dust
+     ! Same dust as in the temperature run : sublimation mask saved by that run
      if (ldust_sublimation) then
-        call sublimate_dust()
+        call init_sublimation()
+        call read_sublimation_mask()
+        call apply_sublimation()
+        call free_sublimation()
         call opacity(1)
      endif
 
@@ -429,7 +432,8 @@ subroutine dust_transfer_sub()
   implicit none
 
   integer :: iter, n_iter_max, icell, start_iter, latest_iter, n_tested, icell_max, max_i, max_j
-  logical :: lconverged
+  logical :: lconverged, lphysics_iter, lupdate_hydro
+  integer :: n_new_sublimated
   real :: max_dT_o_T, mean_dT_o_T, mean_precision, rel_diff
   real :: n_packets_cur, n_packets_prev, sigma_dT_o_T, effective_precision
   real(kind=dp) :: density_residual
@@ -453,6 +457,13 @@ subroutine dust_transfer_sub()
   if (letape_th) then
      n_iter_max = 1
      start_iter = 1
+
+     ! Physics modules iterated with the temperature calculation
+     lphysics_iter = lhydrostatic .or. ldust_sublimation
+     if (ldust_sublimation) then
+        n_iter_max = n_iter_physics
+        call init_sublimation()
+     endif
 
      if (lhydrostatic) then
         n_iter_max = n_iter_physics ! Default 100 or set via -n_iter_physics command line option
@@ -490,13 +501,15 @@ subroutine dust_transfer_sub()
      endif
 
      physics_loop : do iter = start_iter, n_iter_max
-        if (lhydrostatic) then
+        if (lphysics_iter) then
            call run_thermal_mc(lwrite_output=.false.)
         else
            call run_thermal_mc()
         endif
 
         lconverged = .true.
+        lupdate_hydro = .false.
+        n_new_sublimated = 0
 
         ! Physics iteration hook: Hydrostatic equilibrium
         if (lhydrostatic) then
@@ -585,9 +598,7 @@ subroutine dust_transfer_sub()
                          & "), mean = ", f7.4, ", density residual = ", f7.4)') &
                          iter, max_dT_o_T, max_i, max_j, hydrostatic_precision, mean_precision, mean_dT_o_T, density_residual
                  endif
-                 call equilibre_hydrostatique()
-                 call recompute_opacities()
-                 call update_thermal_emission_tables()
+                 lupdate_hydro = .true.
               else
                  write(*,'(" WARNING: hydrostatic equilibrium did not converge after ", i0, " iterations: max |dT|/T = ", &
                       & f7.4, " at (i=", i0, ", j=", i0, ") (target: ", f6.4, ", noise-adjusted mean target: ", f6.4, &
@@ -596,20 +607,55 @@ subroutine dust_transfer_sub()
               endif
            endif
 
-           ! Save per-iteration state for restart and inspection
+        endif
+
+        ! Physics iteration hook: dust sublimation
+        ! Converged once no new grains sublimate with the current temperature
+        if (ldust_sublimation) then
+           call update_sublimation(n_new_sublimated, lapply=.false.)
+           if (n_new_sublimated > 0) then
+              lconverged = .false.
+              if (iter < n_iter_max) then
+                 write(*,'(" Updating dust sublimation (iteration ", i0, "): ", i0, &
+                      & " newly sublimated (grain or zone, cell) pairs")') iter, n_new_sublimated
+              else
+                 write(*,'(" WARNING: dust sublimation did not converge after ", i0, " iterations: ", i0, &
+                      & " newly sublimated (grain or zone, cell) pairs")') n_iter_max, n_new_sublimated
+              endif
+           else
+              write(*,'(" Dust sublimation converged after ", i0, " iteration(s)")') iter
+           endif
+        endif
+
+        ! Apply the updates of the physics modules, in order : gas structure,
+        ! dust redistribution, sublimation, then opacities and emission tables
+        if ((.not.lconverged) .and. (iter < n_iter_max)) then
+           if (lupdate_hydro) call equilibre_hydrostatique()
+           if (ldust_sublimation) then
+              if (lupdate_hydro) call set_pristine_dust_density()
+              if (n_new_sublimated > 0) call update_sublimation(n_new_sublimated, lapply=.true.)
+              if (lupdate_hydro .or. (n_new_sublimated > 0)) call apply_sublimation()
+           endif
+           if (lupdate_hydro .or. (n_new_sublimated > 0)) then
+              call recompute_opacities()
+              call update_thermal_emission_tables()
+           endif
+        endif
+
+        ! Save per-iteration state for restart and inspection
+        if (lhydrostatic) then
            call ecriture_temperature_hydro_iter(iter)
            call ecriture_gas_density_hydro_iter(iter)
         endif
-
-        ! Additional physics iteration hooks can be added here
-        ! e.g., dust sublimation iteration, grain growth, etc.
+        if (ldust_sublimation .and. (.not.lmcfost_lib)) call write_sublimation_mask(iter)
 
         if (lconverged) exit physics_loop
      enddo physics_loop
 
      ! Write final converged temperature and SED once iterations are complete
-     if (lhydrostatic) then
-        call print_hydrostatic_scale_height()
+     if (lphysics_iter) then
+        if (lhydrostatic) call print_hydrostatic_scale_height()
+        if (ldust_sublimation .and. (.not. lmcfost_lib)) call write_sublimation_mask(0)
         if (.not. lmcfost_lib) then
            call ecriture_temperature(1)
            call ecriture_sed(1)
@@ -625,6 +671,7 @@ subroutine dust_transfer_sub()
 
      if (allocated(Tdust_hydro_prev)) deallocate(Tdust_hydro_prev)
      call free_hydrostatic()
+     call free_sublimation()
      if (allocated(N_packets_hydro_prev)) deallocate(N_packets_hydro_prev)
   endif
 
@@ -839,11 +886,6 @@ subroutine run_thermal_mc(lwrite_output)
            n_iter = n_iter + 1
            write(*,*) "Starting iteration", n_iter
         endif
-     endif
-
-     ! todo_physics : this should be moved into the dust_transfer_sub and compared with remove_species
-     if (ldust_sublimation) then
-        call sublimate_dust()
      endif
 
      if (.not.letape_th) exit

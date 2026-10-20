@@ -1589,6 +1589,8 @@ subroutine initialisation_mcfost()
   endif
 
   if (n_zones > 1) lvariable_dust=.true.
+  ! populations sublimate independently : one density per grain size is needed
+  if (ldust_sublimation .and. (n_pop > 1)) lvariable_dust=.true.
 
   if (lemission_mol.and.para_version < 2.11) call error("parameter version must be larger than 2.10")
   if (lemission_atom.and.para_version < 2.11) call error("Atomic line RT only available for latest versions")
@@ -1767,6 +1769,11 @@ subroutine initialisation_mcfost()
      if (any(disk_zone(1:n_zones)%geometry > 2)) &
           call error("Hydrostatic equilibrium only works with disk zones (power-law or tapered-edge)")
   endif
+
+  ! Dust sublimation is iterated with the temperature calculation : the state of
+  ! non-LTE and non-equilibrium grains is not rebuilt between iterations yet
+  if (ldust_sublimation .and. (lRE_nLTE .or. lnRE)) &
+       call error("Dust sublimation only works with grains in LTE (heating method 1) for now")
 
   if ((ltemp.or.lsed.or.lsed_complete).and.(.not.lstop_after_init)) then
      write(*,*) "Thermal equilibrium calculation"

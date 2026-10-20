@@ -28,6 +28,14 @@ module disk_physics
   real(kind=dp), parameter :: hydro_residual_floor = 1.0e-3_dp
   real(kind=dp), parameter :: hydro_density_precision = 5.0e-2_dp
 
+  ! Dust sublimation, iterated with the radiative transfer in the physics loop.
+  ! dust_density_pristine is the dust density before sublimation (it follows the
+  ! hydrostatic redistribution); lsublimated has the first dimension of
+  ! dust_density_o_n_grains : one flag per grain size (lvariable_dust) or per zone.
+  real(kind=dp), allocatable, dimension(:,:), private :: dust_density_pristine
+  logical, allocatable, dimension(:,:) :: lsublimated
+  character(len=32), parameter :: sublimationMaskFile = "sublimation_mask"
+
 contains
 
 
@@ -651,6 +659,192 @@ subroutine print_hydrostatic_scale_height()
 
 end subroutine print_hydrostatic_scale_height
 
+!**********************************************************
+
+subroutine init_sublimation()
+  ! Takes the current dust density as the pristine (unsublimated) density
+
+  if (allocated(dust_density_pristine)) deallocate(dust_density_pristine)
+  if (allocated(lsublimated)) deallocate(lsublimated)
+
+  allocate(dust_density_pristine(size(dust_density_o_n_grains,1),n_cells), &
+       lsublimated(size(dust_density_o_n_grains,1),n_cells))
+  dust_density_pristine(:,:) = dust_density_o_n_grains(:,1:n_cells)
+  lsublimated(:,:) = .false.
+
+  return
+
+end subroutine init_sublimation
+
+!**********************************************************
+
+subroutine set_pristine_dust_density()
+  ! The dust density has been recomputed (hydrostatic redistribution) :
+  ! it becomes the new pristine density, before the sublimation mask is applied
+
+  dust_density_pristine(:,:) = dust_density_o_n_grains(:,1:n_cells)
+
+  return
+
+end subroutine set_pristine_dust_density
+
+!**********************************************************
+
+subroutine update_sublimation(n_new, lapply)
+  ! Flags the grains whose temperature exceeds their sublimation temperature.
+  ! n_new returns the number of newly sublimated (grain or zone, cell) pairs.
+  ! With lapply=.false., the mask is not modified (convergence test only).
+  ! LTE only for now : one temperature per cell.
+  ! PAHs (non-equilibrium grains) are not sublimated.
+
+  integer, intent(out) :: n_new
+  logical, intent(in) :: lapply
+
+  integer :: icell, k, p_k
+
+  n_new = 0
+  do icell=1, n_cells
+     do k=1, n_grains_tot
+        if (dust_pop(grain(k)%pop)%is_PAH) cycle
+        p_k = merge(k, grain(k)%zone, lvariable_dust)
+        if (lsublimated(p_k,icell)) cycle
+        if (dust_density_pristine(p_k,icell) <= 0.0_dp) cycle
+        if (Tdust(icell) > dust_pop(grain(k)%pop)%T_sub) then
+           ! in zone mode, several grains map onto the same p_k : count it once
+           if (lapply) then
+              lsublimated(p_k,icell) = .true.
+              n_new = n_new + 1
+           else if (.not.lvariable_dust) then
+              n_new = n_new + 1
+              exit
+           else
+              n_new = n_new + 1
+           endif
+        endif
+     enddo
+  enddo
+
+  return
+
+end subroutine update_sublimation
+
+!**********************************************************
+
+subroutine apply_sublimation()
+  ! dust density = pristine density where the grains have not sublimated, then
+  ! recomputes the dust mass of each cell and the reference (first non-empty) cell
+
+  integer :: icell, k, pop
+  real(kind=dp) :: mass
+
+  where (lsublimated)
+     dust_density_o_n_grains(:,1:n_cells) = 0.0_dp
+  elsewhere
+     dust_density_o_n_grains(:,1:n_cells) = dust_density_pristine
+  end where
+
+  do icell=1, n_cells
+     dust_mass(icell) = 0.0_dp
+     if (lvariable_dust) then
+        do k=1, n_grains_tot
+           dust_mass(icell) = dust_mass(icell) + dust_density_o_n_grains(k,icell) * n_grains(k) * M_grain(k)
+        enddo
+     else
+        ! zone mode : dust_density_o_n_grains(izone,:) is the mass density of the zone,
+        ! split between its populations by frac_mass (as in normalize_dust_density)
+        do pop=1, n_pop
+           dust_mass(icell) = dust_mass(icell) + dust_density_o_n_grains(dust_pop(pop)%zone,icell) * dust_pop(pop)%frac_mass
+        enddo
+     endif
+     dust_mass(icell) = dust_mass(icell) * volume(icell) * AU3_to_cm3
+  enddo
+
+  call find_non_empty_cell()
+  mass = sum(dust_mass) * g_to_Msun
+  write(*,'(" Sublimation : ", i0, " sublimated (grain or zone, cell) pairs, dust mass = ", es10.3, " Msun")') &
+       count(lsublimated), mass
+  if (mass < tiny_dp) call error("Sublimation : all the dust has sublimated")
+
+  return
+
+end subroutine apply_sublimation
+
+!**********************************************************
+
+subroutine write_sublimation_mask(iter)
+  ! Saves the sublimation mask (1 = sublimated) in data_th, for restart and
+  ! for image/SED runs. iter > 0 : per-iteration file, iter = 0 : final mask.
+
+  use fits_utils, only : cfitsWrite
+
+  integer, intent(in) :: iter
+
+  character(len=512) :: filename
+  character(len=4) :: iter_str
+
+  if (iter > 0) then
+     write(iter_str,'(i4.4)') iter
+     filename = "!"//trim(data_dir)//"/"//trim(sublimationMaskFile)//"_iter"//iter_str//".fits.gz"
+  else
+     filename = "!"//trim(data_dir)//"/"//trim(sublimationMaskFile)//".fits.gz"
+  endif
+  call cfitsWrite(trim(filename), merge(1.0, 0.0, lsublimated), shape(lsublimated))
+
+  return
+
+end subroutine write_sublimation_mask
+
+!**********************************************************
+
+subroutine read_sublimation_mask()
+  ! Reads the final sublimation mask written by the temperature run
+
+  integer :: status, unit, blocksize, readwrite, nfound, group, firstpix, npixels
+  integer, dimension(2) :: naxes
+  real :: nullval
+  logical :: anynull
+  real, dimension(:), allocatable :: mask
+  character(len=512) :: filename
+
+  filename = trim(root_dir)//"/"//trim(seed_dir)//"/data_th/"//trim(sublimationMaskFile)//".fits.gz"
+  write(*,*) "Reading sublimation mask : "//trim(filename)
+
+  status = 0
+  call ftgiou(unit,status)
+  readwrite = 0
+  call ftopen(unit,trim(filename),readwrite,blocksize,status)
+  if (status /= 0) call error("cannot open "//trim(filename), &
+       msg2="the temperature run must be done with this version of mcfost")
+  call ftgknj(unit,'NAXIS',1,2,naxes,nfound,status)
+  if ((status /= 0).or.(nfound /= 2)) call error("cannot read the dimensions of "//trim(filename))
+  if ((naxes(1) /= size(lsublimated,1)).or.(naxes(2) /= size(lsublimated,2))) then
+     call error("sublimation mask does not match the current grid and dust populations")
+  endif
+  npixels = naxes(1)*naxes(2)
+  allocate(mask(npixels))
+  group = 1 ; firstpix = 1 ; nullval = -999
+  call ftgpve(unit,group,firstpix,npixels,nullval,mask,anynull,status)
+  if (status /= 0) call error("cannot read "//trim(filename))
+  call ftclos(unit,status)
+  call ftfiou(unit,status)
+
+  lsublimated = reshape(mask > 0.5, shape(lsublimated))
+  deallocate(mask)
+
+  return
+
+end subroutine read_sublimation_mask
+
+!**********************************************************
+
+subroutine free_sublimation()
+
+  if (allocated(dust_density_pristine)) deallocate(dust_density_pristine)
+  if (allocated(lsublimated)) deallocate(lsublimated)
+
+  return
+
+end subroutine free_sublimation
 
 !**********************************************************
 
