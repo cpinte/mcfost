@@ -17,7 +17,10 @@ module disk_physics
   implicit none
 
   character(len=32) :: sublimationFile = "sublimation_radius.txt"
-  real(kind=dp), parameter :: sub_factor = 1.6_dp
+  ! The innermost zone is extended inwards to sub_factor x the optically thin
+  ! sublimation radius if it starts further out; the sublimation front itself is
+  ! found by the iterations (sublimation mask)
+  real(kind=dp), parameter :: sub_factor = 1.0_dp
 
   ! Surface density snapshot taken on the first hydrostatic iteration,
   ! freed by free_hydrostatic once the iterations are complete
