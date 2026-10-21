@@ -32,6 +32,41 @@ followed by an empty line and then 3 columns containing the wavelengths
 (in microns) and the real and imaginary parts of the optical indices.
 Wavelengths can be in ascending or descending order but must be ordered.
 
+.. _sublimation-laws:
+
+Sublimation laws
+^^^^^^^^^^^^^^^^
+
+When dust sublimation is enabled, the sublimation temperature of a component
+can depend on the gas density. The law is read from an optional file with the
+same name as the optical indices file and the extension ``.sub`` (for
+instance ``Draine_Si_sUV.sub`` for ``Draine_Si_sUV.dat``), searched in the
+same directories (the current directory first, then the dust directory of
+the utils). Without ``.sub`` file, the sublimation temperature of the optical
+indices file is used. The option ``-constant_sublimation_temperature``
+ignores the ``.sub`` files.
+
+The file contains one ``key = value`` per line, ``#`` starts a comment::
+
+  # Sublimation properties for Draine_Si_sUV.dat
+  format_version = 1
+  law = power_law                 # constant | power_law
+  T0 = 2000.                      # K
+  rho0 = 1.0                      # g cm^-3
+  gamma = 0.0195
+  reference = Pollack et al. 1994; Isella & Natta 2005
+
+* ``format_version``: must be 1
+* ``law``: ``constant`` (sublimation temperature of the optical indices file)
+  or ``power_law``: T\ :sub:`sub` = T0 (rho\ :sub:`gas` / rho0)\ :sup:`gamma`, with
+  rho\ :sub:`gas` the local gas density in g/cm\ :sup:`3`
+* ``T0``, ``rho0``, ``gamma``: parameters of the power law (all required)
+* ``reference``: free text, ignored
+
+Unknown keys and missing parameters are errors. For a population with
+several components, the lowest sublimation temperature of the components is
+used.
+
 -  ``CO2_50K-reduit.dat:`` CO2 ice at 50K (origin?)
 
 -  ``Draine_Si.dat "``\ Astronomical silicates" from Bruce Draine

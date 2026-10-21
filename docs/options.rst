@@ -106,7 +106,8 @@ Options related to temperature equilibrium
 
 ``-origin``: save origin of packets received the interest bin
 
-``-rs (remove specie) <specie_number> <Temperature>``
+``-constant_sublimation_temperature``: ignore the ``.sub`` files and use the
+sublimation temperature of the optical indices files (see :ref:`sublimation-laws`)
 
 ``-reemission_stats``
 

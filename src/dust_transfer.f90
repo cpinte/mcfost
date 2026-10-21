@@ -706,12 +706,6 @@ subroutine dust_transfer_sub()
      if (allocated(N_packets_hydro_prev)) deallocate(N_packets_hydro_prev)
   endif
 
-  ! ── Dust Species Removal ──
-  if (lremove) then
-     call remove_species()
-     if (lTemp .and. lsed_complete) call recompute_opacities()
-  endif
-
   ! ── Observables (Image / SED) ──
   if (lmono0) then
      call run_image_mc()

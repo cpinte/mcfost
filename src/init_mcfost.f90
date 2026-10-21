@@ -3,7 +3,7 @@ module init_mcfost
   use parameters
   use naleat
   use grains, only : aggregate_file, mueller_aggregate_file
-  use density, only : species_removed, T_rm, check_density_file_Voronoi_variable_dust
+  use density, only : check_density_file_Voronoi_variable_dust
   use molecular_emission
   !$ use omp_lib
   use benchmarks
@@ -154,7 +154,6 @@ subroutine set_default_variables()
   lonly_top = .false.
   lcorrect_Tgas = .false.
   lcorrect_density=.false.
-  lremove = .false.
   lforce_constant_sublimation = .false.
   lforce_PAH_equilibrium=.false.
   lforce_PAH_out_equilibrium=.false.
@@ -580,17 +579,6 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) izone_tilt
         if (ios /= 0 .or. izone_tilt < 1) call error("izone must be a positive integer")
-        i_arg= i_arg+1
-     case("-rs")
-        lremove=.true.
-        i_arg= i_arg+1
-        if (i_arg > n_args) call error("species number needed")
-        call get_command_argument(i_arg,s)
-        read(s,*,iostat=ios) species_removed
-        i_arg= i_arg+1
-        if (i_arg > n_args) call error("Temperature needed")
-        call get_command_argument(i_arg,s)
-        read(s,*,iostat=ios) T_rm
         i_arg= i_arg+1
      case("-resol")
         lresol=.true.
@@ -1999,7 +1987,6 @@ subroutine display_help()
   write(*,*) "        : -tau_dark_zone_obs <tau_dark_zone> (default : 100)"
   write(*,*) "        : -tau_dark_zone_eq_th <tau_dark_zone> (default : 1500)"
   write(*,*) "        : -origin : save origin of packets received the interest bin"
-  write(*,*) "        : -rs (remove species) <species_number> <Temperature>"
   write(*,*) "        : -reemission_stats"
   write(*,*) "        : -weight_emission  : weight emission towards disk surface"
   write(*,*) "        : -force_PAH_equilibrium : mainly for testing purposes"
