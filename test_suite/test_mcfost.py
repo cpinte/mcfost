@@ -439,6 +439,15 @@ def read_sublimation(root_dir):
     return T, mask
 
 
+def utils_T_sub(dust_file):
+    # constant sublimation temperature of a dust file of the MCFOST utils (2nd value of
+    # the first non-comment line), used with -constant_sublimation_temperature
+    with open(os.path.join(os.environ["MCFOST_UTILS"], "Dust", dust_file)) as f:
+        for line in f:
+            if not line.lstrip().startswith("#"):
+                return float(line.split()[1])
+
+
 def flux_conservation(stdout):
     lines = [l for l in stdout.splitlines() if "Flux conservation" in l]
     assert len(lines) == 1
@@ -450,10 +459,11 @@ def test_sublimation_front():
     # sublimation front is found by iterating the temperature calculation. At
     # convergence, the remaining dust is below T_sub and the sublimated cells (where a
     # trace of dust gives the test-particle temperature) are above it, within the
-    # Monte Carlo hysteresis band.
+    # Monte Carlo hysteresis band. The constant sublimation temperature of the dust
+    # file is used (the density-dependent law is tested in test_sublimation_power_law).
     if not compute_models:
         pytest.skip("Only run when computing models")
-    T_sub = 1500.0 # Draine_Si_sUV.dat
+    T_sub = utils_T_sub("Draine_Si_sUV.dat")
     root_dir = "ref4.1_sublimation_front"
     clean_results(root_dir)
     os.makedirs(root_dir, exist_ok=True)
@@ -463,7 +473,7 @@ def test_sublimation_front():
                "hydostatic equilibrium": set_first_value("F"),
                "Rin, edge, Rout": set_first_value("0.03")})
 
-    stdout = run_mcfost(para, root_dir, "-no_diff_approx")
+    stdout = run_mcfost(para, root_dir, "-no_diff_approx -constant_sublimation_temperature")
     assert "Dust sublimation converged" in stdout
     assert flux_conservation(stdout) < 2.0
 
@@ -475,11 +485,13 @@ def test_sublimation_front():
 
 
 def test_sublimation_multi_population():
-    # Two zones and three populations (ref3.0_multi in LTE): silicates (T_sub = 1500 K)
-    # sublimate in the inner zone, the ice-coated grains of the outer zone
-    # (T_sub = 100 K) beyond the snow line, and PAHs never sublimate. Each population
-    # sublimates independently (variable dust). Only the innermost zone is extended to
-    # the sublimation radius (no overlapping grid regions).
+    # Two zones and three populations (ref3.0_multi in LTE): silicates sublimate in
+    # the inner zone, the ice-coated grains of the outer zone beyond the snow line, and
+    # PAHs never sublimate. Each population sublimates independently (variable dust).
+    # Only the innermost zone is extended to the sublimation radius (no overlapping
+    # grid regions). The outer zone starts at 10 au, where the ice would not reach the
+    # sublimation temperature of the utils (165 K): a copy of ice_opct.dat with
+    # T_sub = 100 K is placed in the run directory, which is searched first.
     if not compute_models:
         pytest.skip("Only run when computing models")
     root_dir = "ref3.0_multi_sublimation"
@@ -492,8 +504,18 @@ def test_sublimation_multi_population():
                "nbr_photons_eq_th": set_first_value("1.28e5"),
                # inner zone only (the outer zone starts at 10 au)
                "Rin, edge, Rout": lambda line: set_first_value("0.03")(line) if line.split()[0] == "1." else line})
+    T_sub_ice = 100.0
+    with open(os.path.join(os.environ["MCFOST_UTILS"], "Dust", "ice_opct.dat")) as f_in, \
+         open(root_dir+"/ice_opct.dat", "w") as f_out:
+        data_line = False
+        for line in f_in:
+            if not data_line and not line.lstrip().startswith("#"):
+                line = line.split()[0]+" "+str(T_sub_ice)+"\n"
+                data_line = True
+            f_out.write(line)
 
-    stdout = run_mcfost(para, root_dir, "-no_diff_approx -no_SED")
+    stdout = run_mcfost("multi.para", ".", "-no_diff_approx -no_SED -constant_sublimation_temperature",
+                        cwd=root_dir)
     assert "Dust sublimation converged" in stdout
 
     T, mask = read_sublimation(root_dir)
@@ -503,8 +525,8 @@ def test_sublimation_multi_population():
     assert silicates.any()
     assert ices.any()
     assert not pah.any()
-    assert T[silicates.any(axis=1)].min() > 0.7 * 1500.0
-    assert T[ices.any(axis=1)].min() > 0.7 * 100.0
+    assert T[silicates.any(axis=1)].min() > 0.7 * utils_T_sub("Draine_Si_sUV.dat")
+    assert T[ices.any(axis=1)].min() > 0.7 * T_sub_ice
 
 
 def test_sublimation_hydrostatic():

@@ -73,10 +73,19 @@ subroutine compute_othin_sublimation_radius()
 
   real(kind=dp) :: E_dust, E_etoile, coeff_exp, cst_wl, sublimation_radius
   real(kind=dp) :: cst, wl, delta_wl, star_flux
+  real :: T_sub
   integer :: lambda, icell, i
 
+  ! Highest sublimation temperature of the first population in the model (density-
+  ! dependent laws) : no dust can survive inside the corresponding radius
+  T_sub = 0.0
+  do icell=1, n_cells
+     T_sub = max(T_sub, population_sublimation_temperature(1, real(gas_density(icell) * mu_mH / m3_to_cm3)))
+  enddo
+  write(*,'(a,f7.1,a)') " Sublimation temperature for the optically thin sublimation radius = ", T_sub, " K"
+
   E_dust = 0.0
-  cst=thermal_const/dust_pop(1)%T_sub
+  cst=thermal_const/T_sub
 
   icell = icell1
 
