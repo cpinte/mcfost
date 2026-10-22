@@ -1289,7 +1289,8 @@ subroutine get_utils()
   if (.not.lok) call error("Cannot get MCFOST UTILS "//trim(utils_version_string())//" from "//trim(utils_url()), &
        msg2="this version may not be released yet")
 
-  cmd = "mkdir -p "//trim(mcfost_utils)//" ; curl -f -s -S -L "//trim(utils_url())//"mcfost_utils.tgz -o "//trim(tarball)
+  cmd = "mkdir -p "//trim(mcfost_utils)//" ; curl -f -s -S -L --retry 3 --retry-delay 5 "// &
+       trim(utils_url())//"mcfost_utils.tgz -o "//trim(tarball)
   call system_call(cmd, syst_status)
   if (syst_status /= 0) then
      call system_call("rm -f "//trim(tarball), syst_status)
@@ -1308,7 +1309,8 @@ subroutine get_utils()
           msg2="downloaded: "//trim(sha1_local)//", expected: "//trim(sha1_server))
   endif
 
-  cmd = "tar xzf "//trim(tarball)//" -C "//trim(mcfost_utils)//" && rm -f "//trim(tarball)
+  ! --no-same-owner: files belong to the user even if tar runs as root (e.g. setuid tar)
+  cmd = "tar xzf "//trim(tarball)//" --no-same-owner -C "//trim(mcfost_utils)//" && rm -f "//trim(tarball)
   call system_call(cmd, syst_status)
   if (syst_status /= 0) call error("Error while extracting MCFOST UTILS")
 
@@ -1356,7 +1358,8 @@ subroutine get_utils_sha1(sha1, lok)
   integer :: syst_status
 
   filename = trim(mcfost_utils)//"/mcfost_utils.sha1.download"
-  call system_call("mkdir -p "//trim(mcfost_utils)//" ; curl -f -s -L "//trim(utils_url())//"mcfost_utils.sha1 -o "// &
+  call system_call("mkdir -p "//trim(mcfost_utils)//" ; curl -f -s -S -L --retry 3 --retry-delay 5 "// &
+       trim(utils_url())//"mcfost_utils.sha1 -o "// &
        trim(filename), syst_status)
   sha1 = ""
   if (syst_status == 0) sha1 = read_sha1(filename)

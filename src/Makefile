@@ -353,14 +353,15 @@ release_doc:
 # them) and are never updated.
 # scp -O: legacy SCP protocol, the server does not provide SFTP (default of OpenSSH >= 9)
 # Local files are not distributed: update date (.last_update), installed release
-# (.sha1) and macOS metadata (COPYFILE_DISABLE: no AppleDouble ._* files).
+# (.sha1) and macOS metadata (COPYFILE_DISABLE: no AppleDouble ._* files,
+# --no-xattrs --no-mac-metadata: no extended attributes, unknown to GNU tar).
 UTILS_DIR = /user/publicdir/pintec/mcfost_utils
 UTILS_VERSION = $(shell cat ../utils/Version)
 
 release_utils :
 	@grep -q "required_utils_version = $(UTILS_VERSION)$$" mcfost_env.f90 || \
 	  { echo "../utils/Version ($(UTILS_VERSION)) differs from required_utils_version in mcfost_env.f90" ; exit 1 ; }
-	COPYFILE_DISABLE=1 tar czvf mcfost_utils.tgz --exclude=.last_update --exclude=.sha1 --exclude='*.download' \
+	COPYFILE_DISABLE=1 tar czvf mcfost_utils.tgz --no-xattrs --no-mac-metadata --exclude=.last_update --exclude=.sha1 --exclude='*.download' \
 	  --exclude=.DS_Store --exclude='._*' -C../utils .
 	openssl sha1 mcfost_utils.tgz | awk '{print $$2}' > mcfost_utils.sha1
 	ssh $(IPAG_SERVER) "mkdir -p $(UTILS_DIR)/$(UTILS_VERSION)"
