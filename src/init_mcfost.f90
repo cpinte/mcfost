@@ -345,10 +345,16 @@ subroutine initialisation_mcfost()
   ! Looking for the mcfost utils directory
   call get_mcfost_utils_dir()
 
-  ! Do we need to search for an update ?
+  ! Command line (needed to restart mcfost after an automatic update)
+  call get_command(cmd_opt)
+
+  ! Do we need to search for an update ? Never for a binary compiled from the
+  ! sources (MCFOST_GIT=1), which would be replaced by the last release
   mcfost_auto_update = 7
   call get_environment_variable('MCFOST_AUTO_UPDATE',s)
   if (s/="") read(s,*) mcfost_auto_update
+  call get_environment_variable('MCFOST_GIT',s)
+  if (trim(s)=="1") mcfost_auto_update = 0
 
   if (mcfost_auto_update > 0) then
      cmd = 'date +%s > date.tmp' ;   call system_call(cmd, syst_status)
@@ -378,9 +384,6 @@ subroutine initialisation_mcfost()
         endif ! lupdate
      endif
   endif
-
-  ! Command line
-  call get_command(cmd_opt)
 
   ! Number of arguments
   n_args = command_argument_count()

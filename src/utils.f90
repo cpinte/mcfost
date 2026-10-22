@@ -860,13 +860,14 @@ function mcfost_update(lforce_update, lmanual, n_days)
      return
   endif
 
-  ! Do we need to update ?
-  if (last_version == mcfost_release) then
-     write(*,*) "MCFOST is up-to-date"
-     lupdate = .false.
-  else ! Updating
+  ! Do we need to update ? Only to a newer version: a development binary
+  ! (version not released yet) is never replaced by the last release
+  if (is_newer_version(last_version, mcfost_release)) then
      write(*,*) "New MCFOST version available: ", trim(last_version)
      lupdate = .true.
+  else
+     write(*,*) "MCFOST is up-to-date"
+     lupdate = .false.
   endif
   if (lforce_update) then
      write(*,*) "Forcing update to ", trim(last_version)
@@ -990,6 +991,51 @@ function mcfost_update(lforce_update, lmanual, n_days)
   return
 
 end function mcfost_update
+
+!***********************************************************
+
+logical function is_newer_version(version, reference)
+  ! true if version (e.g. "4.1.15") is strictly newer than reference
+
+  character(len=*), intent(in) :: version, reference
+
+  integer, dimension(3) :: v, r
+  integer :: i
+
+  call parse_version(version, v)
+  call parse_version(reference, r)
+
+  is_newer_version = .false.
+  do i=1, 3
+     if (v(i) /= r(i)) then
+        is_newer_version = (v(i) > r(i))
+        return
+     endif
+  enddo
+
+contains
+
+  subroutine parse_version(str, n)
+    ! "major.minor.patch", missing or unreadable numbers are 0
+
+    character(len=*), intent(in) :: str
+    integer, dimension(3), intent(out) :: n
+
+    character(len=len(str)) :: s
+    integer :: k, j, ios
+
+    n = 0
+    s = adjustl(str)
+    do k=1, 3
+       j = index(s, ".")
+       if (j == 0) j = len_trim(s) + 1
+       if (j > 1) read(s(1:j-1),*,iostat=ios) n(k)
+       if (j > len_trim(s)) exit
+       s = s(j+1:)
+    enddo
+  end subroutine parse_version
+
+end function is_newer_version
 
 !***********************************************************
 

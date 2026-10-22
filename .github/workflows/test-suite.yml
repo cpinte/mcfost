@@ -14,6 +14,8 @@ on:
 env:
   MCFOST_NO_XGBOOST: yes
   MCFOST_GIT: "1"
+  # the binary under test must not replace itself with the latest release
+  MCFOST_AUTO_UPDATE: "0"
   SKIP_HDF5: no
 
 jobs:
