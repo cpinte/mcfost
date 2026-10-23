@@ -18,13 +18,38 @@ jobs:
         with:
           fetch-depth: 0
 
+      # The review is a single request: with the free tier, the input is limited
+      # to 250k tokens per minute. The full changed files are only sent if the
+      # request stays well below this limit (~600 kB, about 3.5 characters per
+      # token), otherwise the diff alone (with 50, then 10, context lines).
+      - name: Choose review context
+        id: context
+        shell: bash
+        run: |
+          base=${{ github.event.pull_request.base.sha }}
+          head=${{ github.event.pull_request.head.sha }}
+          max_bytes=600000
+          diff50=$(git diff -U50 $base $head | wc -c)
+          files=$(git diff --name-only $base $head | while read f; do [ -f "$f" ] && cat "$f"; done | wc -c)
+          if [ $((diff50 + files)) -le $max_bytes ]; then
+            add_files=true ; context_lines=50
+          elif [ $diff50 -le $max_bytes ]; then
+            add_files=false ; context_lines=50
+          else
+            add_files=false ; context_lines=10
+          fi
+          echo "diff (50 context lines): $diff50 bytes, changed files: $files bytes"
+          echo "add-files: $add_files, context-lines: $context_lines"
+          echo "add_files=$add_files" >> $GITHUB_OUTPUT
+          echo "context_lines=$context_lines" >> $GITHUB_OUTPUT
+
       - name: Run Gemini Reviewer
         uses: sshnaidm/gemini-code-review-action@v2
         with:
           gemini-key: ${{ secrets.GEMINI_API_KEY }}
           model: "gemini-3.6-flash"
-          add-files: "true"
-          context-lines: "50"
+          add-files: ${{ steps.context.outputs.add_files }}
+          context-lines: ${{ steps.context.outputs.context_lines }}
           prompt: |
             You are an expert code reviewer for MCFOST, a high-performance
             3D Monte Carlo radiative transfer code written in modern/legacy
