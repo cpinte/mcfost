@@ -552,6 +552,49 @@ def test_sublimation_hydrostatic():
     assert np.isfinite(T).all()
     assert mask.any()
 
+    # Image: the structure of the temperature run is restored in the same order (grid
+    # extended to the sublimation radius, then hydrostatic density, then sublimation
+    # mask), otherwise the grid redefinition overwrites the hydrostatic density
+    stdout = run_mcfost(para, root_dir, "-img 1.0")
+    lines = stdout.splitlines()
+    def first_line(text):
+        return next(i for i, l in enumerate(lines) if text in l)
+    assert first_line("Reading sublimation file") < first_line("Restoring hydrostatic density") \
+        < first_line("Reading sublimation mask")
+    assert os.path.isfile(root_dir+"/data_1.0/RT.fits.gz")
+
+
+def test_sublimation_sed_only():
+    # SED computed without the temperature calculation (-no_T), from the temperature,
+    # sublimation radius and sublimation mask of a previous run: same SED as the one
+    # computed after the temperature calculation (without the mask, the sublimated
+    # cells keep their dust at the test-particle temperature: ~2.5 x the 1-5 micron flux)
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    root_dir = "ref4.1_sublimation_sed"
+    clean_results(root_dir)
+    os.makedirs(root_dir, exist_ok=True)
+    para = root_dir+"/sed.para"
+    make_para("test_data/ref4.1_hydrostatic/ref4.1_hydrostatic.para", para,
+              {"sublimate dust": set_first_value("T"),
+               "hydostatic equilibrium": set_first_value("F"),
+               "Rin, edge, Rout": set_first_value("0.03")})
+    opt = "-no_diff_approx -constant_sublimation_temperature"
+
+    run_mcfost(para, root_dir, opt)
+    sed_full = fits.getdata(root_dir+"/data_th/sed_rt.fits.gz")
+    # the SED files are not overwritten
+    for f in glob.glob(root_dir+"/data_th/sed_*.fits.gz"):
+        os.remove(f)
+
+    stdout = run_mcfost(para, root_dir, opt+" -no_T")
+    assert "Reading sublimation mask" in stdout
+    sed = fits.getdata(root_dir+"/data_th/sed_rt.fits.gz")
+    # total flux (first contribution), all inclinations and wavelengths
+    ratio = sed[0] / np.where(sed_full[0] > 0, sed_full[0], 1.0)
+    assert abs(np.median(ratio) - 1.0) < 0.02
+    assert ratio.max() < 1.3
+
 
 def test_sublimation_per_grain_size():
     # nLTE grains have one temperature per grain size: the small (hotter) ice-coated

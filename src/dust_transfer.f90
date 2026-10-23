@@ -51,7 +51,7 @@ subroutine init_dust_transfer()
 
   integer :: lambda_threshold
   integer :: lambda, lambda0, p_lambda
-  integer :: i, p_icell, latest_iter
+  integer :: i, p_icell
   logical :: laffichage, lcompute_dust_prop
   real, allocatable, dimension(:) :: extra_heating
 
@@ -116,24 +116,6 @@ subroutine init_dust_transfer()
      if (lwall) call define_density_wall3D()
   endif
 
-  ! ── Restore hydrostatic density for post-processing (-img, -mol, SED) ──
-  ! When running in image/SED/mol mode on a hydrostatic model, the density
-  ! was just set from the parametric prescription. Override it with the
-  ! converged hydrostatic density so that post-processing is consistent.
-  if ((lmono .or. (.not.lTemp)) .and. lhydrostatic .and. (.not.lVoronoi)) then
-     latest_iter = find_latest_hydro_iteration()
-     if (latest_iter > 0) then
-        write(*,*) ""
-        write(*,*) "Restoring hydrostatic density from iteration", latest_iter, "for image/SED/mol"
-        call read_gas_density_hydro_iter(latest_iter)
-        call redistribute_dust_hydrostatic()
-        write(*,*) ""
-     else
-        call warning("lhydrostatic is set but no saved iteration found in data_th/")
-        call warning("Using parametric density for image/SED/mol calculation")
-     endif
-  endif
-
   call setup_scattering()
   ! Dynamic allocation of all other tables
   call alloc_dust_prop()
@@ -150,6 +132,10 @@ subroutine init_dust_transfer()
   do i=1, nb_proc
      stream(i) = init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
   enddo
+
+  ! Post-processing (image, SED or molecular lines without temperature calculation):
+  ! same grid and density as at the end of the temperature run
+  if (lmono .or. (.not.lTemp)) call restore_temperature_run_structure()
 
   if (lProDiMo) call setup_ProDiMo()
   if (lML) call init_ML()
@@ -181,14 +167,6 @@ subroutine init_dust_transfer()
 
      if (llimb_darkening) call read_limb_darkening_file(1)
 
-     if (ldust_sublimation) then
-        call read_sublimation_radius()
-        if (.not.lVoronoi) then
-           call define_grid()
-           call define_dust_density()
-        endif
-     endif
-
      call prop_grains(1)
      if (lscatt_ray_tracing) then
         call alloc_ray_tracing()
@@ -214,15 +192,6 @@ subroutine init_dust_transfer()
      else ! Only the star is emitting
         Tdust=0.0
      endif !l_em_disk_image
-
-     ! Same dust as in the temperature run : sublimation mask saved by that run
-     if (ldust_sublimation) then
-        call init_sublimation()
-        call read_sublimation_mask()
-        call apply_sublimation()
-        call free_sublimation()
-        call opacity(1)
-     endif
 
   else ! not lmono
 
@@ -276,19 +245,25 @@ subroutine init_dust_transfer()
         write(*,*) "Done"
 
         if (ldust_sublimation)  then
-           call compute_othin_sublimation_radius()
-           if (.not.lVoronoi) then
-              call define_grid()
-              call define_dust_density()
+           ! without temperature calculation, the structure of the temperature run
+           ! has already been restored (restore_temperature_run_structure)
+           if (lTemp) then
+              call compute_othin_sublimation_radius()
+              if (.not.lVoronoi) then
+                 call define_grid()
+                 call define_dust_density()
+              endif
            endif
 
            if (ldisk_struct) call write_disk_struct(.false.,lwrite_column_density,lwrite_velocity)
 
-           do lambda=1,n_lambda
-              ! recalculation for opacity 2 :peut etre eviter mais implique + meme : garder tab_s11 en mem
-              call prop_grains(lambda)
-              call opacity(lambda)
-           enddo
+           if (lTemp) then
+              do lambda=1,n_lambda
+                 ! recalculation for opacity 2 :peut etre eviter mais implique + meme : garder tab_s11 en mem
+                 call prop_grains(lambda)
+                 call opacity(lambda)
+              enddo
+           endif
         endif ! ldust_sublimation
 
         test_tau : do lambda=1,n_lambda
@@ -353,6 +328,49 @@ subroutine init_dust_transfer()
   if (laverage_grain_size) call taille_moyenne_grains()
 
 end subroutine init_dust_transfer
+
+!***********************************************************
+
+subroutine restore_temperature_run_structure()
+  ! Post-processing runs (image, SED or molecular lines without temperature
+  ! calculation) : grid and density at the end of the temperature run, in the
+  ! order in which they were set by that run
+  !  1. inner zone extended to the saved sublimation radius (new grid)
+  !  2. converged hydrostatic density
+  !  3. saved sublimation mask
+
+  integer :: latest_iter
+
+  if (ldust_sublimation) then
+     call read_sublimation_radius()
+     if (.not.lVoronoi) then
+        call define_grid()
+        call define_dust_density()
+     endif
+  endif
+
+  if (lhydrostatic .and. (.not.lVoronoi)) then
+     latest_iter = find_latest_hydro_iteration()
+     if (latest_iter > 0) then
+        write(*,*) ""
+        write(*,*) "Restoring hydrostatic density from iteration", latest_iter, "for image/SED/mol"
+        call read_gas_density_hydro_iter(latest_iter)
+        call redistribute_dust_hydrostatic()
+        write(*,*) ""
+     else
+        call warning("lhydrostatic is set but no saved iteration found in data_th/")
+        call warning("Using parametric density for image/SED/mol calculation")
+     endif
+  endif
+
+  if (ldust_sublimation) then
+     call init_sublimation()
+     call read_sublimation_mask()
+     call apply_sublimation()
+     call free_sublimation()
+  endif
+
+end subroutine restore_temperature_run_structure
 
 
 !***********************************************************

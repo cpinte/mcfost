@@ -153,7 +153,7 @@ subroutine set_sublimation_radius(sublimation_radius)
      if ((disk_zone(i)%rmin <= rmin_zones) .and. (sublimation_radius < disk_zone(i)%rmin)) then
         !write(*,*) "SUBLIMATING DUST IN ZONE", i
         disk_zone(i)%rmin = sublimation_radius
-        disk_zone(i)%rin = disk_zone(i)%rmin + 5* disk_zone(1)%edge
+        disk_zone(i)%rin = disk_zone(i)%rmin + 5* disk_zone(i)%edge
         disk_zone(i)%edge = 0.0
      endif
   enddo !i
