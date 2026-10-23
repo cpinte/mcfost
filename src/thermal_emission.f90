@@ -26,7 +26,7 @@ module thermal_emission
        im_reemission_qre, init_emissivite_nre, init_reemission, select_wl_em, &
        select_cellule, temp_finale, temp_finale_nlte, temp_nre, update_proba_abs_nre, &
        repartition_wl_em, repartition_energie, allocate_thermal_energy, set_min_temperature, &
-       reset_temperature
+       reset_temperature, reset_thermal_state
 
   private
 
@@ -194,7 +194,7 @@ subroutine allocate_thermal_emission(Nc,p_Nc)
      if (lRE_nlTE) then
         allocate(Tdust_1grain_old(grain_RE_nLTE_start:grain_RE_nLTE_end,Nc),stat=alloc_status)
         if (alloc_status > 0) call error('Allocation error Tdust_1grain_old')
-        Tdust_old=0.
+        Tdust_1grain_old=0.
      endif
 
      allocate(Emissivite_nRE_old(Nc,n_lambda), stat=alloc_status)
@@ -2167,5 +2167,37 @@ subroutine reset_temperature()
   return
 
 end subroutine reset_temperature
+
+!**********************************************************************
+
+subroutine reset_thermal_state()
+  ! Restores the temperatures and the equilibrium status of the non-LTE and
+  ! non-equilibrium grains as at initialisation, before the emission tables are
+  ! rebuilt for a new temperature calculation on a modified structure (physics loop).
+  ! The packet budget and emissivities modified by emission_nRE are restored by the
+  ! caller (update_thermal_emission_tables), and kappa_abs_RE / proba_abs_RE by
+  ! recompute_opacities (opacity assumes that all nRE grains are out of equilibrium).
+
+  if (lRE_nLTE) then
+     Tdust_1grain = 0.0
+     xT_ech_1grain = 2
+     if (allocated(Tdust_1grain_old)) Tdust_1grain_old = 0.0
+  endif
+
+  if (lnRE) then
+     Tdust_1grain_nRE = 0.0
+     Proba_Tdust = 0.0
+     Tdust_1grain_nRE_old = 0.0
+     Tpeak_old = 0
+     maxP_old = 0.0
+     xT_ech_1grain_nRE = 2
+     l_RE = .false.
+     lchange_nRE = .false.
+     E_abs_nRE = 0.0_dp
+  endif
+
+  return
+
+end subroutine reset_thermal_state
 
 end module thermal_emission

@@ -13,6 +13,12 @@ A calculation in SED mode will create a direcatory named ``data_th`` with the fo
    approximation is used) + additional temperature files of out-of-equilibrium grains are
    present
 
+-  ``sublimation_mask.fits.gz`` and ``sublimation_radius.txt`` if dust
+   sublimation is enabled: mask of the sublimated dust (1 = sublimated) for
+   each cell and grain size (or zone), and optically thin sublimation radius
+   of each star. ``sublimation_mask_iterNNNN.fits.gz`` records the mask at
+   each iteration.
+
 -  ``sed_rt.fits.gz``. This is the main output with the SED computed with a
    ray-tracing method. Ray-ytraced SEDs offer several advantages : they correspond to exact inclinations
    (instead of bins for ``sed_mc.fits.gz``) and converge almost equally fast at

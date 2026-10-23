@@ -19,7 +19,7 @@ contains
 
     character(len=*), intent(in) :: para
 
-    integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
+    integer :: i, j, k, alloc_status, ios, ind_pop, imol
     integer :: nat, ntr
     real(kind=dp) :: total_sum, V_somme
 
@@ -49,7 +49,6 @@ contains
             msg2="Use cavity section is parameter file for earlier version.")
     endif
 
-    correct_Rsub = 1.0_dp
     lmigration = .false.
     lhydrostatic = .false.
     lread_Misselt=.false.
@@ -230,8 +229,7 @@ contains
        endif
     endif
     read(1,*) lmigration
-    read(1,*,IOSTAT=status) ldust_sublimation , correct_Rsub
-    if (status/=0) correct_Rsub = 1.0
+    read(1,*) ldust_sublimation
     read(1,*) lhydrostatic
     read(1,*) lchauff_int, alpha
     T_min= 1.0 ; T_max=3000. ; n_T=100
@@ -562,7 +560,7 @@ contains
 
     character(len=*), intent(in) :: para
 
-    integer :: i, j, k, alloc_status, ios, ind_pop, imol, status, nat, ntr
+    integer :: i, j, k, alloc_status, ios, ind_pop, imol, nat, ntr
     real(kind=dp) :: total_sum, V_somme
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
@@ -670,8 +668,7 @@ contains
        endif
     endif
     read(1,*) lmigration
-    read(1,*,IOSTAT=status) ldust_sublimation , correct_Rsub
-    if (status/=0) correct_Rsub = 1.0
+    read(1,*) ldust_sublimation
     read(1,*) lhydrostatic
     read(1,*) lchauff_int, alpha
     T_min= 1.0 ; T_max=3000. ; n_T=100
@@ -984,7 +981,7 @@ contains
 
    character(len=*), intent(in) :: para
 
-   integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
+   integer :: i, j, k, alloc_status, ios, ind_pop, imol
    real(kind=dp) :: total_sum, V_somme
 
    type(dust_pop_type), dimension(100) :: dust_pop_tmp
@@ -999,7 +996,6 @@ contains
 
    read(1,*) para_version
 
-   correct_Rsub = 1.0_dp
    lmigration = .false.
    lhydrostatic = .false.
    lread_Misselt=.false.
@@ -1098,8 +1094,7 @@ contains
       endif
    endif
    read(1,*) lmigration
-   read(1,*,IOSTAT=status) ldust_sublimation , correct_Rsub
-   if (status/=0) correct_Rsub = 1.0
+   read(1,*) ldust_sublimation
    read(1,*) lhydrostatic
    read(1,*) lchauff_int, alpha
    T_min= 1.0 ; T_max=3000. ; n_T=100
@@ -1385,7 +1380,7 @@ contains
 
     character(len=*), intent(in) :: para
 
-    integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
+    integer :: i, j, k, alloc_status, ios, ind_pop, imol
     real(kind=dp) :: total_sum, V_somme
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
@@ -1493,8 +1488,7 @@ contains
        endif
     endif
     read(1,*) lmigration
-    read(1,*,IOSTAT=status) ldust_sublimation , correct_Rsub
-    if (status/=0) correct_Rsub = 1.0
+    read(1,*) ldust_sublimation
     read(1,*) lhydrostatic
     read(1,*) lchauff_int, alpha
     T_min= 1.0 ; T_max=3000. ; n_T=100
@@ -1775,7 +1769,7 @@ contains
 
     character(len=*), intent(in) :: para
 
-    integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
+    integer :: i, j, k, alloc_status, ios, ind_pop, imol
     real(kind=dp) :: total_sum, V_somme
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
@@ -1877,8 +1871,7 @@ contains
        endif
     endif
     read(1,*) lmigration
-    read(1,*,IOSTAT=status) ldust_sublimation , correct_Rsub
-    if (status/=0) correct_Rsub = 1.0
+    read(1,*) ldust_sublimation
     read(1,*) lhydrostatic
     read(1,*) lchauff_int, alpha
     T_min= 1.0 ; T_max=3000. ; n_T=100
@@ -2143,7 +2136,7 @@ contains
 
     character(len=*), intent(in) :: para
 
-    integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
+    integer :: i, j, k, alloc_status, ios, ind_pop, imol
     real(kind=dp) :: total_sum, V_somme
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
@@ -2245,8 +2238,7 @@ contains
        endif
     endif
     read(1,*) lmigration
-    read(1,*,IOSTAT=status) ldust_sublimation, correct_Rsub
-    if (status/=0) correct_Rsub = 1.0
+    read(1,*) ldust_sublimation
     read(1,*) lhydrostatic
     read(1,*) lchauff_int, alpha
     T_min=1. ; T_max=1500. ; n_T=100
@@ -2497,7 +2489,7 @@ contains
 
     character(len=*), intent(in) :: para
 
-    integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
+    integer :: i, j, k, alloc_status, ios, ind_pop, imol
     real(kind=dp) :: total_sum, V_somme
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
@@ -2597,8 +2589,7 @@ contains
           write(*,*) "Setting exp_strat > 0"
        endif
     endif
-    read(1,*,IOSTAT=status) ldust_sublimation, correct_Rsub
-    if (status/=0) correct_Rsub = 1.0
+    read(1,*) ldust_sublimation
     read(1,*) lchauff_int, alpha
     T_min=1. ; T_max=1500. ; n_T=100
 
@@ -2849,7 +2840,7 @@ contains
 
     character(len=*), intent(in) :: para
 
-    integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
+    integer :: i, j, k, alloc_status, ios, ind_pop, imol
     real(kind=dp) :: total_sum, V_somme
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
@@ -2862,7 +2853,6 @@ contains
     open(unit=1, file=para, status='old')
 
     read(1,*) para_version
-    correct_Rsub = 1.0_dp
     dust_pop_tmp(:)%dhs_maxf = 0.9
 
     ! -------------------------
@@ -2951,8 +2941,7 @@ contains
           write(*,*) "Setting exp_strat > 0"
        endif
     endif
-    read(1,*,IOSTAT=status) ldust_sublimation, correct_Rsub
-    if (status/=0) correct_Rsub = 1.0
+    read(1,*) ldust_sublimation
     read(1,*) lchauff_int, alpha
     T_min=1. ; T_max=1500. ; n_T=100
 
@@ -3205,7 +3194,7 @@ contains
 
     character(len=*), intent(in) :: para
 
-    integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
+    integer :: i, j, k, alloc_status, ios, ind_pop, imol
     real(kind=dp) :: total_sum, V_somme
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
@@ -3218,7 +3207,6 @@ contains
     open(unit=1, file=para, status='old')
 
     read(1,*) para_version
-    correct_Rsub = 1.0_dp
     dust_pop_tmp(:)%type = "Mie"
 
     ! -------------------------
@@ -3303,8 +3291,7 @@ contains
        exp_strat = -exp_strat
        write(*,*) "Setting exp_strat > 0"
     endif
-    read(1,*,IOSTAT=status) ldust_sublimation, correct_Rsub
-    if (status/=0) correct_Rsub = 1.0
+    read(1,*) ldust_sublimation
     read(1,*) lchauff_int, alpha
     T_min=1. ; T_max=1500. ; n_T=100
 
@@ -3552,7 +3539,7 @@ end subroutine read_para215
 
     character(len=*), intent(in) :: para
 
-    integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
+    integer :: i, j, k, alloc_status, ios, ind_pop, imol
     real(kind=dp) :: size_neb_tmp, total_sum, V_somme
     real :: gas_dust
 
@@ -3564,7 +3551,6 @@ end subroutine read_para215
     open(unit=1, file=para, status='old')
 
     read(1,*) para_version
-    correct_Rsub = 1.0_dp
     dust_pop_tmp(:)%type = "Mie"
 
     ! -------------------------
@@ -3640,8 +3626,7 @@ end subroutine read_para215
     read(1,*) line_buffer
     read(1,*) gas_dust
     read(1,*) lvariable_dust, exp_strat, a_strat
-    read(1,*,IOSTAT=status) ldust_sublimation, correct_Rsub
-    if (status/=0) correct_Rsub = 1.0
+    read(1,*) ldust_sublimation
     read(1,*) lchauff_int, alpha
     T_min=1. ; T_max=1500. ; n_T=100
 
@@ -3897,7 +3882,7 @@ end subroutine read_para215
 
     character(len=*), intent(in) :: para
 
-    integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
+    integer :: i, j, k, alloc_status, ios, ind_pop, imol
     real(kind=dp) :: size_neb_tmp, total_sum, V_somme
     real :: gas_dust
 
@@ -3909,7 +3894,6 @@ end subroutine read_para215
     open(unit=1, file=para, status='old')
 
     read(1,*) para_version
-    correct_Rsub = 1.0_dp
     dust_pop_tmp(:)%type = "Mie"
 
     ! -------------------------
@@ -3983,8 +3967,7 @@ end subroutine read_para215
     read(1,*) line_buffer
     read(1,*) gas_dust
     read(1,*) lvariable_dust, exp_strat, a_strat
-    read(1,*,IOSTAT=status) ldust_sublimation, correct_Rsub
-    if (status/=0) correct_Rsub = 1.0
+    read(1,*) ldust_sublimation
     read(1,*) lchauff_int, alpha
     read(1,*) T_min, T_max, n_T
 
@@ -4237,7 +4220,7 @@ end subroutine read_para215
 
     character(len=*), intent(in) :: para
 
-    integer :: i, j, alloc_status, ios, ind_pop, imol, status
+    integer :: i, j, alloc_status, ios, ind_pop, imol
     real(kind=dp) :: size_neb_tmp, total_sum
     real :: gas_dust
 
@@ -4249,7 +4232,6 @@ end subroutine read_para215
     open(unit=1, file=para, status='old')
 
     read(1,*) para_version
-    correct_Rsub = 1.0_dp
     dust_pop_tmp(:)%type = "Mie"
 
     ! -------------------------
@@ -4323,8 +4305,7 @@ end subroutine read_para215
     read(1,*) line_buffer
     read(1,*) gas_dust
     read(1,*) lvariable_dust, exp_strat, a_strat
-    read(1,*,IOSTAT=status) ldust_sublimation, correct_Rsub
-    if (status/=0) correct_Rsub = 1.0
+    read(1,*) ldust_sublimation
     read(1,*) lchauff_int, alpha
     read(1,*) T_min, T_max, n_T
 
@@ -4558,7 +4539,7 @@ end subroutine read_para215
 
     character(len=*), intent(in) :: para
 
-    integer :: i, j, alloc_status, ios, ind_pop, status, imol
+    integer :: i, j, alloc_status, ios, ind_pop, imol
 
     real(kind=dp) :: size_neb_tmp, total_sum
     real :: gas_dust
@@ -4572,7 +4553,6 @@ end subroutine read_para215
     open(unit=1, file=para, status='old')
 
     read(1,*) para_version
-    correct_Rsub = 1.0_dp
     dust_pop_tmp(:)%type = "Mie"
     dust_pop_tmp(:)%mixing_rule=1
 
@@ -4653,8 +4633,7 @@ end subroutine read_para215
     read(1,*) line_buffer
     read(1,*) gas_dust
     read(1,*) lvariable_dust, exp_strat, a_strat
-    read(1,*,IOSTAT=status) ldust_sublimation, correct_Rsub
-    if (status/=0) correct_Rsub = 1.0
+    read(1,*) ldust_sublimation
     read(1,*) lchauff_int, alpha
     read(1,*) T_min, T_max, n_T
 

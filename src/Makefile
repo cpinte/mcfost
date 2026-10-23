@@ -285,7 +285,7 @@ libmcfost.a : $(OBJECTS) voro++_wrapper.o no_xgboost_wrapper.o mcfost2phantom.o
 # Unit tests: built against libmcfost.a with the same compiler and flags as mcfost,
 # run by test_suite/test_unit.py
 UNIT_DIR = ../test_suite/unit
-UNIT_TESTS = $(UNIT_DIR)/test_nan_checks
+UNIT_TESTS = $(patsubst %.f90,%,$(wildcard $(UNIT_DIR)/test_*.f90))
 
 unit_tests : $(UNIT_TESTS)
 
@@ -344,12 +344,28 @@ mcfost2prodimo :  mcfost mcfost2prodimo.o
 .PHONY : release_utils fosti dmz wardlaw
 
 release_doc:
-	pushd . ; cd ../docs ; make html ; cd _build ; tar czf html.tgz html ; scp -r html.tgz $(IPAG_SERVER):/user/publicdir/pintec/mcfost/docs ; ssh $(IPAG_SERVER) "cd /user/publicdir/pintec/mcfost/docs ; tar xzf html.tgz ; rm -f html.tgz" ; popd
+	pushd . ; cd ../docs ; make html ; cd _build ; tar czf html.tgz html ; scp -O html.tgz $(IPAG_SERVER):/user/publicdir/pintec/mcfost/docs ; ssh $(IPAG_SERVER) "cd /user/publicdir/pintec/mcfost/docs ; tar xzf html.tgz ; rm -f html.tgz" ; popd
+
+# The utils are released in one directory per version on the server
+# (mcfost_utils/<version>/, version from ../utils/Version), each binary downloads
+# the version it requires (required_utils_version in mcfost_env.f90). The files at
+# the top of mcfost_utils/ are version 4.0 (used by older binaries, 4.0/ links to
+# them) and are never updated.
+# scp -O: legacy SCP protocol, the server does not provide SFTP (default of OpenSSH >= 9)
+# Local files are not distributed: update date (.last_update), installed release
+# (.sha1) and macOS metadata (COPYFILE_DISABLE: no AppleDouble ._* files,
+# --no-xattrs --no-mac-metadata: no extended attributes, unknown to GNU tar).
+UTILS_DIR = /user/publicdir/pintec/mcfost_utils
+UTILS_VERSION = $(shell cat ../utils/Version)
 
 release_utils :
-	tar czvf mcfost_utils.tgz -C../utils .
-	openssl sha1 mcfost_utils.tgz | awk '{print $2}' > mcfost_utils.sha1
-	scp -r mcfost_utils.tgz mcfost_utils.sha1 ../utils/Version $(IPAG_SERVER):/user/publicdir/pintec/mcfost_utils/
+	@grep -q "required_utils_version = $(UTILS_VERSION)$$" mcfost_env.f90 || \
+	  { echo "../utils/Version ($(UTILS_VERSION)) differs from required_utils_version in mcfost_env.f90" ; exit 1 ; }
+	COPYFILE_DISABLE=1 tar czvf mcfost_utils.tgz --no-xattrs --no-mac-metadata --exclude=.last_update --exclude=.sha1 --exclude='*.download' \
+	  --exclude=.DS_Store --exclude='._*' -C../utils .
+	openssl sha1 mcfost_utils.tgz | awk '{print $$2}' > mcfost_utils.sha1
+	ssh $(IPAG_SERVER) "mkdir -p $(UTILS_DIR)/$(UTILS_VERSION)"
+	scp -O mcfost_utils.tgz mcfost_utils.sha1 ../utils/Version $(IPAG_SERVER):$(UTILS_DIR)/$(UTILS_VERSION)/
 	rm -f mcfost_utils.tgz mcfost_utils.sha1
 
 #------------------------------------------------------------------------------#

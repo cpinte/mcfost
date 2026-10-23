@@ -13,13 +13,9 @@ module density
   implicit none
   save
 
-  ! Grain species removal
-  integer, public :: species_removed
-  real, public :: T_rm
-
   public :: gas_density, gas_mass, surface_density, gas_density_midplane, dust_density_o_n_grains, dust_mass, icell_not_empty, &
        define_density, define_density_wall3d, define_dust_density, read_density_file, check_density_file_Voronoi_variable_dust, &
-       densite_seb_charnoz2, densite_seb_charnoz, remove_species, read_sigma_file, normalize_dust_density, &
+       densite_seb_charnoz2, densite_seb_charnoz, read_sigma_file, normalize_dust_density, &
        reduce_density, read_Voronoi_fits_file, find_non_empty_cell, redistribute_dust_hydrostatic
 
   private
@@ -2552,39 +2548,6 @@ subroutine densite_Seb_Charnoz2()
   return
 
 end subroutine densite_Seb_Charnoz2
-
-!**********************************************************************
-
-subroutine remove_species()
-
-  implicit none
-
-  integer :: k, icell
-  real :: mass
-
-  write(*,*) "Removing species", species_removed, "where T >", T_rm
-
-  do icell=1,n_cells
-     do k=1,n_grains_tot
-        if (grain(k)%pop==species_removed) then
-           if (Tdust(icell) > T_rm) dust_density_o_n_grains(k,icell) = 0.0
-        endif
-     enddo
-  enddo
-
-  mass = 0.0
-  do icell=1,n_cells
-     do k=1,n_grains_tot
-        mass=mass + dust_density_o_n_grains(k,icell) * n_grains(k) * M_grain(k) * (volume(icell) * AU3_to_cm3)
-     enddo
-  enddo
-  mass =  mass/Msun_to_g
-
-  write(*,*) 'New total dust mass in model :', mass,' Msun'
-
-  return
-
-end subroutine remove_species
 
 !************************************************************
 

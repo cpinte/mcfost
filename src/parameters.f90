@@ -30,6 +30,7 @@ module parameters
 
   ! lvariable_dust = true if the dust properties are variable in each cell
   logical :: lvariable_dust, lmigration, lhydrostatic, ldust_sublimation
+  logical :: lforce_constant_sublimation ! ignore the .sub files (sublimation laws)
   integer :: settling_type ! 1 = Parametric, 2 = Dubrulle or 3 = Fromang
   integer :: n_iter_physics = 100 ! Maximum iterations for physics loops (e.g. hydrostatic equilibrium)
 
@@ -128,7 +129,7 @@ module parameters
   logical :: lregular_theta
   real :: theta_max, theta_mask_max
 
-  logical :: letape_th, limg, lorigine, laggregate, lFresnel, lFresnel_per_size, l3D, lremove, lwarp, lcavity, ltilt, lwall
+  logical :: letape_th, limg, lorigine, laggregate, lFresnel, lFresnel_per_size, l3D, lwarp, lcavity, ltilt, lwall
   logical :: lopacite_only, lseed, ldust_prop, ldisk_struct, lwrite_velocity, loptical_depth_to_cell, ltau_map, lreemission_stats
   logical :: lapprox_diffusion, lcylindrical, lspherical, llinear_rgrid, lVoronoi, is_there_disk, lno_backup
   logical :: laverage_grain_size, lisotropic, lno_scattering, lqsca_equal_qabs, lonly_diff_approx, lforce_diff_approx
@@ -201,7 +202,7 @@ module parameters
   type(disk_region_type), dimension(:), allocatable, target :: regions
   type(cavity_type) :: cavity
 
-  real(kind=dp) :: Rmin, Rmax, Rmax2, diskmass, correct_Rsub
+  real(kind=dp) :: Rmin, Rmax, Rmax2, diskmass
 
   real :: exp_strat, a_strat
   real :: alpha

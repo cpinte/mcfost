@@ -368,7 +368,6 @@ def test_sublimation_image():
     if not compute_models:
         pytest.skip("Only run when computing models")
     # ref4.1_hydrostatic with hydrostatic equilibrium turned off: a single-zone 4.1 disk
-    # (hydrostatic equilibrium is not compatible with sublimation)
     root_dir = "ref4.1_sublimation"
     clean_results(root_dir)
     os.makedirs(root_dir, exist_ok=True)
@@ -403,3 +402,321 @@ def test_sublimation_image():
     # and reaches unphysical temperatures (~2e4 K). Silicates sublimate at 1500 K here.
     T = fits.getdata(root_dir+"/data_th/Temperature.fits.gz")
     assert T.max() < 2000.0
+
+
+def make_para(src, dst, edits):
+    # Writes a copy of the parameter file src to dst. edits maps a text found on a
+    # line (e.g. the comment of a parameter) to a function returning the new line.
+    with open(src) as f_in, open(dst, "w") as f_out:
+        for line in f_in:
+            for key, edit in edits.items():
+                if key in line:
+                    line = edit(line)
+            f_out.write(line)
+
+
+def set_first_value(value):
+    # replaces the first value of a parameter line, keeping the rest of the line
+    return lambda line: "  "+value+" "+" ".join(line.split()[1:])+"\n"
+
+
+def run_mcfost(para, root_dir, opt="", cwd=None):
+    # cwd: directory to run from (para and root_dir are then relative to it), e.g. to
+    # pick up dust files placed in the run directory, which is searched first
+    result = subprocess.run((os.path.abspath(_mcfost_bin)+" "+para+" -root_dir "+root_dir+" "+opt).split(),
+                            capture_output=True, text=True, cwd=cwd)
+    print(result.stdout)
+    assert result.returncode == 0, result.stdout[-3000:]
+    return result.stdout
+
+
+def read_sublimation(root_dir):
+    # Temperature (one value per cell) and sublimation mask (n_cells, n_grains or n_zones),
+    # both in the internal cell order
+    T = fits.getdata(root_dir+"/data_th/Temperature.fits.gz").ravel()
+    mask = fits.getdata(root_dir+"/data_th/sublimation_mask.fits.gz") > 0.5
+    assert mask.shape[0] == T.size
+    return T, mask
+
+
+def utils_T_sub(dust_file):
+    # constant sublimation temperature of a dust file of the MCFOST utils (2nd value of
+    # the first non-comment line), used with -constant_sublimation_temperature
+    with open(os.path.join(os.environ["MCFOST_UTILS"], "Dust", dust_file)) as f:
+        for line in f:
+            if not line.lstrip().startswith("#"):
+                return float(line.split()[1])
+
+
+def flux_conservation(stdout):
+    lines = [l for l in stdout.splitlines() if "Flux conservation" in l]
+    assert len(lines) == 1
+    return abs(float(lines[0].split()[4]))
+
+
+def test_sublimation_front():
+    # Single-zone 4.1 disk with its inner radius inside the sublimation radius: the
+    # sublimation front is found by iterating the temperature calculation. At
+    # convergence, the remaining dust is below T_sub and the sublimated cells (where a
+    # trace of dust gives the test-particle temperature) are above it, within the
+    # Monte Carlo hysteresis band. The constant sublimation temperature of the dust
+    # file is used (the density-dependent law is tested in test_sublimation_power_law).
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    T_sub = utils_T_sub("Draine_Si_sUV.dat")
+    root_dir = "ref4.1_sublimation_front"
+    clean_results(root_dir)
+    os.makedirs(root_dir, exist_ok=True)
+    para = root_dir+"/front.para"
+    make_para("test_data/ref4.1_hydrostatic/ref4.1_hydrostatic.para", para,
+              {"sublimate dust": set_first_value("T"),
+               "hydostatic equilibrium": set_first_value("F"),
+               "Rin, edge, Rout": set_first_value("0.03")})
+
+    stdout = run_mcfost(para, root_dir, "-no_diff_approx -constant_sublimation_temperature")
+    assert "Dust sublimation converged" in stdout
+    assert flux_conservation(stdout) < 2.0
+
+    T, mask = read_sublimation(root_dir)
+    sublimated = mask.any(axis=1)
+    assert sublimated.sum() > 100
+    assert T[~sublimated].max() < 1.1 * T_sub
+    assert T[sublimated].min() > 0.9 * T_sub
+
+
+def test_sublimation_multi_population():
+    # Two zones and three populations (ref3.0_multi in LTE): silicates sublimate in
+    # the inner zone, the ice-coated grains of the outer zone beyond the snow line, and
+    # PAHs never sublimate. Each population sublimates independently (variable dust).
+    # Only the innermost zone is extended to the sublimation radius (no overlapping
+    # grid regions). The outer zone starts at 10 au, where the ice would not reach the
+    # sublimation temperature of the utils (165 K): a copy of ice_opct.dat with
+    # T_sub = 100 K is placed in the run directory, which is searched first.
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    root_dir = "ref3.0_multi_sublimation"
+    clean_results(root_dir)
+    os.makedirs(root_dir, exist_ok=True)
+    para = root_dir+"/multi.para"
+    make_para("test_data/ref3.0_multi/ref3.0_multi.para", para,
+              {"sublimate dust": set_first_value("T"),
+               "Heating method": set_first_value("1"),
+               "nbr_photons_eq_th": set_first_value("1.28e5"),
+               # inner zone only (the outer zone starts at 10 au)
+               "Rin, edge, Rout": lambda line: set_first_value("0.03")(line) if line.split()[0] == "1." else line})
+    T_sub_ice = 100.0
+    with open(os.path.join(os.environ["MCFOST_UTILS"], "Dust", "ice_opct.dat")) as f_in, \
+         open(root_dir+"/ice_opct.dat", "w") as f_out:
+        data_line = False
+        for line in f_in:
+            if not data_line and not line.lstrip().startswith("#"):
+                line = line.split()[0]+" "+str(T_sub_ice)+"\n"
+                data_line = True
+            f_out.write(line)
+
+    stdout = run_mcfost("multi.para", ".", "-no_diff_approx -no_SED -constant_sublimation_temperature",
+                        cwd=root_dir)
+    assert "Dust sublimation converged" in stdout
+
+    T, mask = read_sublimation(root_dir)
+    # grain sizes : 50 silicates (inner zone), 50 silicate + ice (outer zone), 1 PAH
+    assert mask.shape[1] == 101
+    silicates, ices, pah = mask[:,0:50], mask[:,50:100], mask[:,100]
+    assert silicates.any()
+    assert ices.any()
+    assert not pah.any()
+    assert T[silicates.any(axis=1)].min() > 0.7 * utils_T_sub("Draine_Si_sUV.dat")
+    assert T[ices.any(axis=1)].min() > 0.7 * T_sub_ice
+
+
+def test_sublimation_hydrostatic():
+    # Hydrostatic equilibrium and sublimation iterated together: the gas structure,
+    # dust redistribution and sublimation mask are updated in the same physics loop
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    root_dir = "ref4.1_sublimation_hydrostatic"
+    clean_results(root_dir)
+    os.makedirs(root_dir, exist_ok=True)
+    para = root_dir+"/hydro.para"
+    make_para("test_data/ref4.1_hydrostatic/ref4.1_hydrostatic.para", para,
+              {"sublimate dust": set_first_value("T"),
+               "Rin, edge, Rout": set_first_value("0.03"),
+               "nbr_photons_eq_th": set_first_value("1.28e5")})
+
+    stdout = run_mcfost(para, root_dir, "-no_diff_approx -n_iter_physics 4")
+    assert "Updating hydrostatic equilibrium" in stdout
+    assert "Updating dust sublimation" in stdout
+    assert os.path.isfile(root_dir+"/data_disk/gas_density.fits.gz")
+
+    T, mask = read_sublimation(root_dir)
+    assert np.isfinite(T).all()
+    assert mask.any()
+
+    # Image: the structure of the temperature run is restored in the same order (grid
+    # extended to the sublimation radius, then hydrostatic density, then sublimation
+    # mask), otherwise the grid redefinition overwrites the hydrostatic density
+    stdout = run_mcfost(para, root_dir, "-img 1.0")
+    lines = stdout.splitlines()
+    def first_line(text):
+        return next(i for i, l in enumerate(lines) if text in l)
+    assert first_line("Reading sublimation file") < first_line("Restoring hydrostatic density") \
+        < first_line("Reading sublimation mask")
+    assert os.path.isfile(root_dir+"/data_1.0/RT.fits.gz")
+
+
+def test_sublimation_sed_only():
+    # SED computed without the temperature calculation (-no_T), from the temperature,
+    # sublimation radius and sublimation mask of a previous run: same SED as the one
+    # computed after the temperature calculation (without the mask, the sublimated
+    # cells keep their dust at the test-particle temperature: ~2.5 x the 1-5 micron flux)
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    root_dir = "ref4.1_sublimation_sed"
+    clean_results(root_dir)
+    os.makedirs(root_dir, exist_ok=True)
+    para = root_dir+"/sed.para"
+    make_para("test_data/ref4.1_hydrostatic/ref4.1_hydrostatic.para", para,
+              {"sublimate dust": set_first_value("T"),
+               "hydostatic equilibrium": set_first_value("F"),
+               "Rin, edge, Rout": set_first_value("0.03")})
+    opt = "-no_diff_approx -constant_sublimation_temperature"
+
+    run_mcfost(para, root_dir, opt)
+    sed_full = fits.getdata(root_dir+"/data_th/sed_rt.fits.gz")
+    # the SED files are not overwritten
+    for f in glob.glob(root_dir+"/data_th/sed_*.fits.gz"):
+        os.remove(f)
+
+    stdout = run_mcfost(para, root_dir, opt+" -no_T")
+    assert "Reading sublimation mask" in stdout
+    sed = fits.getdata(root_dir+"/data_th/sed_rt.fits.gz")
+    # total flux (first contribution), all inclinations and wavelengths
+    ratio = sed[0] / np.where(sed_full[0] > 0, sed_full[0], 1.0)
+    assert abs(np.median(ratio) - 1.0) < 0.02
+    assert ratio.max() < 1.3
+
+
+def test_sublimation_per_grain_size():
+    # nLTE grains have one temperature per grain size: the small (hotter) ice-coated
+    # grains of ref3.0_multi sublimate over a larger region than the large ones, and
+    # some cells are only partially sublimated. PAHs (nRE) never sublimate.
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    root_dir = "ref3.0_multi_sublimation_nlte"
+    clean_results(root_dir)
+    os.makedirs(root_dir, exist_ok=True)
+    para = root_dir+"/multi_nlte.para"
+    make_para("test_data/ref3.0_multi/ref3.0_multi.para", para,
+              {"sublimate dust": set_first_value("T"),
+               "nbr_photons_eq_th": set_first_value("1.28e5"),
+               "Rin, edge, Rout": lambda line: set_first_value("0.03")(line) if line.split()[0] == "1." else line})
+
+    stdout = run_mcfost(para, root_dir, "-no_diff_approx -no_SED")
+    assert "Dust sublimation converged" in stdout
+
+    T, mask = read_sublimation(root_dir)
+    # grain sizes : 50 silicates (LTE), 50 silicate + ice (nLTE, T_sub = 100 K), 1 PAH (nRE)
+    ices, pah = mask[:,50:100], mask[:,100]
+    n_cells_per_size = ices.sum(axis=0)
+    assert n_cells_per_size[0] > 0
+    assert n_cells_per_size[0] > n_cells_per_size[-1]
+    assert (ices.any(axis=1) & ~ices.all(axis=1)).sum() > 0
+    assert not pah.any()
+
+
+def test_sublimation_power_law():
+    # Density-dependent sublimation temperature, read from a .sub file next to the
+    # optical indices file: T_sub = T0 (rho_gas / rho0)^gamma (Pollack et al. 1994).
+    # The .sub file is placed in the run directory (searched before the utils dust
+    # directory) so that it does not affect the other tests. At convergence, each cell
+    # is on the correct side of its own T_sub(rho), within the hysteresis band, and the
+    # sublimation temperature varies along the curved front (dense midplane hotter).
+    # -constant_sublimation_temperature ignores the .sub file.
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    T0, rho0, gamma = 2000.0, 1.0, 0.0195
+    root_dir = "ref4.1_sublimation_power_law"
+    clean_results(root_dir)
+    os.makedirs(root_dir, exist_ok=True)
+    make_para("test_data/ref4.1_hydrostatic/ref4.1_hydrostatic.para", root_dir+"/power_law.para",
+              {"sublimate dust": set_first_value("T"),
+               "hydostatic equilibrium": set_first_value("F"),
+               "Rin, edge, Rout": set_first_value("0.03")})
+    with open(root_dir+"/Draine_Si_sUV.sub", "w") as f:
+        f.write("# test sublimation law\n"
+                "format_version = 1\n"
+                "law = power_law\n"
+                f"T0 = {T0}\n"
+                f"rho0 = {rho0}\n"
+                f"gamma = {gamma}\n")
+
+    # the constant law is used when forced, even with a .sub file
+    stdout = run_mcfost("power_law.para", "constant", "-constant_sublimation_temperature -disk_struct", cwd=root_dir)
+    assert "Sublimation law from" not in stdout
+
+    # +disk_struct writes the gas density on the grid moved to the sublimation radius
+    stdout = run_mcfost("power_law.para", ".", "-no_diff_approx -no_SED +disk_struct", cwd=root_dir)
+    assert "Sublimation law from Draine_Si_sUV.sub" in stdout
+    assert "Dust sublimation converged" in stdout
+
+    T, mask = read_sublimation(root_dir)
+    sublimated = mask.any(axis=1)
+    rho = fits.getdata(root_dir+"/data_disk/gas_density.fits.gz").ravel() # g/cm3
+    assert rho.size == T.size
+    T_sub = T0 * (np.maximum(rho, 1e-30) / rho0)**gamma
+    assert sublimated.sum() > 100
+    assert (T / T_sub)[~sublimated].max() < 1.1
+    assert (T / T_sub)[sublimated].min() > 0.9
+    assert T_sub[sublimated].max() > 1.3 * T_sub[sublimated].min()
+
+
+def nre_absorbed_fractions(stdout):
+    # fraction of the energy absorbed by non-equilibrium grains, first nRE pass of each
+    # temperature calculation
+    values = [float(l.split()[-4]) for l in stdout.splitlines() if "Non equilibrium grains have absorbed" in l]
+    return values[0::2]
+
+
+def check_hydrostatic_temperature_stable(root_dir, tolerance=0.05):
+    T1 = fits.getdata(root_dir+"/data_th/Temperature_iter0001.fits.gz")
+    T2 = fits.getdata(root_dir+"/data_th/Temperature_iter0002.fits.gz")
+    mask = T1 > 2.0
+    assert abs(np.median(T2[mask]/T1[mask]) - 1.0) < tolerance
+
+
+def test_hydrostatic_nre():
+    # Hydrostatic iterations with non-equilibrium grains (PAHs): the packet budget,
+    # emissivities and equilibrium status modified during a temperature calculation are
+    # restored before the next one, and the split between equilibrium and
+    # non-equilibrium absorption is rebuilt with the new density. The energy absorbed
+    # by the PAHs and the temperature must stay consistent between iterations.
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    root_dir = "ref4.1_PAH_hydrostatic"
+    clean_results(root_dir)
+    os.makedirs(root_dir, exist_ok=True)
+    para = root_dir+"/pah_hydro.para"
+    make_para("test_data/ref4.1_PAH/ref4.1_PAH.para", para,
+              {"hydostatic equilibrium": set_first_value("T")})
+
+    stdout = run_mcfost(para, root_dir, "-n_iter_physics 3")
+    fractions = nre_absorbed_fractions(stdout)
+    assert len(fractions) == 3
+    for f in fractions[1:]:
+        assert abs(f/fractions[0] - 1.0) < 0.3
+    check_hydrostatic_temperature_stable(root_dir)
+
+
+def test_hydrostatic_nlte():
+    # Hydrostatic iterations with nLTE grains (one temperature per grain size)
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    root_dir = "ref4.1_nLTE_hydrostatic"
+    clean_results(root_dir)
+    os.makedirs(root_dir, exist_ok=True)
+    para = root_dir+"/nlte_hydro.para"
+    make_para("test_data/ref4.1_nLTE/ref4.1_nLTE.para", para,
+              {"hydostatic equilibrium": set_first_value("T")})
+
+    run_mcfost(para, root_dir, "-n_iter_physics 3")
+    check_hydrostatic_temperature_stable(root_dir)

@@ -5,12 +5,14 @@ module mcfost_env
   implicit none
 
   real, parameter :: mcfost_version = 4.1
-  character(8), parameter :: mcfost_release = "4.1.14"
-  real, parameter :: required_utils_version = 4.0
+  character(8), parameter :: mcfost_release = "4.1.15"
+  real, parameter :: required_utils_version = 4.1
 
   !character(len=128) :: web_server    = "https://ipag.osug.fr/public/pintec/"
   character(len=128) :: webpage       = "https://github.com/cpinte/mcfost/releases/latest/download/"
   character(len=128) :: utils_webpage = "https://ipag.osug.fr/public/pintec/mcfost_utils/"
+  ! sha1 of the installed utils release, written by get_utils in the utils directory
+  character(len=*), parameter :: utils_sha1_file = ".sha1"
   character(len=128) :: doc_webpage   = "https://mcfost.readthedocs.io/"
   character(len=128) :: raw_webpage   = "https://raw.githubusercontent.com/cpinte/mcfost/master/src/"
   character(len=32)  :: version_file  = "mcfost_env.f90"

@@ -3,7 +3,7 @@ module init_mcfost
   use parameters
   use naleat
   use grains, only : aggregate_file, mueller_aggregate_file
-  use density, only : species_removed, T_rm, check_density_file_Voronoi_variable_dust
+  use density, only : check_density_file_Voronoi_variable_dust
   use molecular_emission
   !$ use omp_lib
   use benchmarks
@@ -154,7 +154,7 @@ subroutine set_default_variables()
   lonly_top = .false.
   lcorrect_Tgas = .false.
   lcorrect_density=.false.
-  lremove = .false.
+  lforce_constant_sublimation = .false.
   lforce_PAH_equilibrium=.false.
   lforce_PAH_out_equilibrium=.false.
   lread_grain_size_distrib=.false.
@@ -337,14 +337,24 @@ subroutine initialisation_mcfost()
   !call get_environment_variable('MCFOST_WEB_SERVER',s) ; if  (s/="") web_server = s
   !webpage = trim(web_server)//trim(webpage)
   !utils_webpage = trim(web_server)//trim(utils_webpage)
+  ! Alternative location of the utils (mirror, or local directory with file://)
+  call get_environment_variable('MCFOST_UTILS_WEBPAGE',s)
+  if (s/="") utils_webpage = trim(s)
+  if (utils_webpage(len_trim(utils_webpage):len_trim(utils_webpage)) /= "/") utils_webpage = trim(utils_webpage)//"/"
 
   ! Looking for the mcfost utils directory
   call get_mcfost_utils_dir()
 
-  ! Do we need to search for an update ?
+  ! Command line (needed to restart mcfost after an automatic update)
+  call get_command(cmd_opt)
+
+  ! Do we need to search for an update ? Never for a binary compiled from the
+  ! sources (MCFOST_GIT=1), which would be replaced by the last release
   mcfost_auto_update = 7
   call get_environment_variable('MCFOST_AUTO_UPDATE',s)
   if (s/="") read(s,*) mcfost_auto_update
+  call get_environment_variable('MCFOST_GIT',s)
+  if (trim(s)=="1") mcfost_auto_update = 0
 
   if (mcfost_auto_update > 0) then
      cmd = 'date +%s > date.tmp' ;   call system_call(cmd, syst_status)
@@ -374,9 +384,6 @@ subroutine initialisation_mcfost()
         endif ! lupdate
      endif
   endif
-
-  ! Command line
-  call get_command(cmd_opt)
 
   ! Number of arguments
   n_args = command_argument_count()
@@ -579,17 +586,6 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) izone_tilt
         if (ios /= 0 .or. izone_tilt < 1) call error("izone must be a positive integer")
-        i_arg= i_arg+1
-     case("-rs")
-        lremove=.true.
-        i_arg= i_arg+1
-        if (i_arg > n_args) call error("species number needed")
-        call get_command_argument(i_arg,s)
-        read(s,*,iostat=ios) species_removed
-        i_arg= i_arg+1
-        if (i_arg > n_args) call error("Temperature needed")
-        call get_command_argument(i_arg,s)
-        read(s,*,iostat=ios) T_rm
         i_arg= i_arg+1
      case("-resol")
         lresol=.true.
@@ -1236,6 +1232,9 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*) n_T_opt
         i_arg = i_arg + 1
+     case("-constant_sublimation_temperature")
+        lforce_constant_sublimation = .true.
+        i_arg = i_arg + 1
      case("-n_iter_physics","-n_iter","-max_iter_physics")
         i_arg = i_arg + 1
         if (i_arg > n_args) call error("number of iterations needed for -n_iter_physics")
@@ -1589,6 +1588,9 @@ subroutine initialisation_mcfost()
   endif
 
   if (n_zones > 1) lvariable_dust=.true.
+  ! populations, and grain sizes with their own temperature (nLTE, nRE), sublimate
+  ! independently : one density per grain size is needed
+  if (ldust_sublimation .and. ((n_pop > 1) .or. lRE_nLTE .or. lnRE)) lvariable_dust=.true.
 
   if (lemission_mol.and.para_version < 2.11) call error("parameter version must be larger than 2.10")
   if (lemission_atom.and.para_version < 2.11) call error("Atomic line RT only available for latest versions")
@@ -1757,11 +1759,6 @@ subroutine initialisation_mcfost()
 
   ! Hydrostatic equilibrium : combinations that are not supported yet
   if (lhydrostatic) then
-     ! the dust redistribution would refill the sublimated cells at every iteration
-     if (ldust_sublimation) call error("Hydrostatic equilibrium is not compatible with dust sublimation yet")
-     ! the state of non-LTE and non-equilibrium grains (emission tables, packet budget
-     ! modified by emission_nRE) is not rebuilt between hydrostatic iterations
-     if (lRE_nLTE .or. lnRE) call error("Hydrostatic equilibrium only works with grains in LTE (heating method 1)")
      ! the gas of all zones is reshaped into a disk profile, but the dust of
      ! envelope, debris and wall zones is left untouched
      if (any(disk_zone(1:n_zones)%geometry > 2)) &
@@ -1983,7 +1980,7 @@ subroutine display_help()
   write(*,*) "                                           perform the dump rotation"
   write(*,*) "        : -turn-off_planets : sink particles with id > 1 will not emit"
   write(*,*) "        : -turn-off_Lacc : ignore accretion on sink particles"
-  write(*,*) "        : -turn-off_dust_subl : ignore dust sublimation"
+  write(*,*) "        : -constant_sublimation_temperature : ignore the .sub files, use T_sub from the dust files"
   write(*,*) "        : -img_offset <x0> <y0> <z0> : Centres the observer's los in (x0,y0,z0)"
   write(*,*) "        : -split_image : Split a fits image in a fits file for each orienation (incl,azim)"
   write(*,*) "        : -Pmax <calue> : force s12 to be a bell shape peaking at Pmax (between 0 and 1)"
@@ -1997,7 +1994,6 @@ subroutine display_help()
   write(*,*) "        : -tau_dark_zone_obs <tau_dark_zone> (default : 100)"
   write(*,*) "        : -tau_dark_zone_eq_th <tau_dark_zone> (default : 1500)"
   write(*,*) "        : -origin : save origin of packets received the interest bin"
-  write(*,*) "        : -rs (remove species) <species_number> <Temperature>"
   write(*,*) "        : -reemission_stats"
   write(*,*) "        : -weight_emission  : weight emission towards disk surface"
   write(*,*) "        : -force_PAH_equilibrium : mainly for testing purposes"

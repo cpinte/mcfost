@@ -860,13 +860,14 @@ function mcfost_update(lforce_update, lmanual, n_days)
      return
   endif
 
-  ! Do we need to update ?
-  if (last_version == mcfost_release) then
-     write(*,*) "MCFOST is up-to-date"
-     lupdate = .false.
-  else ! Updating
+  ! Do we need to update ? Only to a newer version: a development binary
+  ! (version not released yet) is never replaced by the last release
+  if (is_newer_version(last_version, mcfost_release)) then
      write(*,*) "New MCFOST version available: ", trim(last_version)
      lupdate = .true.
+  else
+     write(*,*) "MCFOST is up-to-date"
+     lupdate = .false.
   endif
   if (lforce_update) then
      write(*,*) "Forcing update to ", trim(last_version)
@@ -990,6 +991,51 @@ function mcfost_update(lforce_update, lmanual, n_days)
   return
 
 end function mcfost_update
+
+!***********************************************************
+
+logical function is_newer_version(version, reference)
+  ! true if version (e.g. "4.1.15") is strictly newer than reference
+
+  character(len=*), intent(in) :: version, reference
+
+  integer, dimension(3) :: v, r
+  integer :: i
+
+  call parse_version(version, v)
+  call parse_version(reference, r)
+
+  is_newer_version = .false.
+  do i=1, 3
+     if (v(i) /= r(i)) then
+        is_newer_version = (v(i) > r(i))
+        return
+     endif
+  enddo
+
+contains
+
+  subroutine parse_version(str, n)
+    ! "major.minor.patch", missing or unreadable numbers are 0
+
+    character(len=*), intent(in) :: str
+    integer, dimension(3), intent(out) :: n
+
+    character(len=len(str)) :: s
+    integer :: k, j, ios
+
+    n = 0
+    s = adjustl(str)
+    do k=1, 3
+       j = index(s, ".")
+       if (j == 0) j = len_trim(s) + 1
+       if (j > 1) read(s(1:j-1),*,iostat=ios) n(k)
+       if (j > len_trim(s)) exit
+       s = s(j+1:)
+    enddo
+  end subroutine parse_version
+
+end function is_newer_version
 
 !***********************************************************
 
@@ -1187,50 +1233,33 @@ end subroutine mcfost_v
 !***********************************************************
 
 subroutine update_utils(lforce_update)
+  ! The utils are stored on the server in one directory per version
+  ! (utils_webpage/<version>/), this binary uses the version it requires.
+  ! The installed utils are updated if their version is not the required one, or if
+  ! the release on the server has changed (sha1 of the tarball, saved by get_utils).
 
   logical, intent(in) :: lforce_update
-  real :: utils_current_version, last_version
 
-  character(len=512) :: cmd, s_last_version
-  integer ::  syst_status, ios
-  logical :: lupdate
+  real :: utils_current_version
+  character(len=64) :: sha1_server, sha1_installed
+  logical :: lupdate, lok
 
-  ! Last version
   utils_current_version =  get_mcfost_utils_version()
-  write(*,*) "Version ", utils_current_version
-  write(*,*) "Checking last version of MCFOST UTILS ..."
-
-  cmd = "curl "//trim(utils_webpage)//"Version -O -s"
-  call system_call(cmd, syst_status)
-  if (syst_status/=0) call error("Cannot get MCFOST UTILS last version number (Error 1)")
-  open(unit=1, file="Version", status='old',iostat=ios)
-  read(1,*,iostat=ios) s_last_version
-  close(unit=1,status="delete",iostat=ios)
-
-  if ( (ios/=0) .or. (.not.is_digit(s_last_version(1:1)))) then
-     call error("Cannot get MCFOST UTILS last version number (Error 2)")
-  endif
-  read(s_last_version,*) last_version
-
-
-  ! Do we need to update ?
-  if (last_version == required_utils_version) then
-     !Ok we have the correct version of mcfost
-     if (last_version == utils_current_version) then
-        write(*,*) "MCFOST UTILS is up-to-date"
-        lupdate = .false.
-     else ! we update
-        lupdate = .true.
-     endif
-  else ! We need to update MCFOST first
-     write(*,*) "New MCFOST UTILS version available: ", trim(s_last_version)
-     write(*,*) "Please update mcfost first with mcfost -u"
-     lupdate = .false.
-  endif
+  write(*,*) "Installed MCFOST UTILS version ", utils_current_version
+  write(*,*) "Required MCFOST UTILS version  ", required_utils_version
 
   if (lforce_update) then
      write(*,*) "Forcing update"
      lupdate = .true.
+  else if (abs(utils_current_version - required_utils_version) > 1e-3) then
+     lupdate = .true.
+  else
+     write(*,*) "Checking last release of MCFOST UTILS "//trim(utils_version_string())//" ..."
+     call get_utils_sha1(sha1_server, lok)
+     if (.not.lok) call error("Cannot get the MCFOST UTILS release from "//trim(utils_url()))
+     sha1_installed = read_sha1(trim(mcfost_utils)//"/"//trim(utils_sha1_file))
+     lupdate = (sha1_installed /= sha1_server)
+     if (.not.lupdate) write(*,*) "MCFOST UTILS is up-to-date"
   endif
 
   if (lupdate) call get_utils()
@@ -1242,25 +1271,126 @@ end subroutine update_utils
 !***********************************************************
 
 subroutine get_utils()
+  ! Downloads the utils of the required version, checks the sha1 of the tarball
+  ! before extracting it and saves the sha1 to detect later releases
 
-  character(len=512) :: cmd
+  character(len=1024) :: cmd
+  character(len=512) :: tarball
+  character(len=64) :: sha1_server, sha1_local
   integer :: syst_status
+  logical :: lok
 
-  write(*,*) "Downloading MCFOST UTILS (this may take a while) ..."
-  write(*,*) "from "//trim(utils_webpage)//"mcfost_utils.tgz"
+  tarball = trim(mcfost_utils)//"/mcfost_utils.tgz.download"
 
-  cmd = "mkdir -p "//trim(mcfost_utils)//&
-  " ; curl "//trim(utils_webpage)//"mcfost_utils.tgz | tar xzf - -C"//trim(mcfost_utils)
+  write(*,*) "Downloading MCFOST UTILS "//trim(utils_version_string())//" (this may take a while) ..."
+  write(*,*) "from "//trim(utils_url())//"mcfost_utils.tgz"
+
+  call get_utils_sha1(sha1_server, lok)
+  if (.not.lok) call error("Cannot get MCFOST UTILS "//trim(utils_version_string())//" from "//trim(utils_url()), &
+       msg2="this version may not be released yet")
+
+  cmd = "mkdir -p "//trim(mcfost_utils)//" ; curl -f -s -S -L --retry 3 --retry-delay 5 "// &
+       trim(utils_url())//"mcfost_utils.tgz -o "//trim(tarball)
   call system_call(cmd, syst_status)
-  if (syst_status == 0) then
-     write(*,*) "Done"
-  else
-     write(*,*) "Error during download."
+  if (syst_status /= 0) then
+     call system_call("rm -f "//trim(tarball), syst_status)
+     call error("Error while downloading MCFOST UTILS")
   endif
+
+  ! Integrity check: sha1sum (linux), shasum (macOS) or openssl
+  cmd = "{ sha1sum "//trim(tarball)//" || shasum -a 1 "//trim(tarball)//" || openssl sha1 -r "//trim(tarball)// &
+       " ; } 2>/dev/null | awk '{print $1}' > "//trim(tarball)//".sha1"
+  call system_call(cmd, syst_status)
+  sha1_local = read_sha1(trim(tarball)//".sha1")
+  call system_call("rm -f "//trim(tarball)//".sha1", syst_status)
+  if (sha1_local /= sha1_server) then
+     call system_call("rm -f "//trim(tarball), syst_status)
+     call error("MCFOST UTILS download is corrupted (sha1 does not match)", &
+          msg2="downloaded: "//trim(sha1_local)//", expected: "//trim(sha1_server))
+  endif
+
+  ! --no-same-owner: files belong to the user even if tar runs as root (e.g. setuid tar)
+  cmd = "tar xzf "//trim(tarball)//" --no-same-owner -C "//trim(mcfost_utils)//" && rm -f "//trim(tarball)
+  call system_call(cmd, syst_status)
+  if (syst_status /= 0) call error("Error while extracting MCFOST UTILS")
+
+  ! sha1 of the installed release
+  open(unit=1, file=trim(mcfost_utils)//"/"//trim(utils_sha1_file), status="replace")
+  write(1,'(a)') trim(sha1_server)
+  close(unit=1)
+
+  write(*,*) "Done"
 
   return
 
 end subroutine get_utils
+
+!***********************************************************
+
+function utils_version_string()
+  ! Directory of the required utils version on the server, e.g. "4.1"
+
+  character(len=16) :: utils_version_string
+
+  write(utils_version_string,'(f0.1)') required_utils_version
+
+end function utils_version_string
+
+!***********************************************************
+
+function utils_url()
+
+  character(len=256) :: utils_url
+
+  utils_url = trim(utils_webpage)//trim(utils_version_string())//"/"
+
+end function utils_url
+
+!***********************************************************
+
+subroutine get_utils_sha1(sha1, lok)
+  ! sha1 of the utils tarball of the required version on the server
+
+  character(len=64), intent(out) :: sha1
+  logical, intent(out) :: lok
+
+  character(len=512) :: filename
+  integer :: syst_status
+
+  filename = trim(mcfost_utils)//"/mcfost_utils.sha1.download"
+  call system_call("mkdir -p "//trim(mcfost_utils)//" ; curl -f -s -S -L --retry 3 --retry-delay 5 "// &
+       trim(utils_url())//"mcfost_utils.sha1 -o "// &
+       trim(filename), syst_status)
+  sha1 = ""
+  if (syst_status == 0) sha1 = read_sha1(filename)
+  call system_call("rm -f "//trim(filename), syst_status)
+  lok = (len_trim(sha1) == 40)
+
+end subroutine get_utils_sha1
+
+!***********************************************************
+
+function read_sha1(filename)
+  ! sha1 in a file: last word of the first line, i.e. the hash alone or the
+  ! openssl format "SHA1(file)= hash". Empty if the file cannot be read.
+
+  character(len=*), intent(in) :: filename
+  character(len=64) :: read_sha1
+
+  character(len=256) :: line
+  integer :: ios, i
+
+  read_sha1 = ""
+  open(unit=1, file=trim(filename), status="old", iostat=ios)
+  if (ios /= 0) return
+  read(1,'(a)',iostat=ios) line
+  close(unit=1)
+  if (ios /= 0) return
+  line = adjustl(line)
+  i = index(trim(line), " ", back=.true.)
+  read_sha1 = adjustl(line(i+1:))
+
+end function read_sha1
 
 !***********************************************************
 

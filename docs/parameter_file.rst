@@ -224,10 +224,22 @@ Disk physics
 * ``hydrostatic_equilibrium``: (*work in progress*) compute the
   hydrostatic equilibrium assuming Tgas = Tdust
 
-* ``sublimate_dust``: this option will iteratively remove the dust if the
-  temperature reaches the dust sublimation temperature. On Voronoi grids,
-  dust is removed inside the sublimation radius of each star and in
-  cells where the dust temperature exceeds the sublimation temperature.
+* ``sublimate_dust``: the dust is removed where its temperature exceeds the
+  sublimation temperature. The sublimation front is found by iterating the
+  temperature calculation: at each iteration, dust above its sublimation
+  temperature is removed and previously sublimated dust that has become colder
+  than its sublimation temperature re-condenses (the temperature of sublimated
+  dust is computed with a trace amount of dust). Each population sublimates
+  independently, and grains with one temperature per grain size (non-LTE)
+  sublimate size by size. Grains heated out of equilibrium (heating method 3,
+  e.g. PAHs) only sublimate in cells where they reach radiative equilibrium. The sublimation temperature is constant (read from the optical
+  indices file) or depends on the gas density (see :ref:`sublimation-laws`).
+  If the innermost zone starts beyond the optically thin sublimation radius,
+  it is extended inwards to that radius. On Voronoi grids, dust is removed
+  inside the optically thin sublimation radius of each star. The sublimation
+  mask is saved in ``data_th`` and re-used by the image and SED calculations.
+  Sublimation can be combined with hydrostatic equilibrium, both are iterated
+  in the same loop (``-n_iter_physics`` sets the maximum number of iterations).
 
 * ``viscous_heating``: (*work in progress*) includes additional heating
   source due to viscous accretion (note that it does not account for the
@@ -270,8 +282,9 @@ Density structure
 * ``vertical_profile_exponent``: exponent of vertical
   density profile (only relevant for type 4, debris disk)
 
-* ``Rin``: inner radius of disk or envelope in AU (assuming sublimation
-  calculation is not enabled)
+* ``Rin``: inner radius of disk or envelope in AU. If dust sublimation is
+  enabled and the optically thin sublimation radius is smaller, the innermost
+  zone is extended inwards to the sublimation radius.
 
 * ``Rout``: outer radius of disk or envelope [au]
 

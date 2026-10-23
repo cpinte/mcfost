@@ -17,7 +17,10 @@ module disk_physics
   implicit none
 
   character(len=32) :: sublimationFile = "sublimation_radius.txt"
-  real(kind=dp), parameter :: sub_factor = 1.6_dp
+  ! The innermost zone is extended inwards to sub_factor x the optically thin
+  ! sublimation radius if it starts further out; the sublimation front itself is
+  ! found by the iterations (sublimation mask)
+  real(kind=dp), parameter :: sub_factor = 1.0_dp
 
   ! Surface density snapshot taken on the first hydrostatic iteration,
   ! freed by free_hydrostatic once the iterations are complete
@@ -28,6 +31,40 @@ module disk_physics
   real(kind=dp), parameter :: hydro_residual_floor = 1.0e-3_dp
   real(kind=dp), parameter :: hydro_density_precision = 5.0e-2_dp
 
+  ! Dust sublimation, iterated with the radiative transfer in the physics loop.
+  ! dust_density_pristine is the dust density before sublimation (it follows the
+  ! hydrostatic redistribution); lsublimated has the first dimension of
+  ! dust_density_o_n_grains : one flag per grain size (lvariable_dust) or per zone.
+  real(kind=dp), allocatable, dimension(:,:), private :: dust_density_pristine
+  logical, allocatable, dimension(:,:) :: lsublimated
+  integer(kind=1), allocatable, dimension(:,:), private :: n_sublimation_flips
+  integer, allocatable, dimension(:), private :: pop_of_pk ! population of each first index of dust_density_o_n_grains
+  character(len=32), parameter :: sublimationMaskFile = "sublimation_mask"
+
+  ! A trace of the pristine dust is left in sublimated cells : negligible for the
+  ! transport and the observables, but the cell still records the radiation field,
+  ! giving the equilibrium ("test particle") temperature of its dust, which is
+  ! independent of the dust density. Sublimated dust can then re-condense.
+  real(kind=dp), parameter :: sublimation_trace = 1.0e-20_dp
+  ! Hysteresis band around T_sub : sublimation if T > T_sub (1+delta), re-condensation
+  ! if T < T_sub (1-delta), with delta from the Monte Carlo noise on T (as for the
+  ! hydrostatic convergence test), between sublimation_precision and sublimation_band_max
+  real, parameter :: sublimation_precision = 0.02
+  real, parameter :: sublimation_n_sigma = 3.0
+  real, parameter :: sublimation_band_max = 0.3
+  real, parameter :: sublimation_min_packets = 10.0
+  ! a grain that changed state this many times keeps its current state (no oscillation)
+  integer, parameter :: sublimation_max_flips = 4
+  ! The sublimation front is converged when fewer (grain or zone, cell) pairs than this
+  ! fraction of the sublimated ones would change state : the remaining changes are
+  ! Monte Carlo noise near T_sub (in particular with one temperature per grain size)
+  real, parameter :: sublimation_change_tolerance = 1.0e-3
+  ! floor on the gas density in the power-law sublimation temperature [g/cm3]
+  real, parameter :: sublimation_rho_floor = 1.0e-30
+  ! return values of sublimation_change
+  integer, parameter :: sublimation_no_change = 0, sublimation_sublimates = 1, &
+       sublimation_recondenses = -1, sublimation_frozen = 2
+
 contains
 
 
@@ -36,10 +73,19 @@ subroutine compute_othin_sublimation_radius()
 
   real(kind=dp) :: E_dust, E_etoile, coeff_exp, cst_wl, sublimation_radius
   real(kind=dp) :: cst, wl, delta_wl, star_flux
+  real :: T_sub
   integer :: lambda, icell, i
 
+  ! Highest sublimation temperature of the first population in the model (density-
+  ! dependent laws) : no dust can survive inside the corresponding radius
+  T_sub = 0.0
+  do icell=1, n_cells
+     T_sub = max(T_sub, population_sublimation_temperature(1, real(gas_density(icell) * mu_mH / m3_to_cm3)))
+  enddo
+  write(*,'(a,f7.1,a)') " Sublimation temperature for the optically thin sublimation radius = ", T_sub, " K"
+
   E_dust = 0.0
-  cst=thermal_const/dust_pop(1)%T_sub
+  cst=thermal_const/T_sub
 
   icell = icell1
 
@@ -72,9 +118,12 @@ subroutine compute_othin_sublimation_radius()
           real(star(i)%othin_sublimation_radius), " AU"
   enddo
 
-  open(unit=1,file=trim(data_dir)//"/"//trim(sublimationFile),status="replace")
-  write(1,*) star(:)%othin_sublimation_radius
-  close(1)
+  ! data_dir is not created when the run stops after the initialisation (eg -disk_struct)
+  if (.not.lstop_after_init) then
+     open(unit=1,file=trim(data_dir)//"/"//trim(sublimationFile),status="replace")
+     write(1,*) star(:)%othin_sublimation_radius
+     close(1)
+  endif
 
   if (lVoronoi) then
      call sublimate_dust_Voronoi_radius(sub_factor)
@@ -94,13 +143,17 @@ subroutine set_sublimation_radius(sublimation_radius)
   real(kind=dp), intent(in) :: sublimation_radius
 
   integer :: i
+  real(kind=dp) :: rmin_zones
 
+  ! Only the innermost zone(s) are extended inwards to the sublimation radius :
+  ! extending the other zones would spread their dust inside the inner zones
+  ! (and make the grid regions overlap)
+  rmin_zones = minval(disk_zone(:)%rmin)
   do i=1,n_zones
-     !write(*,*) "zone", i,sublimation_radius, disk_zone(i)%rmin, sublimation_radius > disk_zone(i)%rmin
-     if (sublimation_radius < disk_zone(i)%rmin) then
+     if ((disk_zone(i)%rmin <= rmin_zones) .and. (sublimation_radius < disk_zone(i)%rmin)) then
         !write(*,*) "SUBLIMATING DUST IN ZONE", i
         disk_zone(i)%rmin = sublimation_radius
-        disk_zone(i)%rin = disk_zone(i)%rmin + 5* disk_zone(1)%edge
+        disk_zone(i)%rin = disk_zone(i)%rmin + 5* disk_zone(i)%edge
         disk_zone(i)%edge = 0.0
      endif
   enddo !i
@@ -212,58 +265,6 @@ subroutine sublimate_dust_Voronoi_radius(rsub_factor)
 end subroutine sublimate_dust_Voronoi_radius
 
 !**********************************************************************
-
-subroutine sublimate_dust()
-  ! Remove grains whose temperature exceeds the sublimation temperature
-  ! C. Pinte 07/08/12
-  ! D. Price 25/06/26: updated to work with all grid types (esp. Voronoi)
-
-  integer :: icell, k, ipop, p_k
-  real(kind=dp) :: mass
-  logical :: lchanged
-
-  write(*,*) "Sublimating dust"
-
-  do icell=1, n_cells
-     lchanged = .false.
-     do k=1, n_grains_tot
-        ipop = grain(k)%pop
-
-        if (.not.dust_pop(ipop)%is_PAH) then
-           if (Tdust(icell) > dust_pop(ipop)%T_sub) then
-              ! (n_grains_tot,n_cells) if lvariable_dust, else (n_zones,n_cells)
-              p_k = merge(k, grain(k)%zone, lvariable_dust)
-              dust_density_o_n_grains(p_k,icell) = 0.0
-              lchanged = .true.
-           endif
-        endif
-     enddo
-
-     ! Keep dust_mass consistent with density (needed for kappa_factor when .not.lvariable_dust)
-     if (lchanged) then
-        if (lvariable_dust) then
-           dust_mass(icell) = 0.0
-           do k=1, n_grains_tot
-              dust_mass(icell) = dust_mass(icell) + dust_density_o_n_grains(k,icell) * n_grains(k) &
-                   * M_grain(k) * volume(icell) * AU3_to_cm3
-           enddo
-        else
-           ! Zone-indexed density: if wiped, mass is zero (SPH and analytic single-zone)
-           if (maxval(dust_density_o_n_grains(:,icell)) <= 0.0) then
-              dust_mass(icell) = 0.0
-           endif
-        endif
-     endif
-  enddo
-
-  call find_non_empty_cell()
-  mass = real(sum(dust_mass) * g_to_Msun)
-  write(*,*) 'New total dust mass in model :', mass,' Msun'
-
-end subroutine sublimate_dust
-
-
-!**********************************************************
 
 subroutine equilibre_hydrostatique(density_residual, lapply)
   ! Compute hydrostatic equilibrium for the gas, then re-derive the dust
@@ -651,6 +652,341 @@ subroutine print_hydrostatic_scale_height()
 
 end subroutine print_hydrostatic_scale_height
 
+!**********************************************************
+
+subroutine init_sublimation()
+  ! Takes the current dust density as the pristine (unsublimated) density
+
+  integer :: k
+
+  call free_sublimation()
+
+  allocate(dust_density_pristine(size(dust_density_o_n_grains,1),n_cells), &
+       lsublimated(size(dust_density_o_n_grains,1),n_cells), &
+       n_sublimation_flips(size(dust_density_o_n_grains,1),n_cells), &
+       pop_of_pk(size(dust_density_o_n_grains,1)))
+  dust_density_pristine(:,:) = dust_density_o_n_grains(:,1:n_cells)
+  lsublimated(:,:) = .false.
+  n_sublimation_flips(:,:) = 0_1
+
+  ! first index of dust_density_o_n_grains : grain size (lvariable_dust) or zone.
+  ! In zone mode there is a single population per zone (lvariable_dust is set otherwise).
+  pop_of_pk(:) = 0
+  do k=1, n_grains_tot
+     pop_of_pk(merge(k, grain(k)%zone, lvariable_dust)) = grain(k)%pop
+  enddo
+
+  return
+
+end subroutine init_sublimation
+
+!**********************************************************
+
+subroutine set_pristine_dust_density()
+  ! The dust density has been recomputed (hydrostatic redistribution) :
+  ! it becomes the new pristine density, before the sublimation mask is applied
+
+  dust_density_pristine(:,:) = dust_density_o_n_grains(:,1:n_cells)
+
+  return
+
+end subroutine set_pristine_dust_density
+
+!**********************************************************
+
+subroutine update_sublimation(n_new, n_recondensed, n_frozen, lapply)
+  ! Compares the temperature of each (grain size or zone, cell) with the sublimation
+  ! temperature of its population, with a hysteresis band set by the Monte Carlo noise :
+  !  - not sublimated and T > T_sub (1+delta) : sublimates
+  !  - sublimated and T < T_sub (1-delta) : re-condenses (T is then the test-particle
+  !    temperature of the trace dust left in the cell)
+  ! Grains that already changed state sublimation_max_flips times are frozen.
+  ! n_new / n_recondensed return the number of changes, n_frozen the number of frozen
+  ! grains that would otherwise change. With lapply=.false., the mask is not modified.
+  ! LTE grains : one temperature per cell; nLTE grains and nRE grains at equilibrium :
+  ! one temperature per grain size. PAHs are not sublimated.
+
+  use radiation_field, only : xN_abs
+
+  integer, intent(out) :: n_new, n_recondensed, n_frozen
+  logical, intent(in) :: lapply
+
+  integer :: icell, p_k, pop, change
+  real :: delta, n_packets, T_grain, rho_gas
+
+  n_new = 0 ; n_recondensed = 0 ; n_frozen = 0
+  do icell=1, n_cells
+     n_packets = 0.0
+     if (allocated(xN_abs)) n_packets = sum(xN_abs(icell,1,:))
+     delta = sublimation_band(n_packets)
+     rho_gas = real(gas_density(icell) * mu_mH / m3_to_cm3) ! g/cm3
+
+     do p_k=1, size(lsublimated,1)
+        pop = pop_of_pk(p_k)
+        if (pop == 0) cycle
+        if (dust_pop(pop)%is_PAH) cycle
+        if (dust_density_pristine(p_k,icell) <= 0.0_dp) cycle
+
+        ! Temperature of the grain : one per cell for LTE grains, one per grain size for
+        ! nLTE grains and for nRE grains at equilibrium (p_k is the grain index, as
+        ! lvariable_dust is set for nLTE / nRE grains). Stochastically heated grains have
+        ! no single temperature : their state is not changed.
+        T_grain = Tdust(icell)
+        if (lvariable_dust) then
+           select case(dust_pop(pop)%methode_chauffage)
+           case(2)
+              T_grain = Tdust_1grain(p_k,icell)
+           case(3)
+              if (.not.l_RE(p_k,icell)) cycle
+              T_grain = Tdust_1grain_nRE(p_k,icell)
+           end select
+        endif
+
+        change = sublimation_change(lsublimated(p_k,icell), T_grain, population_sublimation_temperature(pop, rho_gas), delta, &
+             int(n_sublimation_flips(p_k,icell)))
+        select case(change)
+        case(sublimation_sublimates)
+           n_new = n_new + 1
+        case(sublimation_recondenses)
+           n_recondensed = n_recondensed + 1
+        case(sublimation_frozen)
+           n_frozen = n_frozen + 1
+           cycle
+        case default
+           cycle
+        end select
+
+        if (lapply) then
+           lsublimated(p_k,icell) = .not.lsublimated(p_k,icell)
+           n_sublimation_flips(p_k,icell) = n_sublimation_flips(p_k,icell) + 1_1
+        endif
+     enddo
+  enddo
+
+  return
+
+end subroutine update_sublimation
+
+!**********************************************************
+
+pure real function sublimation_temperature(law, T_sub_constant, T0, rho0, gamma, rho_gas)
+  ! Sublimation temperature of a dust component [K] for a gas density rho_gas [g/cm3] :
+  !  - sublimation_law_constant  : T_sub_constant (from the optical indices file)
+  !  - sublimation_law_power_law : T0 (rho_gas / rho0)^gamma (Pollack et al. 1994,
+  !    Isella & Natta 2005), with rho_gas floored at sublimation_rho_floor
+
+  integer, intent(in) :: law
+  real, intent(in) :: T_sub_constant, T0, rho0, gamma, rho_gas
+
+  select case(law)
+  case(sublimation_law_power_law)
+     sublimation_temperature = T0 * (max(rho_gas, sublimation_rho_floor) / rho0)**gamma
+  case default
+     sublimation_temperature = T_sub_constant
+  end select
+
+end function sublimation_temperature
+
+!**********************************************************
+
+real function population_sublimation_temperature(pop, rho_gas)
+  ! Sublimation temperature of a population : the lowest one of its components
+  ! (as for the constant T_sub in dust_prop)
+
+  integer, intent(in) :: pop
+  real, intent(in) :: rho_gas
+
+  integer :: k
+
+  if (dust_pop(pop)%is_opacity_file) then
+     population_sublimation_temperature = dust_pop(pop)%T_sub
+     return
+  endif
+
+  population_sublimation_temperature = huge(1.0)
+  do k=1, dust_pop(pop)%n_components
+     population_sublimation_temperature = min(population_sublimation_temperature, &
+          sublimation_temperature(dust_pop(pop)%component_sub_law(k), dust_pop(pop)%component_T_sub(k), &
+          dust_pop(pop)%component_sub_T0(k), dust_pop(pop)%component_sub_rho0(k), &
+          dust_pop(pop)%component_sub_gamma(k), rho_gas))
+  enddo
+
+end function population_sublimation_temperature
+
+!**********************************************************
+
+pure real function sublimation_band(n_packets)
+  ! Relative half-width delta of the hysteresis band around T_sub, from the Monte
+  ! Carlo noise on the temperature : T ~ E^(1/4), relative noise on E ~ 1/sqrt(N),
+  ! so sigma_T/T ~ 0.25/sqrt(N). Bounded by sublimation_precision and
+  ! sublimation_band_max; sublimation_band_max when there are too few packets.
+
+  real, intent(in) :: n_packets
+
+  if (n_packets >= sublimation_min_packets) then
+     sublimation_band = min(max(sublimation_precision, sublimation_n_sigma * 0.25 / sqrt(n_packets)), &
+          sublimation_band_max)
+  else
+     sublimation_band = sublimation_band_max
+  endif
+
+end function sublimation_band
+
+!**********************************************************
+
+pure integer function sublimation_change(lsublimated_in, T, T_sub, delta, n_flips)
+  ! State change of a grain (or zone) in a cell, given its temperature :
+  !  sublimation_sublimates  : not sublimated and T > T_sub (1+delta)
+  !  sublimation_recondenses : sublimated and T < T_sub (1-delta)
+  !  sublimation_frozen      : would change, but already changed sublimation_max_flips times
+  !  sublimation_no_change   : otherwise
+
+  logical, intent(in) :: lsublimated_in
+  real, intent(in) :: T, T_sub, delta
+  integer, intent(in) :: n_flips
+
+  logical :: lchange
+
+  if (lsublimated_in) then
+     lchange = (T < T_sub * (1.0 - delta))
+  else
+     lchange = (T > T_sub * (1.0 + delta))
+  endif
+
+  if (.not.lchange) then
+     sublimation_change = sublimation_no_change
+  else if (n_flips >= sublimation_max_flips) then
+     sublimation_change = sublimation_frozen
+  else if (lsublimated_in) then
+     sublimation_change = sublimation_recondenses
+  else
+     sublimation_change = sublimation_sublimates
+  endif
+
+end function sublimation_change
+
+!**********************************************************
+
+subroutine apply_sublimation()
+  ! dust density = pristine density where the grains have not sublimated, and a trace
+  ! (sublimation_trace) of it where they have; then recomputes the dust mass of each
+  ! cell and the reference (first non-empty) cell
+
+  integer :: icell, k, pop
+  real(kind=dp) :: mass
+
+  where (lsublimated)
+     dust_density_o_n_grains(:,1:n_cells) = dust_density_pristine * sublimation_trace
+  elsewhere
+     dust_density_o_n_grains(:,1:n_cells) = dust_density_pristine
+  end where
+
+  do icell=1, n_cells
+     dust_mass(icell) = 0.0_dp
+     if (lvariable_dust) then
+        do k=1, n_grains_tot
+           dust_mass(icell) = dust_mass(icell) + dust_density_o_n_grains(k,icell) * n_grains(k) * M_grain(k)
+        enddo
+     else
+        ! zone mode : dust_density_o_n_grains(izone,:) is the mass density of the zone,
+        ! split between its populations by frac_mass (as in normalize_dust_density)
+        do pop=1, n_pop
+           dust_mass(icell) = dust_mass(icell) + dust_density_o_n_grains(dust_pop(pop)%zone,icell) * dust_pop(pop)%frac_mass
+        enddo
+     endif
+     dust_mass(icell) = dust_mass(icell) * volume(icell) * AU3_to_cm3
+  enddo
+
+  call find_non_empty_cell()
+  mass = sum(dust_mass) * g_to_Msun
+  write(*,'(" Sublimation : ", i0, " sublimated (grain or zone, cell) pairs, dust mass = ", es10.3, " Msun")') &
+       count(lsublimated), mass
+  if (all(lsublimated .or. (dust_density_pristine <= 0.0_dp))) call error("Sublimation : all the dust has sublimated")
+
+  return
+
+end subroutine apply_sublimation
+
+!**********************************************************
+
+subroutine write_sublimation_mask(iter)
+  ! Saves the sublimation mask (1 = sublimated) in data_th, for restart and
+  ! for image/SED runs. iter > 0 : per-iteration file, iter = 0 : final mask.
+
+  use fits_utils, only : cfitsWrite
+
+  integer, intent(in) :: iter
+
+  character(len=512) :: filename
+  character(len=4) :: iter_str
+
+  if (iter > 0) then
+     write(iter_str,'(i4.4)') iter
+     filename = "!"//trim(data_dir)//"/"//trim(sublimationMaskFile)//"_iter"//iter_str//".fits.gz"
+  else
+     filename = "!"//trim(data_dir)//"/"//trim(sublimationMaskFile)//".fits.gz"
+  endif
+  call cfitsWrite(trim(filename), merge(1.0, 0.0, lsublimated), shape(lsublimated))
+
+  return
+
+end subroutine write_sublimation_mask
+
+!**********************************************************
+
+subroutine read_sublimation_mask()
+  ! Reads the final sublimation mask written by the temperature run
+
+  integer :: status, unit, blocksize, readwrite, nfound, group, firstpix, npixels
+  integer, dimension(2) :: naxes
+  real :: nullval
+  logical :: anynull
+  real, dimension(:), allocatable :: mask
+  character(len=512) :: filename
+
+  if (.not.allocated(lsublimated)) call error("read_sublimation_mask: init_sublimation must be called first")
+
+  filename = trim(root_dir)//"/"//trim(seed_dir)//"/data_th/"//trim(sublimationMaskFile)//".fits.gz"
+  write(*,*) "Reading sublimation mask : "//trim(filename)
+
+  status = 0
+  call ftgiou(unit,status)
+  readwrite = 0
+  call ftopen(unit,trim(filename),readwrite,blocksize,status)
+  if (status /= 0) call error("cannot open "//trim(filename), &
+       msg2="the temperature run must be done with this version of mcfost")
+  call ftgknj(unit,'NAXIS',1,2,naxes,nfound,status)
+  if ((status /= 0).or.(nfound /= 2)) call error("cannot read the dimensions of "//trim(filename))
+  if ((naxes(1) /= size(lsublimated,1)).or.(naxes(2) /= size(lsublimated,2))) then
+     call error("sublimation mask does not match the current grid and dust populations")
+  endif
+  npixels = naxes(1)*naxes(2)
+  allocate(mask(npixels))
+  group = 1 ; firstpix = 1 ; nullval = -999
+  call ftgpve(unit,group,firstpix,npixels,nullval,mask,anynull,status)
+  if (status /= 0) call error("cannot read "//trim(filename))
+  call ftclos(unit,status)
+  call ftfiou(unit,status)
+
+  lsublimated = reshape(mask > 0.5, shape(lsublimated))
+  deallocate(mask)
+
+  return
+
+end subroutine read_sublimation_mask
+
+!**********************************************************
+
+subroutine free_sublimation()
+
+  if (allocated(dust_density_pristine)) deallocate(dust_density_pristine)
+  if (allocated(lsublimated)) deallocate(lsublimated)
+  if (allocated(n_sublimation_flips)) deallocate(n_sublimation_flips)
+  if (allocated(pop_of_pk)) deallocate(pop_of_pk)
+
+  return
+
+end subroutine free_sublimation
 
 !**********************************************************
 
