@@ -22,6 +22,12 @@ module mol_transfer
 
   implicit none
 
+  ! Spectrum with circular pixels (RT_line_method = 1), per ring of the log-polar
+  ! sampling: each ring is computed by a single thread and the rings are summed in
+  ! order after the parallel loop (no race, independent of the number of threads)
+  real(kind=dp), dimension(:,:,:), allocatable, private :: spectrum_ring
+  real(kind=dp), dimension(:,:), allocatable, private :: continu_ring
+
   contains
 
 subroutine mol_line_transfer()
@@ -598,19 +604,22 @@ subroutine emission_line_map(imol,ibin,iaz)
 
      fact_A = sqrt(pi * (fact_r - 1.0_dp/fact_r)  / n_phi_RT )
 
-     ! Loop over sampling rays
-     !$omp parallel &
-     !$omp default(none) &
-     !$omp private(ri_RT,id,r,taille_pix,phi_RT,phi,pixelcorner) &
-     !$omp shared(tab_r,fact_A,x_plan_image,y_plan_image,center,dx,dy,u,v,w,i,j) &
-     !$omp shared(n_iter_min,n_iter_max,l_sym_ima_mol,cst_phi,imol,ibin,iaz)
-     id =1 ! for sequential code
-
      if (l_sym_ima_mol) then
         cst_phi = pi  / real(n_phi_RT,kind=dp)
      else
         cst_phi = two_pi  / real(n_phi_RT,kind=dp)
      endif
+
+     allocate(spectrum_ring(n_speed_rt,nTrans_raytracing,n_rad_RT), continu_ring(nTrans_raytracing,n_rad_RT))
+     spectrum_ring = 0.0_dp ; continu_ring = 0.0_dp
+
+     ! Loop over sampling rays: ring ri_RT is accumulated in spectrum_ring(:,:,ri_RT)
+     !$omp parallel &
+     !$omp default(none) &
+     !$omp private(ri_RT,id,r,taille_pix,phi_RT,phi,pixelcorner) &
+     !$omp shared(tab_r,fact_A,x_plan_image,y_plan_image,center,dx,dy,u,v,w,j) &
+     !$omp shared(n_iter_min,n_iter_max,cst_phi,imol,ibin,iaz)
+     id =1 ! for sequential code
 
      !$omp do schedule(dynamic,1)
      do ri_RT=1, n_rad_RT
@@ -623,11 +632,18 @@ subroutine emission_line_map(imol,ibin,iaz)
            phi = cst_phi * (real(phi_RT,kind=dp) -0.5_dp)
 
            pixelcorner(:,id) = center(:) + r * sin(phi) * x_plan_image + r * cos(phi) * y_plan_image ! This is actually the centre since dx = dy = 0.
-           call intensite_pixel_mol(id,imol,ibin,iaz,n_iter_min,n_iter_max,i,j,pixelcorner(:,id),taille_pix,dx,dy,u,v,w)
+           call intensite_pixel_mol(id,imol,ibin,iaz,n_iter_min,n_iter_max,ri_RT,j,pixelcorner(:,id),taille_pix,dx,dy,u,v,w)
         enddo !j
      enddo !i
      !$omp end do
      !$omp end parallel
+
+     ! Sum of the rings, in a fixed order
+     do ri_RT=1, n_rad_RT
+        spectrum(1,1,:,:,ibin,iaz) = spectrum(1,1,:,:,ibin,iaz) + spectrum_ring(:,:,ri_RT)
+        continu(1,1,:,ibin,iaz) = continu(1,1,:,ibin,iaz) + continu_ring(:,ri_RT)
+     enddo
+     deallocate(spectrum_ring, continu_ring)
 
   else ! method 2: linear sampling with sub-pixels
      lresolved = .true.
@@ -834,9 +850,9 @@ subroutine intensite_pixel_mol(id,imol,ibin,iaz,n_iter_min,n_iter_max,ipix,jpix,
   ! Units tested OK for CMB
   ! unconvolved line profile tested ok with torus
 
-  if (RT_line_method==1) then ! Implicit summation over pixels
-     spectrum(1,1,:,:,ibin,iaz) = spectrum(1,1,:,:,ibin,iaz) + IP(:,:)
-     continu(1,1,:,ibin,iaz) = continu(1,1,:,ibin,iaz) + IPc(:)
+  if (RT_line_method==1) then ! Implicit summation over pixels: ring ipix, added to spectrum by emission_line_map
+     spectrum_ring(:,:,ipix) = spectrum_ring(:,:,ipix) + IP(:,:)
+     continu_ring(:,ipix) = continu_ring(:,ipix) + IPc(:)
   else
      spectrum(ipix,jpix,:,:,ibin,iaz) = IP(:,:)
      continu(ipix,jpix,:,ibin,iaz) = IPc(:)

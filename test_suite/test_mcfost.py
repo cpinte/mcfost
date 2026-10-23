@@ -362,6 +362,35 @@ def test_hydrostatic_restart():
     assert MC_similar(T_ref,T,threshold=0.05)
 
 
+def test_mol_spectrum_circular_pixels():
+    # Molecular spectrum with circular pixels (1x1 map, RT_line_method = 1) and a
+    # symmetric image: same spectrum with 1 thread and with all threads (F5), and
+    # symmetric in velocity. The symmetrisation used to write outside the spectrum
+    # array (old velocity indexing), giving garbage fluxes and crashes.
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    root_dir = "ref3.0_mol_spectrum"
+    clean_results(root_dir)
+    os.makedirs(root_dir, exist_ok=True)
+    para = root_dir+"/spectrum.para"
+    make_para("test_data/ref3.0/ref3.0.para", para, {"grid (nx,ny)": set_first_value("1 1")})
+
+    spectra = []
+    for threads, run_dir in [(1, root_dir+"/t1"), (None, root_dir+"/tN")]:
+        # temperature of the reference model
+        os.makedirs(run_dir+"/data_th")
+        shutil.copy("test_data/ref3.0/data_th/Temperature.fits.gz", run_dir+"/data_th")
+        run_mcfost(para, run_dir, "-mol -no_T", threads=threads)
+        spectra.append(fits.getdata(run_dir+"/data_CO/lines.fits.gz").astype(float))
+
+    s1, sN = spectra
+    assert np.all(np.isfinite(s1)) and np.all(s1 > 0)
+    # the stellar flux is computed with random rays: small differences between thread counts
+    assert np.abs(sN - s1).max() < 1e-3 * s1.max()
+    # axes (azimuth, inclination, transition, velocity, y, x): symmetric in velocity
+    assert np.allclose(s1, np.flip(s1, axis=3), rtol=1e-5)
+
+
 def test_sublimation_image():
     # An image run after a temperature run with dust sublimation must read back
     # the sublimation radius and use the same inner radius as the temperature run
@@ -420,11 +449,15 @@ def set_first_value(value):
     return lambda line: "  "+value+" "+" ".join(line.split()[1:])+"\n"
 
 
-def run_mcfost(para, root_dir, opt="", cwd=None):
+def run_mcfost(para, root_dir, opt="", cwd=None, threads=None):
     # cwd: directory to run from (para and root_dir are then relative to it), e.g. to
     # pick up dust files placed in the run directory, which is searched first
+    # threads: number of OpenMP threads (default: environment)
+    env = None
+    if threads is not None:
+        env = dict(os.environ, OMP_NUM_THREADS=str(threads))
     result = subprocess.run((os.path.abspath(_mcfost_bin)+" "+para+" -root_dir "+root_dir+" "+opt).split(),
-                            capture_output=True, text=True, cwd=cwd)
+                            capture_output=True, text=True, cwd=cwd, env=env)
     print(result.stdout)
     assert result.returncode == 0, result.stdout[-3000:]
     return result.stdout
