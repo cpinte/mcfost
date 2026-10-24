@@ -154,11 +154,16 @@ subroutine init_Doppler_profiles(imol)
   n_speed = mol(imol)%n_speed_rt
 
   do icell=1, n_cells
-     ! Using the LTE dust temperature as the kinetic temperature
-     ! WARNING : this is a delta, not a sigma; see Boisse lecture notes p47
-     ! Consistent avec benchmark
-     sigma2 =  2.0_dp * (kb*Tcin(icell) / (mol(imol)%molecularWeight * mH  * g_to_kg)) + v_turb2(icell)
-     dv_line(icell) = sqrt(sigma2)
+     if (lProDiMo2mcfost) then
+        ! Line broadening parameter from ProDiMo (read_ProDiMo2mcfost)
+        sigma2 = real(dv_line(icell),kind=dp)**2
+     else
+        ! Using the LTE dust temperature as the kinetic temperature
+        ! WARNING : this is a delta, not a sigma; see Boisse lecture notes p47
+        ! Consistent avec benchmark
+        sigma2 =  2.0_dp * (kb*Tcin(icell) / (mol(imol)%molecularWeight * mH  * g_to_kg)) + v_turb2(icell)
+        dv_line(icell) = sqrt(sigma2)
+     endif
 
      !  write(*,*) "FWHM", sqrt(sigma2 * log(2.)) * 2.  ! Teste OK bench water 1
      sigma2_m1 = 1.0_dp / sigma2

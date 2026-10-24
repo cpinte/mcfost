@@ -1603,7 +1603,7 @@ contains
 
     logical :: lCII, lOI, lCO, loH2O, lpH2O
 
-    real :: sigma2, sigma2_m1, r_sph, factor_CO
+    real :: r_sph, factor_CO
     integer :: i,j, ri, zj, n_speed_rt, l, keyword_status, icell
 
     real, parameter :: ratio_12_13_CO = 70.
@@ -1994,24 +1994,19 @@ contains
        enddo
     enddo
 
-    ! velocity Doppler
+    ! Line broadening parameter from ProDiMo [m/s]: init_Doppler_profiles builds the line
+    ! profiles from it instead of the thermal + turbulent width
     do i=1, n_rad
        do j=1, nz
           icell = cell_map(i,j,1)
 
-          if (lCII)  dv_line(icell) =  dvCII(i,j)**2 !/ (2 * log(2.))
-          if (lOI)  dv_line(icell) =  dvOI(i,j)**2
-          if (lCO)  dv_line(icell) =  dvCO(i,j)**2
-          if (loH2O)  dv_line(icell) =  dvoH2O(i,j)**2
-          if (lpH2O)  dv_line(icell) =  dvpH2O(i,j)**2
+          if (lCII)  dv_line(icell) =  dvCII(i,j)
+          if (lOI)  dv_line(icell) =  dvOI(i,j)
+          if (lCO)  dv_line(icell) =  dvCO(i,j)
+          if (loH2O)  dv_line(icell) =  dvoH2O(i,j)
+          if (lpH2O)  dv_line(icell) =  dvpH2O(i,j)
 
-          sigma2 = dv_line(icell)**2
-
-          sigma2_m1 = 1.0_dp / sigma2
-          sigma2_phiProf_m1(icell) = sigma2_m1
-          ! phi(nu) et non pas phi(v) donc factor c_light et il manque 1/f0
-          ! ATTENTION : il ne faut pas oublier de diviser par la freq apres
-          norme_phiProf_m1(icell) = c_light / sqrt(pi * sigma2)
+          if (dv_line(icell) <= 0.) call error("ProDiMo data, line broadening parameter dv <= 0")
        enddo !i
     enddo !j
 
