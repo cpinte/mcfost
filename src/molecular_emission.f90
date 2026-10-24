@@ -10,7 +10,9 @@ module molecular_emission
   implicit none
   save
 
-  logical :: ldouble_RT, lrovib
+  ! second set of populations (not enabled by any option for now)
+  logical :: ldouble_RT = .false.
+  logical :: lrovib
 
   real, dimension(:), allocatable :: Level_energy
   character(len=12), dimension(:), allocatable ::  j_qnb, v_qnb
@@ -361,6 +363,9 @@ subroutine opacite_mol_loc(icell,imol)
         ! opacity and line emissivity
         kap = (nl*fBlu(iTrans) - nu*fBul(iTrans))
         eps =  nu*fAul(iTrans)
+
+        ! population inversion (maser): no amplification, as for the first set of populations
+        if (kap < 0.) kap = 0.
 
         ! flight length in AU, to be multiplied by the line profile
         kappa_mol_o_freq2(icell,iTrans) = kap / Transfreq(iTrans) * AU_to_m
