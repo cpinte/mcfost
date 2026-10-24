@@ -118,6 +118,9 @@ subroutine mol_line_transfer()
 
      ! Create molecular emission map via ray-tracing
      if (mol(imol)%lline) then
+        ! Surface maps: one slot per thread, summed when written. Reset once per molecule:
+        ! each (pixel, inclination, azimuth) is then set by a single thread
+        if (ltau_surface .or. lflux_fraction_surface) tau_surface_map = 0.0
         do ibin=1,RT_n_incl
            do iaz=1,RT_n_az
               call emission_line_map(imol,ibin,iaz)
@@ -423,7 +426,7 @@ subroutine NLTE_mol_line_transfer(imol)
               if (n_iter_loc > max_n_iter_loc(id)) max_n_iter_loc(id) = n_iter_loc
 
               diff = maxval( abs( tab_nLevel(icell,1:n_level_comp) - tab_nLevel_old(1:n_level_comp) ) / &
-                   tab_nLevel_old(1:n_level_comp) + 10*tiny_real)
+                   (tab_nLevel_old(1:n_level_comp) + 10*tiny_real) )
 
               if (diff > maxdiff) maxdiff = diff
            endif ! lcompute_molRT
@@ -1187,8 +1190,6 @@ subroutine emission_line_tau_surface_map(imol,tau,ibin,iaz)
   !$omp shared(taille_pix,npix_x,npix_y,ibin,iaz,tau_surface_map,move_to_grid)
   id = 1 ! for sequential code
 
-  tau_surface_map = 0.0_dp
-
   !$omp do schedule(dynamic,1)
   do i = 1, npix_x
      !$ id = omp_get_thread_num() + 1
@@ -1299,8 +1300,6 @@ subroutine emission_line_energy_fraction_surface_map(imol,flux_fraction,ibin,iaz
   !$omp shared(flux_fraction,Icorner,imol,iTrans,iiTrans,dx,dy,u,v,w,ispeed,tab_speed_rt) &
   !$omp shared(taille_pix,npix_x,npix_y,ibin,iaz,tau_surface_map,move_to_grid,spectrum,factor)
   id = 1 ! for sequential code
-
-  tau_surface_map = 0.0_dp
 
   !$omp do schedule(dynamic,1)
   do i = 1, npix_x

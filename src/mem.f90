@@ -827,6 +827,11 @@ subroutine alloc_emission_mol(imol)
   call allocate_mol_maps(imol)
 
   if (ltau_surface.or.lflux_fraction_surface) then
+     ! The array may have been allocated for the dust ray tracing with other dimensions
+     ! (e.g. 1x1 pixel for the SED): reallocate it with the dimensions of the line maps
+     if (allocated(tau_surface_map)) then
+        if (any(shape(tau_surface_map) /= [npix_x,npix_y,RT_n_incl,RT_n_az,3,nb_proc])) deallocate(tau_surface_map)
+     endif
      if (.not.allocated(tau_surface_map)) then
         allocate(tau_surface_map(npix_x,npix_y,RT_n_incl,RT_n_az,3,nb_proc), stat=alloc_status)
         if (alloc_status > 0) call error('Allocation error tau_surface')

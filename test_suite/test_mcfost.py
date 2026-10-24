@@ -391,6 +391,34 @@ def test_mol_spectrum_circular_pixels():
     assert np.allclose(s1, np.flip(s1, axis=3), rtol=1e-5)
 
 
+def test_mol_tau_surface():
+    # Molecular tau = 1 surface map (-tau_surface) with several inclinations: every
+    # inclination has surface pixels and the map is identical with 1 thread and with all
+    # threads. The map used to be reset inside the parallel region at each inclination
+    # (earlier inclinations erased, race between threads, F6), and was kept with the
+    # 1x1 pixel dimensions of the dust SED ray tracing (out-of-bounds writes).
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    root_dir = "ref3.0_mol_tau_surface"
+    clean_results(root_dir)
+    os.makedirs(root_dir, exist_ok=True)
+    para = root_dir+"/tau_surface.para"
+    make_para("test_data/ref3.0/ref3.0.para", para, {"grid (nx,ny)": set_first_values("21 21")})
+
+    maps = []
+    for threads, run_dir in [(1, root_dir+"/t1"), (None, root_dir+"/tN")]:
+        # temperature of the reference model
+        os.makedirs(run_dir+"/data_th")
+        shutil.copy("test_data/ref3.0/data_th/Temperature.fits.gz", run_dir+"/data_th")
+        run_mcfost(para, run_dir, "-mol -no_T -tau_surface 1", threads=threads)
+        maps.append(fits.getdata(run_dir+"/data_CO/tau=1_surface.fits.gz"))
+
+    # axes (x y z, azimuth, inclination, y, x)
+    for i in range(maps[0].shape[2]):
+        assert (maps[0][:,0,i] != 0).any(), f"inclination {i}: empty tau = 1 surface"
+    assert np.array_equal(maps[0], maps[1])
+
+
 def test_mol_nlte():
     # Molecular NLTE populations (ref3.0 with LTE = F on a coarse grid, without the
     # accurate-population step): each step of the iterations converges in a few
