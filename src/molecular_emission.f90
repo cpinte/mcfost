@@ -618,17 +618,26 @@ subroutine J_mol_loc(id,icell,n_rayons,ispeed)
   integer, dimension(2), intent(in) :: ispeed
 
   real(kind=dp), dimension(ispeed(1):ispeed(2)) :: etau, P, opacity, Snu
-  real(kind=dp) :: total_sum, J
-  integer :: iTrans, iray
+  real(kind=dp) :: total_sum, J, kappa_cont
+  integer :: iTrans, iray, p_icell
+
+  ! Dust opacity: absorption only, as in the ray tracing that computes I0 (integ_ray_mol),
+  ! dust properties of the cell with variable dust, of the first cell otherwise
+  if (lvariable_dust) then
+     p_icell = icell
+  else
+     p_icell = icell1
+  endif
 
   Jmol(:,id) = 0.0_dp
 
   do iTrans=1, nTrans_tot
      total_sum = 0.0_dp
      J = 0.0_dp
+     kappa_cont = kappa_abs_LTE(p_icell,iTrans) * kappa_factor(icell)
      do iray=1, n_rayons
         P(:) =  Doppler_P_x_freq(:,iray,id)
-        opacity(:) = kappa_mol_o_freq(icell,iTrans) * P(:) + kappa(icell,iTrans)
+        opacity(:) = kappa_mol_o_freq(icell,iTrans) * P(:) + kappa_cont
         etau(:) = exp(-ds(iray,id) * opacity(:)) ! exp(-tau)
 
         Snu(:) = ( emissivite_mol_o_freq(icell,iTrans) * P(:) + &
@@ -650,7 +659,7 @@ subroutine J_mol_loc(id,icell,n_rayons,ispeed)
      do iray=1, n_rayons
         do iTrans=1, nTrans_tot
            P(:) =  Doppler_P_x_freq(:,iray,id)
-           opacity(:) = kappa_mol_o_freq2(icell,iTrans) * P(:) + kappa(icell,iTrans)
+           opacity(:) = kappa_mol_o_freq2(icell,iTrans) * P(:) + kappa_abs_LTE(p_icell,iTrans) * kappa_factor(icell)
            etau(:) = exp(-ds(iray,id) * opacity(:)) ! exp(-tau)
 
            Snu(:) = ( emissivite_mol_o_freq2(icell,iTrans) * P(:) + emissivite_dust(icell,iTrans) ) &

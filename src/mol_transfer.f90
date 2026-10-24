@@ -300,6 +300,10 @@ subroutine NLTE_mol_line_transfer(imol)
 
         ! Loop over cells
         call progress_bar(0)
+        ! reset before the parallel region: with reduction(max:maxdiff), the shared value is
+        ! combined with the private copies at the end of the region, so resetting it inside
+        ! the region would keep the maximum of all previous iterations (no convergence)
+        maxdiff = 0.0_dp
         !$omp parallel &
         !$omp default(none) &
         !$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02) &
@@ -311,7 +315,6 @@ subroutine NLTE_mol_line_transfer(imol)
         !$omp reduction(max:maxdiff)
 
         !$ id = omp_get_thread_num() + 1
-        maxdiff=0
 
         !$omp do schedule(static)
         do icell=1, n_cells

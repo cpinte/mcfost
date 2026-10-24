@@ -391,6 +391,44 @@ def test_mol_spectrum_circular_pixels():
     assert np.allclose(s1, np.flip(s1, axis=3), rtol=1e-5)
 
 
+def test_mol_nlte():
+    # Molecular NLTE populations (ref3.0 with LTE = F on a coarse grid, without the
+    # accurate-population step): each step of the iterations converges in a few
+    # iterations. The convergence criterion used to keep the maximum of all previous
+    # iterations (maxdiff reset inside the parallel region with a max reduction, F1) and
+    # never converged. The dust opacity in J_mol_loc was read out of bounds (F14): only
+    # detected by a bounds-checked build.
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    root_dir = "ref3.0_mol_nlte"
+    clean_results(root_dir)
+    os.makedirs(root_dir, exist_ok=True)
+    para = root_dir+"/nlte.para"
+    make_para("test_data/ref3.0/ref3.0.para", para,
+              {"n_rad (log distribution)": set_first_values("20 10 1 4"),
+               "lpop, laccurate_pop, LTE": set_first_values("T F F")})
+
+    stdout = run_mcfost(para, root_dir, "-mol", timeout=300)
+
+    # "Step i Iteration n" ... "Relative difference = x" ... "Threshold = y"
+    steps = {}
+    for line in stdout.splitlines():
+        words = line.split()
+        if line.startswith(" Step") and "Iteration" in line:
+            step, iteration = int(words[1]), int(words[3])
+        elif "Relative difference" in line:
+            diff = float(words[-1])
+        elif "Threshold" in line:
+            steps[step] = (iteration, diff, float(words[-1]))
+    assert sorted(steps) == [1, 2]
+    for step, (n_iter, diff, threshold) in steps.items():
+        assert n_iter <= 10, f"step {step}: {n_iter} iterations"
+        assert diff < threshold, f"step {step}: relative difference {diff}"
+
+    lines = fits.getdata(root_dir+"/data_CO/lines.fits.gz")
+    assert np.all(np.isfinite(lines)) and lines.max() > 0
+
+
 def test_sublimation_image():
     # An image run after a temperature run with dust sublimation must read back
     # the sublimation radius and use the same inner radius as the temperature run
@@ -449,15 +487,23 @@ def set_first_value(value):
     return lambda line: "  "+value+" "+" ".join(line.split()[1:])+"\n"
 
 
-def run_mcfost(para, root_dir, opt="", cwd=None, threads=None):
+def set_first_values(values):
+    # replaces the first values of a parameter line (as many as given, separated by
+    # spaces), keeping the rest of the line
+    n = len(values.split())
+    return lambda line: "  "+values+" "+" ".join(line.split()[n:])+"\n"
+
+
+def run_mcfost(para, root_dir, opt="", cwd=None, threads=None, timeout=None):
     # cwd: directory to run from (para and root_dir are then relative to it), e.g. to
     # pick up dust files placed in the run directory, which is searched first
     # threads: number of OpenMP threads (default: environment)
+    # timeout: maximum run time [s], the test fails if it is exceeded
     env = None
     if threads is not None:
         env = dict(os.environ, OMP_NUM_THREADS=str(threads))
     result = subprocess.run((os.path.abspath(_mcfost_bin)+" "+para+" -root_dir "+root_dir+" "+opt).split(),
-                            capture_output=True, text=True, cwd=cwd, env=env)
+                            capture_output=True, text=True, cwd=cwd, env=env, timeout=timeout)
     print(result.stdout)
     assert result.returncode == 0, result.stdout[-3000:]
     return result.stdout
