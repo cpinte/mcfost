@@ -867,7 +867,7 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   integer :: theta_I, phi_I, dir, iscatt, id
   integer :: k, alloc_status, i1, i2, icell, p_icell
   real :: cos_scatt, sum_sin, f1, f2, sin_scatt, phi_scatt
-  real(kind=dp) :: omega, sinw, cosw, n_sent_photons, v1pi, v1pj, v1pk, xnyp, costhet, theta
+  real(kind=dp) :: n_sent_photons
 
   integer, parameter :: N_super = 5 ! number of elements (N_super^2) to average the phase function
   ! 5 creates a slight overhead in the stratified case (a few 10 sec per inclination and lambda)
@@ -880,7 +880,8 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   integer, dimension(N_super,N_super,n_theta_I,n_phi_I,nang_ray_tracing,0:1) :: tab_k
 
   real, dimension(n_theta_I,n_phi_I,nang_ray_tracing,0:1) :: s11_save
-  real(kind=dp), dimension(n_theta_I,n_phi_I,nang_ray_tracing,0:1) :: tab_sinw, tab_cosw
+  ! (Q,U) blocks of the rotation matrices of the scattering towards the observer
+  real(kind=dp), dimension(2,2,n_theta_I,n_phi_I,nang_ray_tracing,0:1) :: tab_rop, tab_rpo
 
   ! Observer direction in reference frame
   uv0 = tab_uv_rt(ibin) ; w0 = tab_w_rt(ibin) ! epsilon needed here
@@ -987,38 +988,10 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
                  if (k > nang_scatt) k = nang_scatt
                  if (k < 0) k = 0
 
-                 ! Calculation of the omega angle
-                 call rotation(u,v,w,-u_ray_tracing,-v_ray_tracing,-w_ray_tracing,v1pi,v1pj,v1pk)
-                 xnyp = sqrt(v1pk*v1pk + v1pj*v1pj)
-                 if (xnyp < 1e-10) then
-                    xnyp = 0.0
-                    costhet = 1.0_dp ! omega = 0
-                 else
-                    costhet = v1pj / xnyp
-                 endif
-
-                 ! Calculation of the angle between the normal and the z-axis (theta)
-                 theta = acos(costhet)
-                 if (theta >= pi) theta = 0.0
-
-                 !     the scattering plane is at +/- 90deg from the normal
-                 ! Must not be used in ray-tracing !!! tested OK without
-                 !theta = theta  + half_pi
-
-                 !----dans les matrices de rotation l'angle est omega = 2 * theta-----
-                 omega = 2.0_dp * theta ! To check: the minus is to correct a sign bug found by Marshall (removed)
-                 !     next if since arccos only goes from 0 to pi
-                 !     the +/- to differentiate the direction of rotation
-                 if (v1pk < 0.0) omega = -1.0_dp * omega
-
-                 ! Rotation matrices
-                 cosw = cos(omega)
-                 sinw = sin(omega)
-                 if (abs(cosw) < 1e-06) cosw = 0.0_dp
-                 if (abs(sinw) < 1e-06) sinw = 0.0_dp
-
-                 tab_cosw(theta_I,phi_I,iscatt,dir) = cosw
-                 tab_sinw(theta_I,phi_I,iscatt,dir) = sinw
+                 ! Rotation matrices of the scattering towards the observer (Stokes_rotation_matrices)
+                 call Stokes_rotation_matrices(u,v,w, u_ray_tracing,v_ray_tracing,w_ray_tracing, ROP, RPO)
+                 tab_rop(:,:,theta_I,phi_I,iscatt,dir) = ROP(2:3,2:3)
+                 tab_rpo(:,:,theta_I,phi_I,iscatt,dir) = RPO(2:3,2:3)
               endif ! lsepar_pola
            enddo !theta_I
         enddo !phi_I
@@ -1032,10 +1005,10 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   !$omp shared(lvariable_dust,Inu,I_sca2,n_cells,tab_s11_pos,uv0,w0,n_Stokes,icell1,photon_energy,volume) &
   !$omp shared(tab_s12_o_s11_pos,tab_s22_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos,tab_s44_o_s11_pos) &
   !$omp shared(lsepar_pola,tab_k,tab_sin_scatt_norm,lambda,p_lambda,n_phi_I,n_theta_I,nang_ray_tracing,lsepar_contrib) &
-  !$omp shared(s11_save,tab_cosw,tab_sinw,nb_proc,kappa,kappa_factor,tab_albedo_pos) &
+  !$omp shared(s11_save,tab_rop,tab_rpo,nb_proc,kappa,kappa_factor,tab_albedo_pos) &
   !$omp private(iscatt,id,u_ray_tracing,v_ray_tracing,w_ray_tracing,theta_I,phi_I,i1,i2,u,v,w,cos_scatt,sin_scatt) &
   !$omp private(sum_sin,icell,p_icell,stokes,s11,k,alloc_status,dir,phi_scatt) &
-  !$omp private(s12,s22,s33,s34,s44,M,ROP,RPO,v1pi,v1pj,v1pk,xnyp,costhet,theta,omega,cosw,sinw,C,D,S,factor,kappa_sca)
+  !$omp private(s12,s22,s33,s34,s44,M,ROP,RPO,C,D,S,factor,kappa_sca)
   id = 1 ! for sequential code
 
   ! Mueller matrix
@@ -1107,45 +1080,32 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
                     i1 = N_super/2+1 ; i2 = i1
                     k = tab_k(i1,i2,theta_I,phi_I,iscatt,dir)
 
-                    cosw = tab_cosw(theta_I,phi_I,iscatt,dir)
-                    sinw = tab_sinw(theta_I,phi_I,iscatt,dir)
-
-                    RPO(2,2) = cosw
-                    ROP(2,2) = cosw
-                    RPO(2,3) = sinw
-                    ROP(2,3) = -1.0_dp * sinw
-                    RPO(3,2) = -1.0_dp * sinw
-                    ROP(3,2) = sinw
-                    RPO(3,3) = cosw
-                    ROP(3,3) = cosw
-
-                    ! Mueller matrix : I am still confused about the - signs
-                    s12 = - s11 * tab_s12_o_s11_pos(k,p_icell,p_lambda)
-                    s22 = s11 * tab_s22_o_s11_pos(k,p_icell,p_lambda)
-                    s33 = - s11 * tab_s33_o_s11_pos(k,p_icell,p_lambda)
-                    s34 = - s11 * tab_s34_o_s11_pos(k,p_icell,p_lambda)
-                    s44 = - s11 * tab_s44_o_s11_pos(k,p_icell,p_lambda)
-
-                    M(1,1) = s11 ; M(2,2) = s22 ; M(1,2) = s12 ; M(2,1) = s12
-                    M(3,3) = s33 ; M(4,4) = s44 ; M(3,4) = -s34 ; M(4,3) = s34
+                    ! Mueller matrix, same convention as the Monte Carlo (get_Mueller_matrix_per_cell)
+                    M(1,1) = s11
+                    M(1,2) = s11 * tab_s12_o_s11_pos(k,p_icell,p_lambda) ; M(2,1) = M(1,2)
+                    M(2,2) = s11 * tab_s22_o_s11_pos(k,p_icell,p_lambda)
+                    M(3,3) = s11 * tab_s33_o_s11_pos(k,p_icell,p_lambda)
+                    M(4,4) = s11 * tab_s44_o_s11_pos(k,p_icell,p_lambda)
+                    M(3,4) = - s11 * tab_s34_o_s11_pos(k,p_icell,p_lambda) ; M(4,3) = - M(3,4)
 
                     ! Radiation field
                     stokes(:) = Inu(1:4,theta_I,phi_I,icell)
+                    ! The incoming direction is rebuilt as the mirror image (about the meridian
+                    ! plane of the cell, u -> -u) of the direction binned in I_spec, while the
+                    ! observer direction is not mirrored. For an axisymmetric model the
+                    ! radiation field is symmetric about this plane, with U and V reversed: the
+                    ! field in the rebuilt direction is the binned one with U and V reversed
+                    stokes(3) = -stokes(3) ; stokes(4) = -stokes(4)
 
-                    !  FINAL STOKES = RPO * M * ROP * INITIAL STOKES
-                    ! 1st rotation
-                    C(2:3) = matmul(ROP(2:3,2:3),stokes(2:3))
-                    C(1)=stokes(1)
-                    C(4)=stokes(4)
-
-                    ! Mueller matrix multiplication
-                    D=matmul(M,C)
-
-                    ! 2nd rotation
-                    S(2:3)=matmul(RPO(2:3,2:3),D(2:3))
-                    S(1)=D(1)
-                    S(4)=D(4)
-                    S(3)=-S(3)
+                    ! S = RPO * M * ROP * Stokes (scatter_Stokes), without normalisation
+                    C(1) = stokes(1) ; C(4) = stokes(4)
+                    C(2:3) = matmul(tab_rop(:,:,theta_I,phi_I,iscatt,dir), stokes(2:3))
+                    D = matmul(M,C)
+                    S(1) = D(1) ; S(4) = D(4)
+                    S(2:3) = matmul(tab_rpo(:,:,theta_I,phi_I,iscatt,dir), D(2:3))
+                    ! eps_dust2 stores U with the opposite sign: it is reversed back when the
+                    ! source function is interpolated (interpolate_Stokes_QU), V is not
+                    S(3) = -S(3)
 
                     I_sca2(1:4,iscatt,dir,icell) = I_sca2(1:4,iscatt,dir,icell) + S(:)
                  else ! lsepar_pola
