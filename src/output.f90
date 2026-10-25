@@ -3426,7 +3426,7 @@ subroutine ecriture_spectre(imol)
   real, dimension(mol(imol)%nTrans_rayTracing) :: freq
   integer, dimension(mol(imol)%nTrans_rayTracing) :: index_trans
 
-  real, dimension(:,:,:), allocatable :: spectrum_casa
+  real, dimension(:,:,:), allocatable :: spectrum_casa, spectrum_v
 
   real :: pixel_scale_x, pixel_scale_y, W2m2_to_Jy, factor
 
@@ -3514,17 +3514,17 @@ subroutine ecriture_spectre(imol)
 
   if (mol(imol)%l_sym_ima) then ! BUG : it also reverses the Cmb slope but it is not very serious
      if (RT_line_method==1) then
-        ! Add the 2 parts of the spectrum
-        do iv = -mol(imol)%n_speed_rt, -1
-           spectrum(1,1,iv,:,:,:) = spectrum(1,1,iv,:,:,:) + spectrum(1,1,-iv,:,:,:)
+        ! Only half of the disk is sampled (phi in [0, pi], pixels covering 2 pi/n_phi_RT,
+        ! i.e. twice the flux of that half): the other half gives the same spectrum mirrored
+        ! in velocity. The velocity grid is symmetric (checked when setting l_sym_ima), so
+        ! velocity -v is channel n_speed_rt-iv+1: F(v) = (S(v) + S(-v)) / 2
+        allocate(spectrum_v(size(spectrum,4),size(spectrum,5),size(spectrum,6)))
+        do iv = 1, mol(imol)%n_speed_rt/2
+           spectrum_v(:,:,:) = 0.5 * (spectrum(1,1,iv,:,:,:) + spectrum(1,1,mol(imol)%n_speed_rt-iv+1,:,:,:))
+           spectrum(1,1,iv,:,:,:) = spectrum_v(:,:,:)
+           spectrum(1,1,mol(imol)%n_speed_rt-iv+1,:,:,:) = spectrum_v(:,:,:)
         enddo
-        ! Symmetrize
-        do iv = 1, mol(imol)%n_speed_rt
-           spectrum(1,1,iv,:,:,:) = spectrum(1,1,-iv,:,:,:)
-        enddo
-        spectrum(1,1,0,:,:,:) = spectrum(1,1,0,:,:,:) * 2.
-        ! Divide by two
-        spectrum = spectrum * 0.5
+        deallocate(spectrum_v)
      else
         xcenter = npix_x/2 + modulo(npix_x,2)
         if (lkeplerian) then ! line profile inverted on both sides

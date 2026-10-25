@@ -450,7 +450,7 @@ subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_spee
 
   real :: facteur_tau
 
-  logical :: lcell_not_empty, lsubtract_avg, lintersect_stars
+  logical :: lcell_not_empty, lsubtract_avg, lintersect_stars, lsecond_pop
 
   integer, pointer :: p_icell
 
@@ -464,6 +464,15 @@ subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_spee
 
   tau_c(:) = 0.0_dp
   I0c(:,iray,id) = 0.0_dp
+
+  ! Second set of populations: only during the NLTE iterations (I02 is allocated by
+  ! NLTE_mol_line_transfer), not for the line maps
+  lsecond_pop = ldouble_RT .and. allocated(I02)
+
+  if (lsecond_pop) then
+     tau2(:,:) = 0.0_dp
+     I02(:,:,iray,id) = 0.0_dp
+  endif
 
   if (lvariable_dust) then
      p_icell => icell
@@ -551,22 +560,22 @@ subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_spee
            tau_c(i) = tau_c(i) + dtau_c
         enddo ! i
 
-        if (ldouble_RT) then
+        if (lsecond_pop) then
            do i=1,nTrans
               iTrans = tab_Trans(i) ! selecting the proper transition for ray-tracing
 
               opacity(:) = kappa_mol_o_freq2(icell,iTrans) * P(:) + kappa_abs_LTE(p_icell,iTrans) * kappa_factor(icell)
-              dtau(:) =  l_contrib * opacity(:)
+              dtau2(:) =  l_contrib * opacity(:)
 
               ! Adding emission at cell exit (=debut car on va a l'envers) ponderee par
               ! la profondeur optique jusqu'a la cell
               Snu(:) = ( emissivite_mol_o_freq2(icell,iTrans) * P(:) + &
                    emissivite_dust(icell,iTrans) ) / (opacity(:) + 1.0e-30_dp)
-              I02(:,iTrans,iray,id) = I02(:,iTrans,iray,id) + &
-                   exp(-tau2(:,iTrans)) * (1.0_dp - exp(-dtau2(:))) * Snu(:)
+              ! Warning I02 and tau2 are indexed as I0 and tau (i, dimension nTrans)
+              I02(:,i,iray,id) = I02(:,i,iray,id) + &
+                   exp(-tau2(:,i)) * (1.0_dp - exp(-dtau2(:))) * Snu(:)
 
               ! Updating optical depth for next cell
-              ! Warning tau2 is a smaller array (dimension nTrans)
               tau2(:,i) = tau2(:,i) + dtau2(:)
            enddo
         endif
@@ -587,7 +596,7 @@ subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_spee
      I0(:,i,iray,id) = I0(:,i,iray,id) + tab_Cmb_mol(iTrans) * exp(-tau(:,i))
   enddo
 
-  if (ldouble_RT) then
+  if (lsecond_pop) then
      do i=1,nTrans
         iTrans = tab_Trans(i)
         I02(:,i,iray,id) = I02(:,i,iray,id) + tab_Cmb_mol(iTrans) * exp(-tau2(:,i))

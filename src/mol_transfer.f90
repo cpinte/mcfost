@@ -22,6 +22,12 @@ module mol_transfer
 
   implicit none
 
+  ! Spectrum with circular pixels (RT_line_method = 1), per ring of the log-polar
+  ! sampling: each ring is computed by a single thread and the rings are summed in
+  ! order after the parallel loop (no race, independent of the number of threads)
+  real(kind=dp), dimension(:,:,:), allocatable, private :: spectrum_ring
+  real(kind=dp), dimension(:,:), allocatable, private :: continu_ring
+
   contains
 
 subroutine mol_line_transfer()
@@ -112,6 +118,9 @@ subroutine mol_line_transfer()
 
      ! Create molecular emission map via ray-tracing
      if (mol(imol)%lline) then
+        ! Surface maps: one slot per thread, summed when written. Reset once per molecule:
+        ! each (pixel, inclination, azimuth) is then set by a single thread
+        if (ltau_surface .or. lflux_fraction_surface) tau_surface_map = 0.0
         do ibin=1,RT_n_incl
            do iaz=1,RT_n_az
               call emission_line_map(imol,ibin,iaz)
@@ -262,6 +271,13 @@ subroutine NLTE_mol_line_transfer(imol)
         I0 = 0.0_dp
         I0c = 0.0_dp
 
+        if (ldouble_RT) then
+           deallocate(I02)
+           allocate(I02(ispeed(1):ispeed(2),nTrans_tot,n_rayons_max,nb_proc), stat=alloc_status)
+           if (alloc_status > 0) call error('Allocation error I02')
+           I02 = 0.0_dp
+        endif
+
         allocate(ds(n_rayons_max,nb_proc), stat=alloc_status)
         if (alloc_status > 0) call error('Allocation error ds')
         ds = 0.0_dp
@@ -294,6 +310,10 @@ subroutine NLTE_mol_line_transfer(imol)
 
         ! Loop over cells
         call progress_bar(0)
+        ! reset before the parallel region: with reduction(max:maxdiff), the shared value is
+        ! combined with the private copies at the end of the region, so resetting it inside
+        ! the region would keep the maximum of all previous iterations (no convergence)
+        maxdiff = 0.0_dp
         !$omp parallel &
         !$omp default(none) &
         !$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02) &
@@ -305,7 +325,6 @@ subroutine NLTE_mol_line_transfer(imol)
         !$omp reduction(max:maxdiff)
 
         !$ id = omp_get_thread_num() + 1
-        maxdiff=0
 
         !$omp do schedule(static)
         do icell=1, n_cells
@@ -414,7 +433,7 @@ subroutine NLTE_mol_line_transfer(imol)
               if (n_iter_loc > max_n_iter_loc(id)) max_n_iter_loc(id) = n_iter_loc
 
               diff = maxval( abs( tab_nLevel(icell,1:n_level_comp) - tab_nLevel_old(1:n_level_comp) ) / &
-                   tab_nLevel_old(1:n_level_comp) + 10*tiny_real)
+                   (tab_nLevel_old(1:n_level_comp) + 10*tiny_real) )
 
               if (diff > maxdiff) maxdiff = diff
            endif ! lcompute_molRT
@@ -474,6 +493,7 @@ subroutine NLTE_mol_line_transfer(imol)
   enddo ! etape
 
   deallocate(ds, Doppler_P_x_freq, I0, I0c)
+  if (allocated(I02)) deallocate(I02)
 
   return
 
@@ -598,19 +618,22 @@ subroutine emission_line_map(imol,ibin,iaz)
 
      fact_A = sqrt(pi * (fact_r - 1.0_dp/fact_r)  / n_phi_RT )
 
-     ! Loop over sampling rays
-     !$omp parallel &
-     !$omp default(none) &
-     !$omp private(ri_RT,id,r,taille_pix,phi_RT,phi,pixelcorner) &
-     !$omp shared(tab_r,fact_A,x_plan_image,y_plan_image,center,dx,dy,u,v,w,i,j) &
-     !$omp shared(n_iter_min,n_iter_max,l_sym_ima_mol,cst_phi,imol,ibin,iaz)
-     id =1 ! for sequential code
-
      if (l_sym_ima_mol) then
         cst_phi = pi  / real(n_phi_RT,kind=dp)
      else
         cst_phi = two_pi  / real(n_phi_RT,kind=dp)
      endif
+
+     allocate(spectrum_ring(n_speed_rt,nTrans_raytracing,n_rad_RT), continu_ring(nTrans_raytracing,n_rad_RT))
+     spectrum_ring = 0.0_dp ; continu_ring = 0.0_dp
+
+     ! Loop over sampling rays: ring ri_RT is accumulated in spectrum_ring(:,:,ri_RT)
+     !$omp parallel &
+     !$omp default(none) &
+     !$omp private(ri_RT,id,r,taille_pix,phi_RT,phi,pixelcorner) &
+     !$omp shared(tab_r,fact_A,x_plan_image,y_plan_image,center,dx,dy,u,v,w,j) &
+     !$omp shared(n_iter_min,n_iter_max,cst_phi,imol,ibin,iaz)
+     id =1 ! for sequential code
 
      !$omp do schedule(dynamic,1)
      do ri_RT=1, n_rad_RT
@@ -623,11 +646,18 @@ subroutine emission_line_map(imol,ibin,iaz)
            phi = cst_phi * (real(phi_RT,kind=dp) -0.5_dp)
 
            pixelcorner(:,id) = center(:) + r * sin(phi) * x_plan_image + r * cos(phi) * y_plan_image ! This is actually the centre since dx = dy = 0.
-           call intensite_pixel_mol(id,imol,ibin,iaz,n_iter_min,n_iter_max,i,j,pixelcorner(:,id),taille_pix,dx,dy,u,v,w)
+           call intensite_pixel_mol(id,imol,ibin,iaz,n_iter_min,n_iter_max,ri_RT,j,pixelcorner(:,id),taille_pix,dx,dy,u,v,w)
         enddo !j
      enddo !i
      !$omp end do
      !$omp end parallel
+
+     ! Sum of the rings, in a fixed order
+     do ri_RT=1, n_rad_RT
+        spectrum(1,1,:,:,ibin,iaz) = spectrum(1,1,:,:,ibin,iaz) + spectrum_ring(:,:,ri_RT)
+        continu(1,1,:,ibin,iaz) = continu(1,1,:,ibin,iaz) + continu_ring(:,ri_RT)
+     enddo
+     deallocate(spectrum_ring, continu_ring)
 
   else ! method 2: linear sampling with sub-pixels
      lresolved = .true.
@@ -834,9 +864,9 @@ subroutine intensite_pixel_mol(id,imol,ibin,iaz,n_iter_min,n_iter_max,ipix,jpix,
   ! Units tested OK for CMB
   ! unconvolved line profile tested ok with torus
 
-  if (RT_line_method==1) then ! Implicit summation over pixels
-     spectrum(1,1,:,:,ibin,iaz) = spectrum(1,1,:,:,ibin,iaz) + IP(:,:)
-     continu(1,1,:,ibin,iaz) = continu(1,1,:,ibin,iaz) + IPc(:)
+  if (RT_line_method==1) then ! Implicit summation over pixels: ring ipix, added to spectrum by emission_line_map
+     spectrum_ring(:,:,ipix) = spectrum_ring(:,:,ipix) + IP(:,:)
+     continu_ring(:,ipix) = continu_ring(:,ipix) + IPc(:)
   else
      spectrum(ipix,jpix,:,:,ibin,iaz) = IP(:,:)
      continu(ipix,jpix,:,ibin,iaz) = IPc(:)
@@ -1168,8 +1198,6 @@ subroutine emission_line_tau_surface_map(imol,tau,ibin,iaz)
   !$omp shared(taille_pix,npix_x,npix_y,ibin,iaz,tau_surface_map,move_to_grid)
   id = 1 ! for sequential code
 
-  tau_surface_map = 0.0_dp
-
   !$omp do schedule(dynamic,1)
   do i = 1, npix_x
      !$ id = omp_get_thread_num() + 1
@@ -1280,8 +1308,6 @@ subroutine emission_line_energy_fraction_surface_map(imol,flux_fraction,ibin,iaz
   !$omp shared(flux_fraction,Icorner,imol,iTrans,iiTrans,dx,dy,u,v,w,ispeed,tab_speed_rt) &
   !$omp shared(taille_pix,npix_x,npix_y,ibin,iaz,tau_surface_map,move_to_grid,spectrum,factor)
   id = 1 ! for sequential code
-
-  tau_surface_map = 0.0_dp
 
   !$omp do schedule(dynamic,1)
   do i = 1, npix_x

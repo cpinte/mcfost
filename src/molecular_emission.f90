@@ -10,7 +10,11 @@ module molecular_emission
   implicit none
   save
 
-  logical :: ldouble_RT, lrovib
+  ! Second set of populations, started from the optically thin populations instead of
+  ! LTE and iterated alongside the first one during the NLTE iterations: the solution is
+  ! converged when both sets agree. Not enabled by any option yet (convergence test to add)
+  logical :: ldouble_RT = .false.
+  logical :: lrovib
 
   real, dimension(:), allocatable :: Level_energy
   character(len=12), dimension(:), allocatable ::  j_qnb, v_qnb
@@ -154,11 +158,16 @@ subroutine init_Doppler_profiles(imol)
   n_speed = mol(imol)%n_speed_rt
 
   do icell=1, n_cells
-     ! Using the LTE dust temperature as the kinetic temperature
-     ! WARNING : this is a delta, not a sigma; see Boisse lecture notes p47
-     ! Consistent avec benchmark
-     sigma2 =  2.0_dp * (kb*Tcin(icell) / (mol(imol)%molecularWeight * mH  * g_to_kg)) + v_turb2(icell)
-     dv_line(icell) = sqrt(sigma2)
+     if (lProDiMo2mcfost) then
+        ! Line broadening parameter from ProDiMo (read_ProDiMo2mcfost)
+        sigma2 = real(dv_line(icell),kind=dp)**2
+     else
+        ! Using the LTE dust temperature as the kinetic temperature
+        ! WARNING : this is a delta, not a sigma; see Boisse lecture notes p47
+        ! Consistent avec benchmark
+        sigma2 =  2.0_dp * (kb*Tcin(icell) / (mol(imol)%molecularWeight * mH  * g_to_kg)) + v_turb2(icell)
+        dv_line(icell) = sqrt(sigma2)
+     endif
 
      !  write(*,*) "FWHM", sqrt(sigma2 * log(2.)) * 2.  ! Teste OK bench water 1
      sigma2_m1 = 1.0_dp / sigma2
@@ -356,6 +365,9 @@ subroutine opacite_mol_loc(icell,imol)
         ! opacity and line emissivity
         kap = (nl*fBlu(iTrans) - nu*fBul(iTrans))
         eps =  nu*fAul(iTrans)
+
+        ! population inversion (maser): no amplification, as for the first set of populations
+        if (kap < 0.) kap = 0.
 
         ! flight length in AU, to be multiplied by the line profile
         kappa_mol_o_freq2(icell,iTrans) = kap / Transfreq(iTrans) * AU_to_m
@@ -618,17 +630,26 @@ subroutine J_mol_loc(id,icell,n_rayons,ispeed)
   integer, dimension(2), intent(in) :: ispeed
 
   real(kind=dp), dimension(ispeed(1):ispeed(2)) :: etau, P, opacity, Snu
-  real(kind=dp) :: total_sum, J
-  integer :: iTrans, iray
+  real(kind=dp) :: total_sum, J, kappa_cont
+  integer :: iTrans, iray, p_icell
+
+  ! Dust opacity: absorption only, as in the ray tracing that computes I0 (integ_ray_mol),
+  ! dust properties of the cell with variable dust, of the first cell otherwise
+  if (lvariable_dust) then
+     p_icell = icell
+  else
+     p_icell = icell1
+  endif
 
   Jmol(:,id) = 0.0_dp
 
   do iTrans=1, nTrans_tot
      total_sum = 0.0_dp
      J = 0.0_dp
+     kappa_cont = kappa_abs_LTE(p_icell,iTrans) * kappa_factor(icell)
      do iray=1, n_rayons
         P(:) =  Doppler_P_x_freq(:,iray,id)
-        opacity(:) = kappa_mol_o_freq(icell,iTrans) * P(:) + kappa(icell,iTrans)
+        opacity(:) = kappa_mol_o_freq(icell,iTrans) * P(:) + kappa_cont
         etau(:) = exp(-ds(iray,id) * opacity(:)) ! exp(-tau)
 
         Snu(:) = ( emissivite_mol_o_freq(icell,iTrans) * P(:) + &
@@ -650,12 +671,12 @@ subroutine J_mol_loc(id,icell,n_rayons,ispeed)
      do iray=1, n_rayons
         do iTrans=1, nTrans_tot
            P(:) =  Doppler_P_x_freq(:,iray,id)
-           opacity(:) = kappa_mol_o_freq2(icell,iTrans) * P(:) + kappa(icell,iTrans)
+           opacity(:) = kappa_mol_o_freq2(icell,iTrans) * P(:) + kappa_abs_LTE(p_icell,iTrans) * kappa_factor(icell)
            etau(:) = exp(-ds(iray,id) * opacity(:)) ! exp(-tau)
 
            Snu(:) = ( emissivite_mol_o_freq2(icell,iTrans) * P(:) + emissivite_dust(icell,iTrans) ) &
                 / (opacity(:) + 1.0e-30_dp)
-           J = sum( (I0(:,iTrans,iray,id) * etau(:) + Snu(:) * (1.0_dp - etau(:))) &
+           J = sum( (I02(:,iTrans,iray,id) * etau(:) + Snu(:) * (1.0_dp - etau(:))) &
                 * P(:)) / sum(P(:))
 
            Jmol2(iTrans,id) = Jmol2(iTrans,id) + J

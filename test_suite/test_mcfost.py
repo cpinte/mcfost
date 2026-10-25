@@ -362,6 +362,101 @@ def test_hydrostatic_restart():
     assert MC_similar(T_ref,T,threshold=0.05)
 
 
+def test_mol_spectrum_circular_pixels():
+    # Molecular spectrum with circular pixels (1x1 map, RT_line_method = 1) and a
+    # symmetric image: same spectrum with 1 thread and with all threads (F5), and
+    # symmetric in velocity. The symmetrisation used to write outside the spectrum
+    # array (old velocity indexing), giving garbage fluxes and crashes.
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    root_dir = "ref3.0_mol_spectrum"
+    clean_results(root_dir)
+    os.makedirs(root_dir, exist_ok=True)
+    para = root_dir+"/spectrum.para"
+    make_para("test_data/ref3.0/ref3.0.para", para, {"grid (nx,ny)": set_first_value("1 1")})
+
+    spectra = []
+    for threads, run_dir in [(1, root_dir+"/t1"), (None, root_dir+"/tN")]:
+        # temperature of the reference model
+        os.makedirs(run_dir+"/data_th")
+        shutil.copy("test_data/ref3.0/data_th/Temperature.fits.gz", run_dir+"/data_th")
+        run_mcfost(para, run_dir, "-mol -no_T", threads=threads)
+        spectra.append(fits.getdata(run_dir+"/data_CO/lines.fits.gz").astype(float))
+
+    s1, sN = spectra
+    assert np.all(np.isfinite(s1)) and np.all(s1 > 0)
+    # the stellar flux is computed with random rays: small differences between thread counts
+    assert np.abs(sN - s1).max() < 1e-3 * s1.max()
+    # axes (azimuth, inclination, transition, velocity, y, x): symmetric in velocity
+    assert np.allclose(s1, np.flip(s1, axis=3), rtol=1e-5)
+
+
+def test_mol_tau_surface():
+    # Molecular tau = 1 surface map (-tau_surface) with several inclinations: every
+    # inclination has surface pixels and the map is identical with 1 thread and with all
+    # threads. The map used to be reset inside the parallel region at each inclination
+    # (earlier inclinations erased, race between threads, F6), and was kept with the
+    # 1x1 pixel dimensions of the dust SED ray tracing (out-of-bounds writes).
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    root_dir = "ref3.0_mol_tau_surface"
+    clean_results(root_dir)
+    os.makedirs(root_dir, exist_ok=True)
+    para = root_dir+"/tau_surface.para"
+    make_para("test_data/ref3.0/ref3.0.para", para, {"grid (nx,ny)": set_first_values("21 21")})
+
+    maps = []
+    for threads, run_dir in [(1, root_dir+"/t1"), (None, root_dir+"/tN")]:
+        # temperature of the reference model
+        os.makedirs(run_dir+"/data_th")
+        shutil.copy("test_data/ref3.0/data_th/Temperature.fits.gz", run_dir+"/data_th")
+        run_mcfost(para, run_dir, "-mol -no_T -tau_surface 1", threads=threads)
+        maps.append(fits.getdata(run_dir+"/data_CO/tau=1_surface.fits.gz"))
+
+    # axes (x y z, azimuth, inclination, y, x)
+    for i in range(maps[0].shape[2]):
+        assert (maps[0][:,0,i] != 0).any(), f"inclination {i}: empty tau = 1 surface"
+    assert np.array_equal(maps[0], maps[1])
+
+
+def test_mol_nlte():
+    # Molecular NLTE populations (ref3.0 with LTE = F on a coarse grid, without the
+    # accurate-population step): each step of the iterations converges in a few
+    # iterations. The convergence criterion used to keep the maximum of all previous
+    # iterations (maxdiff reset inside the parallel region with a max reduction, F1) and
+    # never converged. The dust opacity in J_mol_loc was read out of bounds (F14): only
+    # detected by a bounds-checked build.
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    root_dir = "ref3.0_mol_nlte"
+    clean_results(root_dir)
+    os.makedirs(root_dir, exist_ok=True)
+    para = root_dir+"/nlte.para"
+    make_para("test_data/ref3.0/ref3.0.para", para,
+              {"n_rad (log distribution)": set_first_values("20 10 1 4"),
+               "lpop, laccurate_pop, LTE": set_first_values("T F F")})
+
+    stdout = run_mcfost(para, root_dir, "-mol", timeout=300)
+
+    # "Step i Iteration n" ... "Relative difference = x" ... "Threshold = y"
+    steps = {}
+    for line in stdout.splitlines():
+        words = line.split()
+        if line.startswith(" Step") and "Iteration" in line:
+            step, iteration = int(words[1]), int(words[3])
+        elif "Relative difference" in line:
+            diff = float(words[-1])
+        elif "Threshold" in line:
+            steps[step] = (iteration, diff, float(words[-1]))
+    assert sorted(steps) == [1, 2]
+    for step, (n_iter, diff, threshold) in steps.items():
+        assert n_iter <= 10, f"step {step}: {n_iter} iterations"
+        assert diff < threshold, f"step {step}: relative difference {diff}"
+
+    lines = fits.getdata(root_dir+"/data_CO/lines.fits.gz")
+    assert np.all(np.isfinite(lines)) and lines.max() > 0
+
+
 def test_sublimation_image():
     # An image run after a temperature run with dust sublimation must read back
     # the sublimation radius and use the same inner radius as the temperature run
@@ -420,11 +515,23 @@ def set_first_value(value):
     return lambda line: "  "+value+" "+" ".join(line.split()[1:])+"\n"
 
 
-def run_mcfost(para, root_dir, opt="", cwd=None):
+def set_first_values(values):
+    # replaces the first values of a parameter line (as many as given, separated by
+    # spaces), keeping the rest of the line
+    n = len(values.split())
+    return lambda line: "  "+values+" "+" ".join(line.split()[n:])+"\n"
+
+
+def run_mcfost(para, root_dir, opt="", cwd=None, threads=None, timeout=None):
     # cwd: directory to run from (para and root_dir are then relative to it), e.g. to
     # pick up dust files placed in the run directory, which is searched first
+    # threads: number of OpenMP threads (default: environment)
+    # timeout: maximum run time [s], the test fails if it is exceeded
+    env = None
+    if threads is not None:
+        env = dict(os.environ, OMP_NUM_THREADS=str(threads))
     result = subprocess.run((os.path.abspath(_mcfost_bin)+" "+para+" -root_dir "+root_dir+" "+opt).split(),
-                            capture_output=True, text=True, cwd=cwd)
+                            capture_output=True, text=True, cwd=cwd, env=env, timeout=timeout)
     print(result.stdout)
     assert result.returncode == 0, result.stdout[-3000:]
     return result.stdout
