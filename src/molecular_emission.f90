@@ -10,7 +10,9 @@ module molecular_emission
   implicit none
   save
 
-  ! second set of populations (not enabled by any option for now)
+  ! Second set of populations, started from the optically thin populations instead of
+  ! LTE and iterated alongside the first one during the NLTE iterations: the solution is
+  ! converged when both sets agree. Not enabled by any option yet (convergence test to add)
   logical :: ldouble_RT = .false.
   logical :: lrovib
 
@@ -674,7 +676,7 @@ subroutine J_mol_loc(id,icell,n_rayons,ispeed)
 
            Snu(:) = ( emissivite_mol_o_freq2(icell,iTrans) * P(:) + emissivite_dust(icell,iTrans) ) &
                 / (opacity(:) + 1.0e-30_dp)
-           J = sum( (I0(:,iTrans,iray,id) * etau(:) + Snu(:) * (1.0_dp - etau(:))) &
+           J = sum( (I02(:,iTrans,iray,id) * etau(:) + Snu(:) * (1.0_dp - etau(:))) &
                 * P(:)) / sum(P(:))
 
            Jmol2(iTrans,id) = Jmol2(iTrans,id) + J

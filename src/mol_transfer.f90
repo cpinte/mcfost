@@ -271,6 +271,13 @@ subroutine NLTE_mol_line_transfer(imol)
         I0 = 0.0_dp
         I0c = 0.0_dp
 
+        if (ldouble_RT) then
+           deallocate(I02)
+           allocate(I02(ispeed(1):ispeed(2),nTrans_tot,n_rayons_max,nb_proc), stat=alloc_status)
+           if (alloc_status > 0) call error('Allocation error I02')
+           I02 = 0.0_dp
+        endif
+
         allocate(ds(n_rayons_max,nb_proc), stat=alloc_status)
         if (alloc_status > 0) call error('Allocation error ds')
         ds = 0.0_dp
@@ -486,6 +493,7 @@ subroutine NLTE_mol_line_transfer(imol)
   enddo ! etape
 
   deallocate(ds, Doppler_P_x_freq, I0, I0c)
+  if (allocated(I02)) deallocate(I02)
 
   return
 
