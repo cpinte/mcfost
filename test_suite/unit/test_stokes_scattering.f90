@@ -38,8 +38,14 @@ program test_stokes_scattering
   call random_seed(put=seed)
 
   do iseq=1, n_seq
-     do i=0, n_scatt
+     ! the scattering plane is undefined for forward or backward scattering: such
+     ! (measure zero) draws are redone
+     k(:,0) = random_direction()
+     do i=1, n_scatt
         k(:,i) = random_direction()
+        do while (abs(dot_product(k(:,i), k(:,i-1))) > 0.999999_dp)
+           k(:,i) = random_direction()
+        enddo
      enddo
      do i=1, n_scatt
         S1(i) = random_complex() ; S2(i) = random_complex()
@@ -110,7 +116,11 @@ contains
     ! e_a : projected z axis, e_b = k x e_a
     real(kind=dp), dimension(3), intent(in) :: kv
     real(kind=dp), dimension(3), intent(out) :: ea, eb
-    ea = [0.0_dp, 0.0_dp, 1.0_dp] - kv(3) * kv
+    if (abs(kv(3)) > 0.999999_dp) then ! along z: any perpendicular axis
+       ea = [1.0_dp, 0.0_dp, 0.0_dp] - kv(1) * kv
+    else
+       ea = [0.0_dp, 0.0_dp, 1.0_dp] - kv(3) * kv
+    endif
     ea = ea / norm2(ea)
     eb = cross(kv, ea)
   end subroutine beam_basis
