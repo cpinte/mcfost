@@ -984,7 +984,7 @@ subroutine ecriture_map_ray_tracing()
            if (lsepar_pola) then
               image_casa(i,:,2,1) = image_casa(npix_x-i+1,:,2,1)
               image_casa(i,:,3,1) = - image_casa(npix_x-i+1,:,3,1)
-              image_casa(i,:,4,1) = image_casa(npix_x-i+1,:,4,1)
+              image_casa(i,:,4,1) = - image_casa(npix_x-i+1,:,4,1) ! mirror: U and V change sign
            endif
         enddo
      endif
