@@ -37,7 +37,10 @@ module dust_ray_tracing
   ! todo: collapse the 2 dimension to save memory and stay under the 7-dimension limit
 
   integer, dimension(:,:,:), allocatable :: itheta_rt1 ! RT_n_incl,RT_n_az,nb_proc
-  real(kind=dp), dimension(:,:,:), allocatable ::  sin_omega_rt1, cos_omega_rt1, sin_scatt_rt1 ! RT_n_incl,RT_n_az,nb_proc
+  real(kind=dp), dimension(:,:,:), allocatable ::  sin_scatt_rt1 ! RT_n_incl,RT_n_az,nb_proc
+  ! RT1 : (Q,U) blocks of the rotation matrices of the scattering towards each observer
+  ! direction (Stokes_rotation_matrices), for the current packet direction
+  real(kind=dp), dimension(:,:,:,:,:), allocatable ::  rop_rt1, rpo_rt1 ! 2,2,RT_n_incl,RT_n_az,nb_proc
   real(kind=dp), dimension(:,:,:,:), allocatable ::  eps_dust1 !N_type_flux, n_cells, n_az_rt,n_theta_rt
 
   ! RT method 2 : saving specific intensity (2D image)
@@ -162,12 +165,11 @@ subroutine alloc_ray_tracing()
      eps_dust1 =0._dp
 
      allocate(itheta_rt1(RT_n_incl,RT_n_az,nb_proc), sin_scatt_rt1(RT_n_incl,RT_n_az,nb_proc), &
-          sin_omega_rt1(RT_n_incl,RT_n_az,nb_proc), cos_omega_rt1(RT_n_incl,RT_n_az,nb_proc), stat=alloc_status)
+          rop_rt1(2,2,RT_n_incl,RT_n_az,nb_proc), rpo_rt1(2,2,RT_n_incl,RT_n_az,nb_proc), stat=alloc_status)
      if (alloc_status > 0) call error('Allocation error itheta_rt1')
      itheta_rt1 = 1
      sin_scatt_rt1 = 0.0
-     sin_omega_rt1 = 0.5
-     cos_omega_rt1 = 0.5
+     rop_rt1 = 0.0_dp ; rpo_rt1 = 0.0_dp
 
   else !rt 2
      allocate(I_spec_star(n_cells,nb_proc), stat=alloc_status)
@@ -218,7 +220,7 @@ subroutine dealloc_ray_tracing()
      deallocate(Stokes_ray_tracing,stars_map,J_th)
 
      if (lscatt_ray_tracing1) then
-        deallocate(xI_scatt,I_scatt,eps_dust1,sin_scatt_rt1,sin_omega_rt1,cos_omega_rt1)
+        deallocate(xI_scatt,I_scatt,eps_dust1,sin_scatt_rt1,rop_rt1,rpo_rt1)
      else
         deallocate(I_spec_star,eps_dust2, eps_dust2_star, I_sca2,cos_thet_ray_tracing,omega_ray_tracing,I_spec)
      endif
@@ -413,15 +415,14 @@ subroutine angles_scatt_rt1(id,u,v,w)
   !
   ! Returns:
   ! - itheta : index of the scattering angle
-  ! - cosw and sinw, cosine and sine of the rotation matrix angle
-  !   used by new_stokes_rt1
+  ! - rop_rt1 and rpo_rt1, rotation matrices used by calc_xI_scatt_pola
   ! C. Pinte
   ! 13/09/09, initial version  19/01/08
 
   integer, intent(in) :: id
   real(kind=dp), intent(in) :: u, v, w
 
-  real(kind=dp) :: v1pi, v1pj, v1pk, xnyp, costhet, theta, omega, cosw, sinw
+  real(kind=dp), dimension(4,4) :: ROP, RPO
   real :: cos_scatt
   integer :: k, ibin, iaz
 
@@ -437,36 +438,10 @@ subroutine angles_scatt_rt1(id,u,v,w)
         sin_scatt_rt1(ibin,iaz,id) = sqrt(1.0 - cos_scatt**2)
 
         if (lsepar_pola) then
-           ! Rotation matrix to align with celestial North
-           call rotation(u,v,w,-tab_u_rt(ibin,iaz),-tab_v_rt(ibin,iaz),-tab_w_rt(ibin),v1pi,v1pj,v1pk)
-           xnyp = sqrt(v1pk*v1pk + v1pj*v1pj)
-           if (xnyp < 1e-10) then
-              xnyp = 0.0_dp
-              costhet = 1.0_dp ! omega = 0
-           else
-              costhet = -1.0_dp*v1pj / xnyp
-           endif
-
-           ! Calculation of the angle between the normal and the z-axis (theta)
-           theta = acos(costhet)
-           if (theta >= pi) theta = 0.0_dp
-
-           !     The scattering plane is at +/- 90 deg from the normal
-           theta = theta + half_pi
-
-           !---- In the rotation matrices, the angle is omega = 2 * theta ----
-           omega = 2.0_dp * theta
-           !     The next if is needed because arccos only spans 0 to pi
-           !     +/- distinguishes the sense of rotation
-           if (v1pk < 0.0) omega = -1.0_dp * omega
-
-           cosw = cos(omega)
-           sinw = sin(omega)
-           if (abs(cosw) < 1e-06) cosw = 0.0_dp
-           if (abs(sinw) < 1e-06) sinw = 0.0_dp
-
-           cos_omega_rt1(ibin,iaz,id) = cosw
-           sin_omega_rt1(ibin,iaz,id) = sinw
+           ! Scattering from the packet direction to the observer direction
+           call Stokes_rotation_matrices(u,v,w, tab_u_rt(ibin,iaz),tab_v_rt(ibin,iaz),tab_w_rt(ibin), ROP, RPO)
+           rop_rt1(:,:,ibin,iaz,id) = ROP(2:3,2:3)
+           rpo_rt1(:,:,ibin,iaz,id) = RPO(2:3,2:3)
         endif ! lsepar_pola
      enddo ! iaz
   enddo ! ibin
@@ -547,18 +522,10 @@ subroutine calc_xI_scatt_pola(id,lambda,p_lambda,icell,phik,psup,l,stokes,flag_s
   integer, intent(in) :: id, lambda, p_lambda, icell, phik, psup
 
   real(kind=dp), dimension(4) :: C, D, S
-  real(kind=dp), dimension(4,4) ::  M, ROP, RPO
-  real(kind=dp) :: cosw, sinw, flux
-  real :: s11, s22, s12, s33, s34, s44
+  real(kind=dp), dimension(4,4) ::  M
+  real(kind=dp) :: flux
+  real :: s11
   integer :: ibin, iaz, iRT, it, p_icell
-
-
-  ROP = 0.0_dp
-  RPO = 0.0_dp
-  RPO(1,1) = 1.0_dp
-  ROP(1,1) = 1.0_dp
-  RPO(4,4) = 1.0_dp
-  ROP(4,4) = 1.0_dp
 
   M = 0.0_dp
 
@@ -573,43 +540,22 @@ subroutine calc_xI_scatt_pola(id,lambda,p_lambda,icell,phik,psup,l,stokes,flag_s
         ! Mueller matrix
         it = itheta_rt1(ibin,iaz,id)
 
+        ! Mueller matrix, same convention as the Monte Carlo (get_Mueller_matrix_per_cell)
         s11 = tab_s11_pos(it,p_icell,p_lambda)
-        s12 = -s11 * tab_s12_o_s11_pos(it,p_icell,p_lambda)
-        s22 = s11 * tab_s22_o_s11_pos(it,p_icell,p_lambda)
-        s33 = -s11 * tab_s33_o_s11_pos(it,p_icell,p_lambda)
-        s34 = -s11 * tab_s34_o_s11_pos(it,p_icell,p_lambda)
-        s44 = -s11 * tab_s44_o_s11_pos(it,p_icell,p_lambda)
+        M(1,1) = s11
+        M(1,2) = s11 * tab_s12_o_s11_pos(it,p_icell,p_lambda) ; M(2,1) = M(1,2)
+        M(2,2) = s11 * tab_s22_o_s11_pos(it,p_icell,p_lambda)
+        M(3,3) = s11 * tab_s33_o_s11_pos(it,p_icell,p_lambda)
+        M(4,4) = s11 * tab_s44_o_s11_pos(it,p_icell,p_lambda)
+        M(3,4) = - s11 * tab_s34_o_s11_pos(it,p_icell,p_lambda) ; M(4,3) = - M(3,4)
 
-        M(1,1) = s11 ; M(2,2) = s22 ; M(1,2) = s12 ; M(2,1) = s12
-        M(3,3) = s33 ; M(4,4) = s44 ; M(3,4) = -s34 ; M(4,3) = s34
-
-        ! Rotation matrices
-        cosw = cos_omega_rt1(ibin,iaz,id)
-        sinw = sin_omega_rt1(ibin,iaz,id)
-
-        RPO(2,2) = -cosw
-        ROP(2,2) = cosw
-        RPO(2,3) = -sinw
-        ROP(2,3) = -sinw
-        RPO(3,2) = -sinw
-        ROP(3,2) = sinw
-        RPO(3,3) = cosw
-        ROP(3,3) = cosw
-
-        !  FINAL STOKES = RPO * M * ROP * INITIAL STOKES
-
-        ! 1st rotation
-        C(2:3) = matmul(ROP(2:3,2:3),stokes(2:3))
-        C(1)=stokes(1)
-        C(4)=stokes(4)
-
-        ! Mueller matrix multiplication
-        D=matmul(M,C)
-
-        ! 2nd rotation
-        S(2:3)=matmul(RPO(2:3,2:3),D(2:3))
-        S(1)=D(1)
-        S(4)=D(4)
+        ! S = RPO * M * ROP * Stokes (scatter_Stokes), without normalisation: the
+        ! weight of the scattering towards the observer is s11 (and s12)
+        C(1) = stokes(1) ; C(4) = stokes(4)
+        C(2:3) = matmul(rop_rt1(:,:,ibin,iaz,id), stokes(2:3))
+        D = matmul(M,C)
+        S(1) = D(1) ; S(4) = D(4)
+        S(2:3) = matmul(rpo_rt1(:,:,ibin,iaz,id), D(2:3))
 
         iRT = RT2d_to_RT1d(ibin, iaz)
         xI_scatt(phik,psup,1:4,iRT,icell,id) =  xI_scatt(phik,psup,1:4,iRT,icell,id) + l * S(:)

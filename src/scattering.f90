@@ -1180,18 +1180,12 @@ end subroutine mueller_opacity_file
 !**********************************************************************
 
 subroutine update_Stokes(S,u0,v0,w0,u1,v1,w1, M)
-  ! Stokes vector after a scattering from direction (u0,v0,w0) to (u1,v1,w1):
-  ! S_out = RPO * M * ROP * S_in
-  !  - ROP rotates the reference frame of the incoming beam into the scattering plane
-  !  - M is the scattering (Mueller) matrix in the scattering plane
-  !  - RPO rotates from the scattering plane to the reference frame of the outgoing beam
-  ! The reference frame of a beam is defined by rotation (utils): the direction of
-  ! propagation is x' and z' is the projected z axis. The two rotation angles are
-  ! different in general: one in the frame of each beam.
+  ! Monte Carlo scattering from direction (u0,v0,w0) to (u1,v1,w1): Stokes vector
+  ! transformed by scatter_Stokes, then normalised so that the packet keeps its energy
+  ! (the scattering angle is sampled from the phase function).
   !
   ! Initial version : Francois Menard, Montreal, 15 February 1989
   ! C. Pinte
-  !  - Energy normalization: the photon leaves with the energy it entered with
 
   implicit none
 
@@ -1199,29 +1193,10 @@ subroutine update_Stokes(S,u0,v0,w0,u1,v1,w1, M)
   real(kind=dp), dimension(4,4), intent(in) :: M
   real(kind=dp), dimension(4), intent(inout) :: S
 
-  real(kind=dp) :: omega_in, omega_out, cosw, sinw, S1_0
-  real(kind=dp), dimension(4,4) :: ROP, RPO
-
-  ! angle between the scattering plane and the reference axis of each beam
-  omega_in = scattering_plane_angle(u1,v1,w1, u0,v0,w0)
-  omega_out = scattering_plane_angle(u0,v0,w0, u1,v1,w1)
-
-  ROP(:,:) = 0.0_dp ; RPO(:,:) = 0.0_dp
-  ROP(1,1) = 1.0_dp ; ROP(4,4) = 1.0_dp
-  RPO(1,1) = 1.0_dp ; RPO(4,4) = 1.0_dp
-
-  ! ROP : from the frame of the incoming beam to the scattering plane
-  cosw = cos(omega_in) ; sinw = sin(omega_in)
-  ROP(2,2) = cosw ; ROP(2,3) = -sinw
-  ROP(3,2) = sinw ; ROP(3,3) = cosw
-
-  ! RPO : from the scattering plane to the frame of the outgoing beam
-  cosw = cos(omega_out) ; sinw = sin(omega_out)
-  RPO(2,2) = cosw ; RPO(2,3) = sinw
-  RPO(3,2) = -sinw ; RPO(3,3) = cosw
+  real(kind=dp) :: S1_0
 
   S1_0 = S(1)
-  S = matmul(RPO, matmul(M, matmul(ROP, S)))
+  call scatter_Stokes(S,u0,v0,w0,u1,v1,w1,M)
 
   ! Energy normalization: the photon leaves with the energy it entered with
   ! I outgoing = I incoming if scattered according to s11 (tab_s11=1.0 normalized in mueller2)
@@ -1231,6 +1206,66 @@ subroutine update_Stokes(S,u0,v0,w0,u1,v1,w1, M)
   return
 
 end subroutine update_Stokes
+
+!**********************************************************************
+
+subroutine scatter_Stokes(S,u0,v0,w0,u1,v1,w1, M)
+  ! Stokes vector after a scattering from direction (u0,v0,w0) to (u1,v1,w1), without
+  ! normalisation: S_out = RPO * M * ROP * S_in (see Stokes_rotation_matrices)
+
+  implicit none
+
+  real(kind=dp), intent(in) ::  u0,v0,w0,u1,v1,w1
+  real(kind=dp), dimension(4,4), intent(in) :: M
+  real(kind=dp), dimension(4), intent(inout) :: S
+
+  real(kind=dp), dimension(4,4) :: ROP, RPO
+
+  call Stokes_rotation_matrices(u0,v0,w0,u1,v1,w1, ROP, RPO)
+  S = matmul(RPO, matmul(M, matmul(ROP, S)))
+
+  return
+
+end subroutine scatter_Stokes
+
+!**********************************************************************
+
+subroutine Stokes_rotation_matrices(u0,v0,w0,u1,v1,w1, ROP, RPO)
+  ! Rotation matrices for a scattering from direction (u0,v0,w0) to (u1,v1,w1),
+  ! S_out = RPO * M * ROP * S_in, with M the scattering (Mueller) matrix:
+  !  - ROP rotates the reference frame of the incoming beam into the scattering plane
+  !  - RPO rotates from the scattering plane to the reference frame of the outgoing beam
+  ! The reference frame of a beam is defined by rotation (utils): the direction of
+  ! propagation is x' and z' is the projected z axis. The two rotation angles are
+  ! different in general: one in the frame of each beam. Unchanged by a rotation of
+  ! both directions around the z axis.
+
+  implicit none
+
+  real(kind=dp), intent(in) ::  u0,v0,w0,u1,v1,w1
+  real(kind=dp), dimension(4,4), intent(out) :: ROP, RPO
+
+  real(kind=dp) :: omega, cosw, sinw
+
+  ROP(:,:) = 0.0_dp ; RPO(:,:) = 0.0_dp
+  ROP(1,1) = 1.0_dp ; ROP(4,4) = 1.0_dp
+  RPO(1,1) = 1.0_dp ; RPO(4,4) = 1.0_dp
+
+  ! ROP : from the frame of the incoming beam to the scattering plane
+  omega = scattering_plane_angle(u1,v1,w1, u0,v0,w0)
+  cosw = cos(omega) ; sinw = sin(omega)
+  ROP(2,2) = cosw ; ROP(2,3) = -sinw
+  ROP(3,2) = sinw ; ROP(3,3) = cosw
+
+  ! RPO : from the scattering plane to the frame of the outgoing beam
+  omega = scattering_plane_angle(u0,v0,w0, u1,v1,w1)
+  cosw = cos(omega) ; sinw = sin(omega)
+  RPO(2,2) = cosw ; RPO(2,3) = sinw
+  RPO(3,2) = -sinw ; RPO(3,3) = cosw
+
+  return
+
+end subroutine Stokes_rotation_matrices
 
 !**********************************************************************
 

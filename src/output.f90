@@ -348,7 +348,9 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
         u1 = -u1
         v1 = -v1
         w1 = -w1
+        ! a reflection reverses the handedness: U and V change sign
         stok(3) = -stok(3)
+        stok(4) = -stok(4)
      else
         return
      endif
@@ -384,7 +386,9 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
      if (v1 < 0.0) then
         v1 = - v1
         y1 = - y1
+        ! mirror: U and V change sign
         stok(3) = -stok(3)
+        stok(4) = -stok(4)
      endif
      ! Selection of angle phi
      ! (atan2 returns [-Pi,Pi] but here [0,Pi] since v1 > 0)
@@ -531,7 +535,7 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
            if (lsepar_pola) then
               STOKEQ(lambda,IMAP2,JMAP2,capt,c_phi,id) = STOKEQ(lambda,IMAP2,JMAP2,capt,c_phi,id) + 0.5 * STOK(2)
               STOKEU(lambda,IMAP2,JMAP2,capt,c_phi,id) = STOKEU(lambda,IMAP2,JMAP2,capt,c_phi,id) - 0.5 * STOK(3)
-              STOKEV(lambda,IMAP2,JMAP2,capt,c_phi,id) = STOKEV(lambda,IMAP2,JMAP2,capt,c_phi,id) + 0.5 * STOK(4)
+              STOKEV(lambda,IMAP2,JMAP2,capt,c_phi,id) = STOKEV(lambda,IMAP2,JMAP2,capt,c_phi,id) - 0.5 * STOK(4) ! mirror: -V
            endif
 
            if (lsepar_contrib) then
@@ -1027,7 +1031,7 @@ subroutine ecriture_map_ray_tracing()
            if (lsepar_pola) then
               image(i,:,:,:,2) = image(npix_x-i+1,:,:,:,2)
               image(i,:,:,:,3) = - image(npix_x-i+1,:,:,:,3)
-              image(i,:,:,:,4) = image(npix_x-i+1,:,:,:,4)
+              image(i,:,:,:,4) = - image(npix_x-i+1,:,:,:,4) ! mirror: U and V change sign
            endif
 
            if (lsepar_contrib) then
