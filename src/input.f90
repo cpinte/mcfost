@@ -199,6 +199,7 @@ end subroutine readmolecule
 subroutine lect_Temperature()
 
   integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,nbuffer,npixels, hdutype
+  character(len=1024) :: filename
   real :: nullval
   integer, dimension(5) :: naxes
   logical :: anynull, there_is_dust
@@ -217,11 +218,11 @@ subroutine lect_Temperature()
      !  Get an unused Logical Unit Number to use to open the FITS file.
      call ftgiou(unit,status)
 
-     Tfile = trim(root_dir)//"/"//trim(Tfile)
-     write(*,*) "Reading temperature file : "//trim(Tfile)
+     filename = temperature_filename(Tfile)
+     write(*,*) "Reading temperature file : "//trim(filename)
 
      readwrite=0
-     call ftopen(unit,Tfile,readwrite,blocksize,status)
+     call ftopen(unit,filename,readwrite,blocksize,status)
      if (status /= 0) call error("temperature file needed")
 
      group=1
@@ -234,7 +235,7 @@ subroutine lect_Temperature()
         if (nfound /= 1) then
            write(*,*) "# fits file,   required"
            write(*,*) nfound, 1
-           call error('failed to read the NAXISn keywords of '//trim(Tfile))
+           call error('failed to read the NAXISn keywords of '//trim(filename))
         endif
         if ((naxes(1) /= n_cells)) then
            write(*,*) "# fits file,   required"
@@ -247,7 +248,7 @@ subroutine lect_Temperature()
            if (nfound /= 3) then
               write(*,*) "# fits file,   required"
               write(*,*) nfound, 3
-              call error('failed to read the NAXISn keywords of '//trim(Tfile))
+              call error('failed to read the NAXISn keywords of '//trim(filename))
            endif
            if ((naxes(1) /= n_rad).or.(naxes(2) /= 2*nz).or.(naxes(3) /= n_az)) then
               write(*,*) "# fits file,   required"
@@ -261,7 +262,7 @@ subroutine lect_Temperature()
            if (nfound /= 2) then
               write(*,*) "# fits file,   required"
               write(*,*) nfound, 2
-              call error('failed to read the NAXISn keywords of '//trim(Tfile))
+              call error('failed to read the NAXISn keywords of '//trim(filename))
            endif
 
            if ((naxes(1) /= n_rad).or.(naxes(2) /= nz)) then
@@ -284,11 +285,11 @@ subroutine lect_Temperature()
      !  Get an unused Logical Unit Number to use to open the FITS file.
      call ftgiou(unit,status)
 
-     Tfile_nLTE = trim(root_dir)//"/"//trim(Tfile_nLTE)
-     write(*,*) "Reading temperature file : "//trim(Tfile_nLTE)
+     filename = temperature_filename(Tfile_nLTE)
+     write(*,*) "Reading temperature file : "//trim(filename)
 
      readwrite=0
-     call ftopen(unit,Tfile_nLTE,readwrite,blocksize,status)
+     call ftopen(unit,filename,readwrite,blocksize,status)
      if (status /= 0) call error("temperature file needed")
 
      group=1
@@ -300,20 +301,20 @@ subroutine lect_Temperature()
      if (lVoronoi) then
         if (nfound /= 2) then
            write(*,*) "Found", nfound, "axes", naxes
-           call error('failed to read the NAXISn keywords of '//trim(Tfile_nLTE))
+           call error('failed to read the NAXISn keywords of '//trim(filename))
         endif
         npixels=naxes(1)*naxes(2)
      else
         if (l3D) then
            if (nfound /= 4) then
               write(*,*) "Found", nfound, "axes", naxes
-              call error('failed to read the NAXISn keywords of '//trim(Tfile_nLTE)//' file.')
+              call error('failed to read the NAXISn keywords of '//trim(filename)//' file.')
            endif
            npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
         else
            if (nfound /= 3) then
               write(*,*) "Found", nfound, "axes", naxes
-              call error('failed to read the NAXISn keywords of '//trim(Tfile_nLTE)//' file.')
+              call error('failed to read the NAXISn keywords of '//trim(filename)//' file.')
            endif
            npixels=naxes(1)*naxes(2)*naxes(3)
         endif
@@ -334,12 +335,12 @@ subroutine lect_Temperature()
      !  Get an unused Logical Unit Number to use to open the FITS file.
      call ftgiou(unit,status)
 
-     Tfile_nRE=trim(root_dir)//"/"//trim(Tfile_nRE)
-     write(*,*) "Reading temperature file : "//trim(Tfile_nRE)
+     filename = temperature_filename(Tfile_nRE)
+     write(*,*) "Reading temperature file : "//trim(filename)
      !call init_tab_Temp()
 
      readwrite=0
-     call ftopen(unit,Tfile_nRE,readwrite,blocksize,status)
+     call ftopen(unit,filename,readwrite,blocksize,status)
      if (status /= 0) call error("ERROR : temperature file needed")
 
      group=1
@@ -351,7 +352,7 @@ subroutine lect_Temperature()
      if (lVoronoi) then
         if (nfound /= 2) then
            write(*,*) "Found", nfound, "axes", naxes
-           call error('failed to read the NAXISn keywords of '//trim(Tfile_nLTE)//' file.')
+           call error('failed to read the NAXISn keywords of '//trim(filename)//' file.')
         endif
         npixels=naxes(1)*naxes(2)
      else
@@ -377,7 +378,7 @@ subroutine lect_Temperature()
      if (lVoronoi) then
         if (nfound /= 2) then
            write(*,*) "Found", nfound, "axes", naxes
-           call error('failed to read the NAXISn keywords of '//trim(Tfile_nLTE)//' file.')
+           call error('failed to read the NAXISn keywords of '//trim(filename)//' file.')
         endif
         npixels=naxes(1)*naxes(2)
      else
@@ -404,7 +405,7 @@ subroutine lect_Temperature()
      if (lVoronoi) then
         if (nfound /= 3) then
            write(*,*) "Found", nfound, "axes", naxes
-           call error('failed to read the NAXISn keywords of '//trim(Tfile_nLTE)//' file.')
+           call error('failed to read the NAXISn keywords of '//trim(filename)//' file.')
         endif
         npixels=naxes(1)*naxes(2)*naxes(3)
      else
@@ -431,6 +432,26 @@ subroutine lect_Temperature()
   return
 
 end subroutine lect_Temperature
+
+!********************************************************************
+
+function temperature_filename(file) result(filename)
+  ! Path of a temperature file: default files (./data_th/...) are in the data
+  ! directory of the run, root_dir/seed_dir/data_th; a file given with -Tfile is
+  ! relative to root_dir unless it is an absolute path
+
+  character(len=*), intent(in) :: file
+  character(len=1024) :: filename
+
+  if (file(1:1) == "/") then
+     filename = file
+  else if (file(1:10) == "./data_th/") then
+     filename = trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(file(3:))
+  else
+     filename = trim(root_dir)//"/"//trim(file)
+  endif
+
+end function temperature_filename
 
 !**********************************************************************
 

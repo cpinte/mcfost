@@ -457,6 +457,25 @@ def test_mol_nlte():
     assert np.all(np.isfinite(lines)) and lines.max() > 0
 
 
+def test_seed_image():
+    # With -seed, results are written in root_dir/seed=<n>: an image run with the same
+    # seed must read the temperature computed there (J5: Tfile ignored seed_dir)
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    root_dir = "ref3.0_seed"
+    clean_results(root_dir)
+    os.makedirs(root_dir, exist_ok=True)
+    para = root_dir+"/seed.para"
+    make_para("test_data/ref3.0/ref3.0.para", para, {})
+
+    run_mcfost(para, root_dir, "-seed 7", timeout=300)
+    assert os.path.isfile(root_dir+"/seed=7/data_th/Temperature.fits.gz")
+
+    stdout = run_mcfost(para, root_dir, "-seed 7 -img 1.0", timeout=300)
+    assert "seed=7/data_th/Temperature.fits.gz" in stdout
+    assert os.path.isfile(root_dir+"/seed=7/data_1.0/RT.fits.gz")
+
+
 def test_sublimation_image():
     # An image run after a temperature run with dust sublimation must read back
     # the sublimation radius and use the same inner radius as the temperature run
