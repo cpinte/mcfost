@@ -873,7 +873,7 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   ! 5 creates a slight overhead in the stratified case (a few 10 sec per inclination and lambda)
   ! 15 creates a significant overhead
 
-  real :: s11, s22, s12, s33, s34, s44
+  real :: s11
 
   ! Many dimensions but small numbers (<1MB for default values)
   real, dimension(N_super,N_super,n_theta_I,n_phi_I,nang_ray_tracing,0:1) :: tab_sin_scatt_norm
@@ -1008,20 +1008,14 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   !$omp shared(s11_save,tab_rop,tab_rpo,nb_proc,kappa,kappa_factor,tab_albedo_pos) &
   !$omp private(iscatt,id,u_ray_tracing,v_ray_tracing,w_ray_tracing,theta_I,phi_I,i1,i2,u,v,w,cos_scatt,sin_scatt) &
   !$omp private(sum_sin,icell,p_icell,stokes,s11,k,alloc_status,dir,phi_scatt) &
-  !$omp private(s12,s22,s33,s34,s44,M,ROP,RPO,C,D,S,factor,kappa_sca)
+  !$omp private(M,C,D,S,factor,kappa_sca)
   id = 1 ! for sequential code
 
   ! Mueller matrix
   M = 0.0_dp
 
   ! Rotation matrices
-  ROP = 0.0_dp
-  RPO = 0.0_dp
 
-  RPO(1,1) = 1.0_dp
-  ROP(1,1) = 1.0_dp
-  RPO(4,4) = 1.0_dp
-  ROP(4,4) = 1.0_dp
 
   if (.not.lvariable_dust) then   ! we precalculate the s11 as they are all the same
      icell = icell1
@@ -1074,7 +1068,7 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
                  endif
 
 
-                 if (lsepar_pola) then ! Compute s12, s33, s34 and the rotation matrix
+                 if (lsepar_pola) then ! Mueller matrix and rotations of the scattering towards the observer
                     ! The polarisability phase function is not as steep as the phase function,
                     ! so we only use the center of the bin for the polarization to make it faster
                     i1 = N_super/2+1 ; i2 = i1
