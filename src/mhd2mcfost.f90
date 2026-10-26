@@ -69,11 +69,11 @@ module mhd2mcfost
            call error("Dust not handled yet for pluto models!")
         endif
 
-           cmd = "wc -l < "//shell_quote(density_files(1))//" > ntest.txt"
+           cmd = "wc -l < "//shell_quote(density_files(1))//" > "//shell_quote(tmp_filename("ntest.txt"))
            call system_call(cmd,syst_status)
-           open(unit=1,file="ntest.txt",status="old")
+           open(unit=1,file=tmp_filename("ntest.txt"),status="old")
            read(1,*) N_points
-           close(unit=1)
+           close(unit=1,status="delete")
            N_points = N_points - Nheader
            write(*,*) " Input model has ", N_points," grid points !"
 

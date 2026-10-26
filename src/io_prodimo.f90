@@ -9,7 +9,7 @@ module ProDiMo
   use stars, only : star_spectrum, ProDiMo_star_HR, E_stars, R_ISM
   use read_params
   use sha
-  use utils, only : system_call, shell_quote
+  use utils, only : system_call, shell_quote, tmp_filename
   use messages
   use thermal_emission
   use mcfost_env
@@ -1326,8 +1326,8 @@ contains
     ! Copie temporaire et lecture du fichier de parameters
     ! car je ne connais pas le nom du fichier .par dans data_th
     n_files = 0
-    cmd = "ls data_th/*.par* | wc -l > n_files.tmp" ; call system_call(cmd, syst_status)
-    open(unit=1, file="n_files.tmp", status='old')
+    cmd = "ls data_th/*.par* | wc -l > "//shell_quote(tmp_filename("n_files.tmp")) ; call system_call(cmd, syst_status)
+    open(unit=1, file=tmp_filename("n_files.tmp"), status='old')
     read(1,*) n_files
     close(unit=1,status="delete")
 

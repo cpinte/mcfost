@@ -3,18 +3,19 @@ program test_shell_quote
   !  - shell_quote : a path with spaces, $(...), backticks, double and single
   !    quotes or ; is passed to the shell as one word and never executed
   !  - system_call : exit status of the command
+  !  - tmp_filename : per-process temporary file in $TMPDIR (default /tmp)
   ! Works in a scratch directory created in the current directory and removed at the end.
   ! Built by "make unit_tests" in src/ and run by test_suite/test_unit.py.
   ! Exits with status 1 on failure.
 
-  use utils, only : shell_quote, system_call, is_dir, is_file
+  use utils, only : shell_quote, system_call, is_dir, is_file, tmp_filename
 
   implicit none
 
   character(len=*), parameter :: base = "test_shell_quote.tmp"
   character(len=*), parameter :: weird = "My Models $(touch PWNED1) `touch PWNED2` ""q"" it's; touch PWNED3"
 
-  character(len=:), allocatable :: dir
+  character(len=:), allocatable :: dir, tmp
   character(len=256) :: line
   integer :: n_fail, n_test, status, unit
 
@@ -51,6 +52,15 @@ program test_shell_quote
 
   call system_call("rm -rf "//shell_quote(base), status)
   call check_log("scratch directory removed", .not.is_dir(base))
+
+  ! temporary file: unique name ending with the requested name, writable
+  tmp = tmp_filename("test.tmp")
+  call check_log("tmp_filename ends with the name", index(tmp, "_test.tmp", back=.true.) == len(tmp)-8)
+  call check_log("tmp_filename depends on the name", tmp /= tmp_filename("other.tmp"))
+  call system_call("echo ok > "//shell_quote(tmp), status)
+  call check_int("tmp file written", status, 0)
+  call check_log("tmp file exists", is_file(tmp))
+  call system_call("rm -f "//shell_quote(tmp), status)
 
   write(*,'(a,i0,a,i0)') "test_shell_quote: failures = ", n_fail, " / ", n_test
   if (n_fail > 0) stop 1

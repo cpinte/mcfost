@@ -819,8 +819,11 @@ function mcfost_update(lforce_update, lmanual, n_days)
 
   character(len=512) :: cmd, url, url_sha1, last_version, current_binary
   character(len=40) :: mcfost_sha1, mcfost_update_sha1
+  character(len=:), allocatable :: version_tmp, binary_tmp
   integer ::  syst_status, ios
 
+  version_tmp = tmp_filename("version.txt")
+  binary_tmp = tmp_filename("which_mcfost_binary.txt")
 
   ! Last version
   write(*,*) "Checking last version ..."
@@ -828,7 +831,7 @@ function mcfost_update(lforce_update, lmanual, n_days)
   !cmd = "wget "//trim(webpage)//"/version.txt -q -T 5 -t 3"
   !cmd = "curl "//trim(webpage)//"version.txt -O -s"
   cmd = "curl "//trim(raw_webpage)//trim(version_file)//&
-       ' -s | grep mcfost_release | awk ''NF>1{print $NF}'' | sed s/\"//g > version.txt'
+       ' -s | grep mcfost_release | awk ''NF>1{print $NF}'' | sed s/\"//g > '//shell_quote(version_tmp)
   call system_call(cmd, syst_status)
   if (syst_status/=0) then
      write(*,*) "ERROR: Cannot connect to MCFOST server."
@@ -837,7 +840,7 @@ function mcfost_update(lforce_update, lmanual, n_days)
   endif
 
   ios=0
-  open(unit=1, file="version.txt", status='old',iostat=ios)
+  open(unit=1, file=version_tmp, status='old',iostat=ios)
   read(1,*,iostat=ios) last_version
   close(unit=1,status="delete",iostat=ios)
   if ( (ios/=0) .or. (.not.is_digit(last_version(1:1)))) then
@@ -938,14 +941,14 @@ function mcfost_update(lforce_update, lmanual, n_days)
      call get_command_argument(0,current_binary)
      if (current_binary(1:1)/=".") then
         write(*,'(a28, $)') "Locating current binary ..."
-        cmd = "rm -rf which_mcfost_binary.txt && which "//shell_quote(current_binary)// &
-             " | awk '{print "//' "\"" $NF "\""'//"}' > which_mcfost_binary.txt"
+        cmd = "which "//shell_quote(current_binary)// &
+             " | awk '{print "//' "\"" $NF "\""'//"}' > "//shell_quote(binary_tmp)
         call system_call(cmd, syst_status)
 
         ios=0
-        open(unit=1, file="which_mcfost_binary.txt", status='old',iostat=ios)
+        open(unit=1, file=binary_tmp, status='old',iostat=ios)
         read(1,*,iostat=ios) current_binary
-        close(unit=1,iostat=ios)
+        close(unit=1,status="delete",iostat=ios)
 
         if ( (ios/=0) .or. (.not.is_digit(last_version(1:1)))) then
            write(*,*) ""
@@ -1144,8 +1147,12 @@ subroutine mcfost_v()
   character(len=512) :: cmd, last_version
   integer ::  syst_status, line_number, ios
   character(len=128) :: sline_number
+  character(len=:), allocatable :: version_tmp, history_tmp, line_tmp
 
   syst_status = 0
+  version_tmp = tmp_filename("version.txt")
+  history_tmp = tmp_filename("history.txt")
+  line_tmp = tmp_filename("line_number.txt")
 
   write(*,*) "Binary compiled the ",__DATE__," at ",__TIME__
 #if defined (__INTEL_COMPILER)
@@ -1162,12 +1169,12 @@ subroutine mcfost_v()
   ! Last version
   write(*,*) "Checking last version ..."
   cmd = "curl "//trim(raw_webpage)//trim(version_file)//&
-       ' -s | grep mcfost_release | awk ''NF>1{print $NF}'' | sed s/\"//g > version.txt'
+       ' -s | grep mcfost_release | awk ''NF>1{print $NF}'' | sed s/\"//g > '//shell_quote(version_tmp)
   call system_call(cmd, syst_status)
   if (syst_status/=0) &
        call error("Cannot get MCFOST last version number (Error 1)","'"//trim(cmd)//"' did not run as expected.")
 
-  open(unit=1, file="version.txt", status='old',iostat=ios)
+  open(unit=1, file=version_tmp, status='old',iostat=ios)
   read(1,*,iostat=ios) last_version
   close(unit=1,status="delete",iostat=ios)
 
@@ -1183,14 +1190,14 @@ subroutine mcfost_v()
      ! Last version
      write(*,*)
      write(*,*) "Getting MCFOST history ..."
-     cmd = "curl "//trim(webpage)//"history.txt -O -s"
+     cmd = "curl "//trim(webpage)//"history.txt -s -o "//shell_quote(history_tmp)
      call system_call(cmd, syst_status)
      if (syst_status/=0) call error("Cannot get MCFOST history")
 
      ! Getting line number of current version in history
-     cmd = "grep -n "//trim(mcfost_release)//" history.txt | awk -F : '{print $1}' > line_number.txt"
+     cmd = "grep -n "//trim(mcfost_release)//" "//shell_quote(history_tmp)//" | awk -F : '{print $1}' > "//shell_quote(line_tmp)
      call system_call(cmd, syst_status)
-     open(unit=1, file="line_number.txt", status='old',iostat=ios)
+     open(unit=1, file=line_tmp, status='old',iostat=ios)
      read(1,*,iostat=ios) line_number
      close(unit=1,status="delete",iostat=ios)
 
@@ -1199,7 +1206,7 @@ subroutine mcfost_v()
         if (line_number > 1) then
            write(sline_number,*)  line_number-1
            write(*,*) "Changes since your version:"
-           cmd = "head -"//trim(adjustl(sline_number))//" history.txt ; rm -rf history.txt"
+           cmd = "head -"//trim(adjustl(sline_number))//" "//shell_quote(history_tmp)//" ; rm -f "//shell_quote(history_tmp)
            call system_call(cmd, syst_status)
         else
            write(*,*) "No changes found since your version (?????)"
@@ -1208,7 +1215,7 @@ subroutine mcfost_v()
         write(*,*) "Full history is available with mcfost -h"
         write(*,*) "The new version can be downloaded with mcfost -u"
      else
-        cmd = "rm -rf history.txt"
+        cmd = "rm -f "//shell_quote(history_tmp)
         call system_call(cmd, syst_status)
         write(*,*) "ERROR: I did not find any modifications in the history"
         write(*,*) "Exiting"
@@ -1590,6 +1597,36 @@ function shell_quote(str) result(quoted)
   quoted = quoted//"'"
 
 end function shell_quote
+
+!************************************************************
+
+function tmp_filename(name) result(filename)
+  ! Name of a temporary file unique to this process: $TMPDIR/mcfost_<pid>_<name>
+  ! ($TMPDIR defaults to /tmp). Jobs running in the same directory no longer
+  ! share temporary files, and the working directory may be read-only.
+
+  use iso_c_binding, only : c_int
+
+  character(len=*), intent(in) :: name
+  character(len=:), allocatable :: filename
+
+  interface
+     function c_getpid() bind(C, name="getpid") result(pid)
+       import :: c_int
+       integer(c_int) :: pid
+     end function c_getpid
+  end interface
+
+  character(len=512) :: tmpdir
+  character(len=16) :: spid
+  integer :: l, status
+
+  call get_environment_variable("TMPDIR", tmpdir, length=l, status=status)
+  if ((status /= 0) .or. (l == 0)) tmpdir = "/tmp"
+  write(spid,'(i0)') c_getpid()
+  filename = trim(tmpdir)//"/mcfost_"//trim(spid)//"_"//trim(name)
+
+end function tmp_filename
 
 !************************************************************
 
