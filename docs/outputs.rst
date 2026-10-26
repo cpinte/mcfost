@@ -77,28 +77,35 @@ Q/I, U/I, V/I]. That is to say, all the polarizations are written with
 the same dimensionality as intensities and units of
 W.m\ :sup:`-2`.pixel\ :sup:`-1`.
 
-Polarisation conventions:
+Polarisation conventions (IAU, Hamaker & Bregman 1996; van Straten et al. 2010):
 
 - Images are oriented as on the sky: north is up and east is to the left
   (``CDELT1`` is negative).
-- Q and U follow the IAU convention: the polarisation angle is measured
-  from north towards east, :math:`\theta = \frac{1}{2}\arctan(U/Q)`. The
+- Stokes parameters are defined in the frame x = north, y = east, with the
+  z axis towards the observer.
+- Q > 0 for polarisation along the north-south axis and U > 0 along the
+  north-east to south-west axis. The polarisation angle is measured from
+  north towards east, :math:`\theta = \frac{1}{2}\arctan(U/Q)`. The
   azimuthal Stokes parameters Q\ :sub:`φ` and U\ :sub:`φ` can be computed
-  with the usual definitions (e.g. as in pymcfost); for a face-on
-  axisymmetric disc, U\ :sub:`φ` is zero.
-- V (circular polarisation) is produced by multiple scattering. Its sign is
-  consistent between the Monte Carlo images and both ray-tracing methods,
-  but has not yet been tied to the IAU convention for V: to be confirmed.
+  with the usual definitions (e.g. as in pymcfost). For a face-on
+  axisymmetric disc, Q\ :sub:`φ` > 0 and U\ :sub:`φ` = 0.
+- V > 0 when the electric field rotates counter-clockwise as seen by the
+  observer, i.e. from north towards east (right-handed circular
+  polarisation in the IEEE and IAU definitions). V is produced by multiple
+  scattering and has the same convention in the Monte Carlo images and in
+  both ray-tracing methods.
 - With image symmetry, the mirrored half of the image is computed with
   U and V reversed. For an axisymmetric model, Q is symmetric and U and V
   are antisymmetric about the minor axis of the image.
 
-.. note:: the treatment of polarisation in multiple scattering was
-   corrected after version 4.1.15 (Stokes vector rotations in the Monte
-   Carlo and in the last scattering of both ray-tracing methods, circular
-   polarisation in ray-tracing method 2, sign of V in the image
-   symmetries). Q and U of the light scattered several times, and V,
-   differ from earlier versions.
+.. note:: the treatment of polarisation was corrected after version
+   4.1.15: Stokes vector rotations in multiple scattering (Monte Carlo and
+   last scattering of both ray-tracing methods), circular polarisation in
+   ray-tracing method 2, sign of V in the image symmetries, reference axis
+   of exactly face-on ray-traced images, and the sign of V, which was
+   opposite to the IAU convention. Q and U of the light scattered several
+   times, Q and U of exactly face-on ray-traced images, and V differ from
+   earlier versions.
 
 .. note:: the -casa option makes the fits file compliant with casa and reduces the number of dimensions. Only the first inclination and azimuth are considered. Additional keywords are added for casa, units are changed to Jy/pixel.
 

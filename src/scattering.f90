@@ -1320,7 +1320,8 @@ subroutine get_Mueller_matrix_per_grain(lambda,itheta,frac,igrain, M)
   M(2,1) = M(1,2)
   M(3,3) = tab_s33(itheta,igrain,lambda) * frac + tab_s33(itheta-1,igrain,lambda) * frac_m1
   M(4,4) = tab_s44(itheta,igrain,lambda) * frac + tab_s44(itheta-1,igrain,lambda) * frac_m1
-  M(3,4) = -tab_s34(itheta,igrain,lambda)* frac - tab_s34(itheta-1,igrain,lambda) * frac_m1
+  ! Bohren & Huffman sign of s34: V follows the IAU convention (see get_Mueller_matrix_per_cell)
+  M(3,4) = tab_s34(itheta,igrain,lambda)* frac + tab_s34(itheta-1,igrain,lambda) * frac_m1
   M(4,3) = -M(3,4)
 
   return
@@ -1346,7 +1347,12 @@ subroutine get_Mueller_matrix_per_cell(lambda,itheta,frac,icell, M)
   M(2,1) = M(1,2)
   M(3,3) = tab_s33_o_s11_pos(itheta,icell,lambda) * frac +  tab_s33_o_s11_pos(itheta-1,icell,lambda) * frac_m1
   M(4,4) = tab_s44_o_s11_pos(itheta,icell,lambda) * frac +  tab_s44_o_s11_pos(itheta-1,icell,lambda) * frac_m1
-  M(3,4) = -tab_s34_o_s11_pos(itheta,icell,lambda)* frac -  tab_s34_o_s11_pos(itheta-1,icell,lambda) * frac_m1
+  ! Bohren & Huffman sign of s34 (s34 = Im(S2 S1*), exp(-i omega t) amplitudes): with the
+  ! Stokes reference axis along the projected z axis (north in the images), V > 0 when the
+  ! electric field rotates counter-clockwise as seen by the observer, as in the IAU
+  ! convention (Hamaker & Bregman 1996; van Straten et al. 2010). Up to version 4.1.15,
+  ! M(3,4) had the opposite sign, which reversed V only.
+  M(3,4) = tab_s34_o_s11_pos(itheta,icell,lambda)* frac +  tab_s34_o_s11_pos(itheta-1,icell,lambda) * frac_m1
   M(4,3) = -M(3,4)
 
   return

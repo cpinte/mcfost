@@ -7,9 +7,10 @@ program test_stokes_scattering
   ! amplitudes (S2 parallel, S1 perpendicular to the scattering plane) in the basis
   ! (e_par, e_perp), e_perp = k_in x k_out normalised, e_par = e_perp x k.
   ! update_Stokes receives the Mueller matrix built from the same amplitudes with the
-  ! MCFOST definitions (mueller_Mie). Quantities independent of the reference frames
-  ! are compared after each scattering: I, the linearly polarised flux sqrt(Q^2+U^2)
-  ! and |V| (the sign of V depends on the convention).
+  ! MCFOST definitions (mueller_Mie). The Stokes parameters of the reference are those of
+  ! the IAU convention with e_a = north and e_b = east for a beam towards the observer
+  ! (V = -2 Im(J_ab) for exp(-i omega t) amplitudes, i.e. V > 0 for a field rotating from
+  ! north to east). I, Q, U and V are compared after each scattering.
   ! Built by "make unit_tests" in src/ and run by test_suite/test_unit.py.
   ! Exits with status 1 on failure.
 
@@ -27,11 +28,11 @@ program test_stokes_scattering
   complex(kind=dp), dimension(2,2) :: J
   real(kind=dp), dimension(4) :: S_ref, S_mc
   real(kind=dp), dimension(4,4) :: M
-  real(kind=dp) :: err_I, err_P, err_V
+  real(kind=dp) :: err_I, err_Q, err_U, err_V
   integer, allocatable :: seed(:)
 
   n_fail = 0 ; n_test = 0
-  err_I = 0.0_dp ; err_P = 0.0_dp ; err_V = 0.0_dp
+  err_I = 0.0_dp ; err_Q = 0.0_dp ; err_U = 0.0_dp ; err_V = 0.0_dp
 
   call random_seed(size=i)
   allocate(seed(i)) ; seed = 12345
@@ -63,14 +64,16 @@ program test_stokes_scattering
         call update_Stokes(S_mc, k(1,i-1),k(2,i-1),k(3,i-1), k(1,i),k(2,i),k(3,i), M)
 
         err_I = max(err_I, abs(S_mc(1) - S_ref(1)))
-        err_P = max(err_P, abs(hypot(S_mc(2),S_mc(3)) - hypot(S_ref(2),S_ref(3))))
-        err_V = max(err_V, abs(abs(S_mc(4)) - abs(S_ref(4))))
+        err_Q = max(err_Q, abs(S_mc(2) - S_ref(2)))
+        err_U = max(err_U, abs(S_mc(3) - S_ref(3)))
+        err_V = max(err_V, abs(S_mc(4) - S_ref(4)))
      enddo
   enddo
 
   call check("intensity", err_I)
-  call check("linear polarisation", err_P)
-  call check("circular polarisation |V|", err_V)
+  call check("Q", err_Q)
+  call check("U", err_U)
+  call check("V", err_V)
 
   write(*,'(a,i0,a,i0)') "test_stokes_scattering: failures = ", n_fail, " / ", n_test
   if (n_fail > 0) stop 1
@@ -113,7 +116,7 @@ contains
   end function cross
 
   subroutine beam_basis(kv, ea, eb)
-    ! e_a : projected z axis, e_b = k x e_a
+    ! e_a : projected z axis, e_b = k x e_a (north and east for a beam towards the observer)
     real(kind=dp), dimension(3), intent(in) :: kv
     real(kind=dp), dimension(3), intent(out) :: ea, eb
     if (abs(kv(3)) > 0.999999_dp) then ! along z: any perpendicular axis
@@ -179,7 +182,7 @@ contains
     M(1,1) = 1.0_dp ; M(2,2) = 1.0_dp
     M(1,2) = s12/s11 ; M(2,1) = M(1,2)
     M(3,3) = s33/s11 ; M(4,4) = s33/s11
-    M(3,4) = -s34/s11 ; M(4,3) = -M(3,4)
+    M(3,4) = s34/s11 ; M(4,3) = -M(3,4)
   end subroutine mcfost_mueller
 
 end program test_stokes_scattering

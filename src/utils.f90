@@ -566,18 +566,15 @@ subroutine rotation(xinit,yinit,zinit,u1,v1,w1,xfin,yfin,zfin)
 
   real(kind=dp) :: cost, sint, sing, prod, theta
 
-  if (w1 > 0.999999999_dp) then
-     cost = 1.0_dp
-     sint = 0.0_dp
-     sing = 0.0_dp
-  else
-     ! atan2 also handles u1 = 0 (sin(theta) = sign of v1). A special case with
-     ! sint = 1 for u1 = 0 used to mirror the frame when v1 < 0 (e.g. observer at azimuth 0)
-     theta=atan2(v1,u1)
-     cost=cos(theta)
-     sint=sin(theta)
-     sing = sqrt(1.0_dp - w1*w1)
-  endif
+  ! atan2 also handles u1 = 0 (sin(theta) = sign of v1). A special case with
+  ! sint = 1 for u1 = 0 used to mirror the frame when v1 < 0 (e.g. observer at azimuth 0).
+  ! Directions along +z keep the azimuth of (u1,v1), however small: the ray-tracing
+  ! uses (u1,v1) ~ 1e-20 for a face-on observer to set the reference axis of the image.
+  ! atan2(0,0) = 0 for an exact +/-z direction.
+  theta=atan2(v1,u1)
+  cost=cos(theta)
+  sint=sin(theta)
+  sing = sqrt(max(0.0_dp, 1.0_dp - w1*w1))
 
   prod=cost*xinit + sint*yinit
 

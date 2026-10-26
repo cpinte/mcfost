@@ -547,7 +547,7 @@ subroutine calc_xI_scatt_pola(id,lambda,p_lambda,icell,phik,psup,l,stokes,flag_s
         M(2,2) = s11 * tab_s22_o_s11_pos(it,p_icell,p_lambda)
         M(3,3) = s11 * tab_s33_o_s11_pos(it,p_icell,p_lambda)
         M(4,4) = s11 * tab_s44_o_s11_pos(it,p_icell,p_lambda)
-        M(3,4) = - s11 * tab_s34_o_s11_pos(it,p_icell,p_lambda) ; M(4,3) = - M(3,4)
+        M(3,4) = s11 * tab_s34_o_s11_pos(it,p_icell,p_lambda) ; M(4,3) = - M(3,4)
 
         ! S = RPO * M * ROP * Stokes (scatter_Stokes), without normalisation: the
         ! weight of the scattering towards the observer is s11 (and s12)
@@ -1080,7 +1080,7 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
                     M(2,2) = s11 * tab_s22_o_s11_pos(k,p_icell,p_lambda)
                     M(3,3) = s11 * tab_s33_o_s11_pos(k,p_icell,p_lambda)
                     M(4,4) = s11 * tab_s44_o_s11_pos(k,p_icell,p_lambda)
-                    M(3,4) = - s11 * tab_s34_o_s11_pos(k,p_icell,p_lambda) ; M(4,3) = - M(3,4)
+                    M(3,4) = s11 * tab_s34_o_s11_pos(k,p_icell,p_lambda) ; M(4,3) = - M(3,4)
 
                     ! Radiation field
                     stokes(:) = Inu(1:4,theta_I,phi_I,icell)
