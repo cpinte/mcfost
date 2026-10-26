@@ -1180,29 +1180,12 @@ end subroutine mueller_opacity_file
 !**********************************************************************
 
 subroutine update_Stokes(S,u0,v0,w0,u1,v1,w1, M)
-  ! Astronomical convention used: position angle
-  ! Calculated counter-clockwise from celestial north
+  ! Monte Carlo scattering from direction (u0,v0,w0) to (u1,v1,w1): Stokes vector
+  ! transformed by scatter_Stokes, then normalised so that the packet keeps its energy
+  ! (the scattering angle is sampled from the phase function).
   !
-  ! Francois Menard, Montreal, 15 February 1989
-  !
+  ! Initial version : Francois Menard, Montreal, 15 February 1989
   ! C. Pinte
-  !  - Modification 22/12/03 (C. Pinte): index l for scattering grain size
-  !  - Energy normalization: the photon leaves with the energy it entered with
-  !
-  ! Scatterer coordinates
-  !  - x is towards the observer
-  !  - y and z form a right-handed basis (in the correct direction)
-  !   - y to the right and z upwards
-  !
-  ! Calculation of the omega angle between the scattering plane
-  ! and the projected celestial north (equatorial coordinates)
-  !
-  ! In the nebula's coordinate system
-  !    vector 1 (from point "0" to point "1") = (u0,v0,w0)
-  !    vector 2 (from point "1" to point "2") = (u1,v1,w1)
-  !
-  !  Transform so that v2prime = (1,0,0)
-  !  The observer is then at +x in the new system
 
   implicit none
 
@@ -1210,78 +1193,10 @@ subroutine update_Stokes(S,u0,v0,w0,u1,v1,w1, M)
   real(kind=dp), dimension(4,4), intent(in) :: M
   real(kind=dp), dimension(4), intent(inout) :: S
 
-  real :: sinw, cosw, omega, theta, costhet,  xnyp
-  real(kind=dp) :: v1pi, v1pj, v1pk, S1_0
-  real(kind=dp), dimension(4,4) :: ROP, RPO
-  real(kind=dp), dimension(4) :: C, D
-
-
-  ! Transformation for v1prime
-  call rotation(u0,v0,w0,u1,v1,w1,v1pi,v1pj,v1pk)
-
-  ! Calculation of angles for the rotation
-  ! The normal yprime is the cross product of v1prime x v2prime
-  !
-  !  yprimei = 0.0
-  !  yprimej = v1pk
-  !  yprimek = -v1pj
-  xnyp = sqrt(v1pk*v1pk + v1pj*v1pj)
-  if (xnyp < 1e-10) then
-     xnyp = 0.0
-     costhet = 1.0
-  else
-     costhet = -1.0*v1pj / xnyp
-  endif
-
-  ! Calculation of the angle between the normal and the z axis (theta)
-  theta = acos(costhet)
-  if (theta >= pi) theta = 0.0
-
-  ! the scattering plane is at +/- 90deg from the normal
-  theta = theta + half_pi
-
-  ! In the rotation matrices the angle is omega = 2 * theta
-  omega = 2.0 * theta
-
-  ! next if because arccos only goes from 0 a pi only
-  ! The +/- to distinguish the rotation sense
-  if (v1pk < 0.0) omega = -1.0 * omega
-
-  ! Calculation of rotation matrix elements
-  !
-  ! RPO = rotation from the point to the original system
-  ! ROP = rotation from the original system to the point
-  ! (brings the z-axis into the scattering plane)
-  cosw = cos(omega)
-  sinw = sin(omega)
-
-  if (abs(cosw) < 1e-06) cosw = 0.0
-  if (abs(sinw) < 1e-06) sinw = 0.0
-
-  RPO(:,:) = 0.0
-  ROP(:,:) = 0.0
-
-  RPO(1,1) = 1.0
-  ROP(1,1) = 1.0
-  RPO(2,2) = cosw
-  ROP(2,2) = cosw
-
-
-  RPO(2,3) = sinw
-  ROP(3,2) = sinw
-  RPO(3,2) = -1.0 * sinw
-  ROP(2,3) = -1.0 * sinw
-
-  RPO(3,3) = cosw
-  ROP(3,3) = cosw
-  RPO(4,4) = 1.0
-  ROP(4,4) = 1.0
+  real(kind=dp) :: S1_0
 
   S1_0 = S(1)
-  ! Stoke final = RPO * M * ROP * Stoke initial
-  C=matmul(ROP,S)
-  D=matmul(M,C)
-  S=matmul(RPO,D)
+  call scatter_Stokes(S,u0,v0,w0,u1,v1,w1,M)
 
   ! Energy normalization: the photon leaves with the energy it entered with
   ! I outgoing = I incoming if scattered according to s11 (tab_s11=1.0 normalized in mueller2)
@@ -1291,6 +1206,100 @@ subroutine update_Stokes(S,u0,v0,w0,u1,v1,w1, M)
   return
 
 end subroutine update_Stokes
+
+!**********************************************************************
+
+subroutine scatter_Stokes(S,u0,v0,w0,u1,v1,w1, M)
+  ! Stokes vector after a scattering from direction (u0,v0,w0) to (u1,v1,w1), without
+  ! normalisation: S_out = RPO * M * ROP * S_in (see Stokes_rotation_matrices)
+
+  implicit none
+
+  real(kind=dp), intent(in) ::  u0,v0,w0,u1,v1,w1
+  real(kind=dp), dimension(4,4), intent(in) :: M
+  real(kind=dp), dimension(4), intent(inout) :: S
+
+  real(kind=dp), dimension(4,4) :: ROP, RPO
+
+  call Stokes_rotation_matrices(u0,v0,w0,u1,v1,w1, ROP, RPO)
+  S = matmul(RPO, matmul(M, matmul(ROP, S)))
+
+  return
+
+end subroutine scatter_Stokes
+
+!**********************************************************************
+
+subroutine Stokes_rotation_matrices(u0,v0,w0,u1,v1,w1, ROP, RPO)
+  ! Rotation matrices for a scattering from direction (u0,v0,w0) to (u1,v1,w1),
+  ! S_out = RPO * M * ROP * S_in, with M the scattering (Mueller) matrix:
+  !  - ROP rotates the reference frame of the incoming beam into the scattering plane
+  !  - RPO rotates from the scattering plane to the reference frame of the outgoing beam
+  ! The reference frame of a beam is defined by rotation (utils): the direction of
+  ! propagation is x' and z' is the projected z axis. The two rotation angles are
+  ! different in general: one in the frame of each beam. Unchanged by a rotation of
+  ! both directions around the z axis.
+
+  implicit none
+
+  real(kind=dp), intent(in) ::  u0,v0,w0,u1,v1,w1
+  real(kind=dp), dimension(4,4), intent(out) :: ROP, RPO
+
+  real(kind=dp) :: omega, cosw, sinw
+
+  ROP(:,:) = 0.0_dp ; RPO(:,:) = 0.0_dp
+  ROP(1,1) = 1.0_dp ; ROP(4,4) = 1.0_dp
+  RPO(1,1) = 1.0_dp ; RPO(4,4) = 1.0_dp
+
+  ! ROP : from the frame of the incoming beam to the scattering plane
+  omega = scattering_plane_angle(u1,v1,w1, u0,v0,w0)
+  cosw = cos(omega) ; sinw = sin(omega)
+  ROP(2,2) = cosw ; ROP(2,3) = -sinw
+  ROP(3,2) = sinw ; ROP(3,3) = cosw
+
+  ! RPO : from the scattering plane to the frame of the outgoing beam
+  omega = scattering_plane_angle(u0,v0,w0, u1,v1,w1)
+  cosw = cos(omega) ; sinw = sin(omega)
+  RPO(2,2) = cosw ; RPO(2,3) = sinw
+  RPO(3,2) = -sinw ; RPO(3,3) = cosw
+
+  return
+
+end subroutine Stokes_rotation_matrices
+
+!**********************************************************************
+
+real(kind=dp) function scattering_plane_angle(xa,ya,za, xb,yb,zb)
+  ! Rotation angle (2 x the angle between the scattering plane and the reference axis)
+  ! for the Stokes parameters of beam b, in the reference frame of beam b
+  ! (rotation: direction of b is x', projected z axis is z'). (xa,ya,za) is the
+  ! direction of the other beam of the scattering.
+
+  real(kind=dp), intent(in) :: xa,ya,za, xb,yb,zb
+
+  real(kind=dp) :: vi, vj, vk, xnyp, costhet, theta
+
+  ! direction of beam a in the frame of beam b
+  call rotation(xa,ya,za, xb,yb,zb, vi,vj,vk)
+
+  ! The normal to the scattering plane is x' x (vi,vj,vk) = (0, -vk, vj)
+  xnyp = sqrt(vk*vk + vj*vj)
+  if (xnyp < 1e-10_dp) then
+     costhet = 1.0_dp
+  else
+     costhet = -vj / xnyp
+  endif
+
+  ! angle between the normal and the z' axis, the scattering plane is at 90deg
+  theta = acos(max(-1.0_dp, min(1.0_dp, costhet)))
+  if (theta >= pi) theta = 0.0_dp
+  theta = theta + half_pi
+
+  ! the Stokes parameters rotate by twice the angle; acos only gives [0,pi]
+  scattering_plane_angle = 2.0_dp * theta
+  if (vk < 0.0_dp) scattering_plane_angle = -scattering_plane_angle
+
+end function scattering_plane_angle
 
 !**********************************************************************
 
@@ -1311,7 +1320,8 @@ subroutine get_Mueller_matrix_per_grain(lambda,itheta,frac,igrain, M)
   M(2,1) = M(1,2)
   M(3,3) = tab_s33(itheta,igrain,lambda) * frac + tab_s33(itheta-1,igrain,lambda) * frac_m1
   M(4,4) = tab_s44(itheta,igrain,lambda) * frac + tab_s44(itheta-1,igrain,lambda) * frac_m1
-  M(3,4) = -tab_s34(itheta,igrain,lambda)* frac - tab_s34(itheta-1,igrain,lambda) * frac_m1
+  ! Bohren & Huffman sign of s34: V follows the IAU convention (see get_Mueller_matrix_per_cell)
+  M(3,4) = tab_s34(itheta,igrain,lambda)* frac + tab_s34(itheta-1,igrain,lambda) * frac_m1
   M(4,3) = -M(3,4)
 
   return
@@ -1337,7 +1347,12 @@ subroutine get_Mueller_matrix_per_cell(lambda,itheta,frac,icell, M)
   M(2,1) = M(1,2)
   M(3,3) = tab_s33_o_s11_pos(itheta,icell,lambda) * frac +  tab_s33_o_s11_pos(itheta-1,icell,lambda) * frac_m1
   M(4,4) = tab_s44_o_s11_pos(itheta,icell,lambda) * frac +  tab_s44_o_s11_pos(itheta-1,icell,lambda) * frac_m1
-  M(3,4) = -tab_s34_o_s11_pos(itheta,icell,lambda)* frac -  tab_s34_o_s11_pos(itheta-1,icell,lambda) * frac_m1
+  ! Bohren & Huffman sign of s34 (s34 = Im(S2 S1*), exp(-i omega t) amplitudes): with the
+  ! Stokes reference axis along the projected z axis (north in the images), V > 0 when the
+  ! electric field rotates counter-clockwise as seen by the observer, as in the IAU
+  ! convention (Hamaker & Bregman 1996; van Straten et al. 2010). Up to version 4.1.15,
+  ! M(3,4) had the opposite sign, which reversed V only.
+  M(3,4) = tab_s34_o_s11_pos(itheta,icell,lambda)* frac +  tab_s34_o_s11_pos(itheta-1,icell,lambda) * frac_m1
   M(4,3) = -M(3,4)
 
   return
