@@ -782,14 +782,12 @@ end function get_NH
 
 subroutine mcfost_setup()
 
-  character(len=512) :: cmd, s
-  integer ::  syst_status, mcfost_git
+  character(len=512) :: s
+  integer ::  mcfost_git
 
   call get_utils()
   ! Write date of the last time an update was searched for
-  cmd = "rm -rf "//shell_quote(trim(mcfost_utils)//"/.last_update")//" ; date +%s > "&
-       //shell_quote(trim(mcfost_utils)//"/.last_update")
-  call system_call(cmd, syst_status)
+  call write_last_update(0_8)
 
   ! We do not need to download the parameter files if we use the sources
   call get_environment_variable('MCFOST_GIT',s)
@@ -974,9 +972,7 @@ function mcfost_update(lforce_update, lmanual, n_days)
   endif ! lupdate
 
   ! Write date of the last time an update was searched for
-  cmd = "rm -rf "//shell_quote(trim(mcfost_utils)//"/.last_update")//" ; date +%s > "// &
-       shell_quote(trim(mcfost_utils)//"/.last_update")
-  call system_call(cmd, syst_status)
+  call write_last_update(0_8)
 
   mcfost_update = lupdate
 
@@ -1040,9 +1036,6 @@ subroutine exit_update(lmanual, n_days, lupdate)
   integer, intent(in) :: n_days
   logical, intent(out) :: lupdate
 
-  character(len=512) :: cmd, s
-  integer :: syst_status
-
   if (lmanual) then
      write(*,*) "Exiting."
      call exit(1)
@@ -1050,10 +1043,7 @@ subroutine exit_update(lmanual, n_days, lupdate)
      lupdate = .false.
      ! We try again tomorrow : Write date of the last time an update was searched for - (mcfost_auto_update -1) days
      write(*,*) "WARNING: Skipping auto-update. MCFOST will try again tomorrow."
-     write(s,*) (n_days-1) * 3600 * 24
-     cmd = "rm -rf "//shell_quote(trim(mcfost_utils)//"/.last_update")//" ; expr `date +%s` - "&
-          //trim(s)//" > "//shell_quote(trim(mcfost_utils)//"/.last_update")
-     call system_call(cmd, syst_status)
+     call write_last_update(int(n_days-1,kind=8) * 86400_8)
   endif
 
   return
@@ -1627,6 +1617,47 @@ function tmp_filename(name) result(filename)
   filename = trim(tmpdir)//"/mcfost_"//trim(spid)//"_"//trim(name)
 
 end function tmp_filename
+
+!************************************************************
+
+function unix_time()
+  ! Current time in seconds since 1970-01-01 UTC (as "date +%s"), from the C library
+
+  use iso_c_binding, only : c_long, c_ptr, c_null_ptr
+
+  integer(kind=8) :: unix_time
+
+  interface
+     function c_time(tloc) bind(C, name="time") result(t)
+       import :: c_long, c_ptr
+       type(c_ptr), value :: tloc
+       integer(c_long) :: t
+     end function c_time
+  end interface
+
+  unix_time = int(c_time(c_null_ptr), kind=8)
+
+end function unix_time
+
+!************************************************************
+
+subroutine write_last_update(offset)
+  ! Records the time of the last search for an update in the utils directory,
+  ! minus offset seconds (to search again earlier than mcfost_auto_update days)
+
+  integer(kind=8), intent(in) :: offset
+
+  integer :: unit, ios
+
+  open(newunit=unit, file=trim(mcfost_utils)//"/.last_update", status="replace", action="write", iostat=ios)
+  if (ios /= 0) then
+     call warning("cannot write "//trim(mcfost_utils)//"/.last_update")
+     return
+  endif
+  write(unit,'(i0)') unix_time() - offset
+  close(unit)
+
+end subroutine write_last_update
 
 !************************************************************
 

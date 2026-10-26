@@ -293,7 +293,8 @@ subroutine initialisation_mcfost()
   implicit none
 
   integer :: ios, n_args, i_arg, nx, ny, syst_status, imol, i
-  integer :: current_date, update_date, mcfost_auto_update, ntheta, nazimuth, ilen
+  integer :: mcfost_auto_update, ntheta, nazimuth, ilen
+  integer(kind=8) :: current_date, update_date
   real(kind=dp) :: wvl
   real :: opt_zoom, utils_version, PA
 
@@ -352,25 +353,26 @@ subroutine initialisation_mcfost()
   ! sources (MCFOST_GIT=1), which would be replaced by the last release
   mcfost_auto_update = 7
   call get_environment_variable('MCFOST_AUTO_UPDATE',s)
-  if (s/="") read(s,*) mcfost_auto_update
+  if (s/="") then
+     read(s,*,iostat=ios) mcfost_auto_update
+     if (ios /= 0) call error("MCFOST_AUTO_UPDATE must be an integer number of days (0 to disable), got: "//trim(s))
+  endif
   call get_environment_variable('MCFOST_GIT',s)
   if (trim(s)=="1") mcfost_auto_update = 0
 
   if (mcfost_auto_update > 0) then
-     cmd = 'date +%s > date.tmp' ;   call system_call(cmd, syst_status)
-     open(unit=1,file="date.tmp",status="old")
-     read(1,*) current_date
-     close(unit=1,status="delete")
+     current_date = unix_time()
 
+     ! if the file .last_update does not exist or cannot be read, I assume mcfost is old
+     update_date = 0
      if (is_file(trim(mcfost_utils)//"/.last_update")) then
-        open(unit=1,file=trim(mcfost_utils)//"/.last_update",status="old")
-        read(1,*) update_date
-        close(unit=1)
-     else
-        update_date = 0 ! if the file .last_update does not exist, I assume mcfost is old
+        open(unit=1,file=trim(mcfost_utils)//"/.last_update",status="old",iostat=ios)
+        if (ios == 0) read(1,*,iostat=ios) update_date
+        if (ios /= 0) update_date = 0
+        close(unit=1,iostat=ios)
      endif
 
-     if ( (current_date-update_date) > mcfost_auto_update*86400) then
+     if ( (current_date-update_date) > int(mcfost_auto_update,kind=8)*86400_8) then
         write(n_chiffres,fmt="(i4)") ceiling(log10(1.0*mcfost_auto_update))
         fmt1 = '(" Your version of mcfost is more than ", i'//adjustl(trim(n_chiffres))//'," days old")'
         write(*,fmt=fmt1) mcfost_auto_update

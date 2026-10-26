@@ -2,14 +2,17 @@ program test_version
   ! Unit test: version comparison used by the automatic update (utils)
   !  - is_newer_version : a binary is only updated to a newer release, never
   !    downgraded (e.g. a development version not released yet)
+  !  - unix_time : time of the last update check, same as "date +%s"
   ! Built by "make unit_tests" in src/ and run by test_suite/test_unit.py.
   ! Exits with status 1 on failure.
 
-  use utils, only : is_newer_version
+  use utils, only : is_newer_version, unix_time, system_call, shell_quote, tmp_filename
 
   implicit none
 
-  integer :: n_fail, n_test
+  integer :: n_fail, n_test, unit, ios, status
+  integer(kind=8) :: t_shell, t_mcfost
+  character(len=:), allocatable :: tmp
 
   n_fail = 0 ; n_test = 0
 
@@ -21,6 +24,15 @@ program test_version
   call check("newer major",               is_newer_version("5.0.0", "4.9.99"),  .true.)
   call check("missing patch number",      is_newer_version("4.2", "4.1.15"),    .true.)
   call check("missing patch, same",       is_newer_version("4.1", "4.1.0"),     .false.)
+
+  tmp = tmp_filename("date.txt")
+  t_mcfost = unix_time()
+  call system_call("date +%s > "//shell_quote(tmp), status)
+  t_shell = 0
+  open(newunit=unit, file=tmp, status="old", iostat=ios)
+  if (ios == 0) read(unit,*,iostat=ios) t_shell
+  close(unit, status="delete", iostat=ios)
+  call check("unix_time as date +%s", abs(t_shell - t_mcfost) <= 2, .true.)
 
   write(*,'(a,i0,a,i0)') "test_version: failures = ", n_fail, " / ", n_test
   if (n_fail > 0) stop 1
