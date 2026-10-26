@@ -9,7 +9,7 @@ module ProDiMo
   use stars, only : star_spectrum, ProDiMo_star_HR, E_stars, R_ISM
   use read_params
   use sha
-  use utils, only : system_call
+  use utils, only : system_call, shell_quote
   use messages
   use thermal_emission
   use mcfost_env
@@ -1167,7 +1167,6 @@ contains
     ! Create the *.in files for ProDiMo
     ! C. Pinte 17/03/2012
 
-    character(len=512) :: cmd
 
     character(len=128) :: line
     character(len=10) :: fmt
@@ -1179,12 +1178,11 @@ contains
 
     write (*,*) 'Creating directory '//trim(data_ProDiMo)
     ! Copy *.in files ()
-    cmd = 'mkdir -p '//trim(data_ProDiMo)//" ; "// &
-         "cp "//trim(ProDiMo_input_dir)//"/Elements.in "&
-         //trim(ProDiMo_input_dir)//"/LineTransferList.in "&
-         //trim(ProDiMo_input_dir)//"/Reactions.in "&
-         //trim(ProDiMo_input_dir)//"/Species.in "//trim(data_ProDiMo)
-    call system_call(cmd,syst_status)
+    call system_call('mkdir -p '//shell_quote(data_ProDiMo)//" ; "// &
+         "cp "//shell_quote(trim(ProDiMo_input_dir)//"/Elements.in")//" " &
+         //shell_quote(trim(ProDiMo_input_dir)//"/LineTransferList.in")//" " &
+         //shell_quote(trim(ProDiMo_input_dir)//"/Reactions.in")//" " &
+         //shell_quote(trim(ProDiMo_input_dir)//"/Species.in")//" "//shell_quote(data_ProDiMo), syst_status)
 
 
     ! Copy and modify Parameter.in

@@ -3,7 +3,7 @@ module Voronoi_grid
   use constants
   use mcfost_env
   use parameters
-  use utils, only : system_call
+  use utils, only : system_call, shell_quote
   use sort, only : Knuth_shuffle, index_quicksort
   use naleat, only : seed, stream, gtype
   use cylindrical_grid, only : volume
@@ -762,9 +762,9 @@ module Voronoi_grid
     integer :: ios, syst_status
 
     if (operating_system=="Linux ") then
-       cmd = "sha1sum  "//trim(filename)//" > voronoi.sha1"
+       cmd = "sha1sum  "//shell_quote(filename)//" > voronoi.sha1"
     else if (operating_system=="Darwin") then
-       cmd = "openssl sha1 "//trim(filename)//" | awk '{print $2}' > voronoi.sha1"
+       cmd = "openssl sha1 "//shell_quote(filename)//" | awk '{print $2}' > voronoi.sha1"
     else
        write(*,*) "Unknown operatinf system"
        write(*,*) "Can't compute sha1 of "//trim(filename)

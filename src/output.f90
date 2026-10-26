@@ -2941,7 +2941,7 @@ subroutine ecriture_gas_density_hydro_iter(iter)
 
   ! Ensure data_disk directory exists
   if (.not. is_dir(trim(root_dir)//"/"//trim(seed_dir)//"/data_disk")) then
-     cmd = "mkdir -p "//trim(root_dir)//"/"//trim(seed_dir)//"/data_disk"
+     cmd = "mkdir -p "//shell_quote(trim(root_dir)//"/"//trim(seed_dir)//"/data_disk")
      call system_call(cmd, syst_status)
   endif
 

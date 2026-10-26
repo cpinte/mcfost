@@ -1358,6 +1358,10 @@ subroutine write_dust_prop()
 
   real, dimension(:), allocatable :: kappa_lambda,albedo_lambda,g_lambda
   real, dimension(:,:), allocatable :: S11_lambda_theta, pol_lambda_theta, kappa_grain
+  character(len=1024) :: dust_dir
+
+  ! data_dir is data_th at this stage: the directory created by save_data_prop is rebuilt
+  dust_dir = trim(root_dir)//"/"//trim(seed_dir)//"/data_dust"
 
   write(*,*) "Writing dust properties"
   ! Rewrite step2 on top of step1 (we still get step 1 if step 2 does not finish)
@@ -1382,30 +1386,30 @@ subroutine write_dust_prop()
   kappa_lambda=real((kappa(icell,:)*kappa_factor(icell)/AU_to_cm)/(dust_mass(icell)/(volume(icell)*AU_to_cm**3))) ! cm^2/g
   albedo_lambda=tab_albedo_pos(icell,:)
 
-  call cfitsWrite("!data_dust/lambda.fits.gz",real(tab_lambda),shape(tab_lambda))
-  call cfitsWrite("!data_dust/kappa.fits.gz",kappa_lambda,shape(kappa_lambda))
-  call cfitsWrite("!data_dust/albedo.fits.gz",albedo_lambda,shape(albedo_lambda))
+  call cfitsWrite("!"//trim(dust_dir)//"/lambda.fits.gz",real(tab_lambda),shape(tab_lambda))
+  call cfitsWrite("!"//trim(dust_dir)//"/kappa.fits.gz",kappa_lambda,shape(kappa_lambda))
+  call cfitsWrite("!"//trim(dust_dir)//"/albedo.fits.gz",albedo_lambda,shape(albedo_lambda))
 
   if (aniso_method==2) then
      g_lambda=tab_g_pos(icell,:)
-     call cfitsWrite("!data_dust/g.fits.gz",g_lambda,shape(g_lambda))
+     call cfitsWrite("!"//trim(dust_dir)//"/g.fits.gz",g_lambda,shape(g_lambda))
   endif
 
   do l=1, n_lambda
      kappa_grain(l,:) = C_abs(:,l) * mum_to_cm**2 / M_grain(:) ! cm^2/g
   enddo
-  call cfitsWrite("!data_dust/kappa_grain.fits.gz",kappa_grain,shape(kappa_grain)) ! lambda, n_grains
+  call cfitsWrite("!"//trim(dust_dir)//"/kappa_grain.fits.gz",kappa_grain,shape(kappa_grain)) ! lambda, n_grains
 
   do l=1, n_lambda
      S11_lambda_theta(l,:)= tab_s11_pos(:,p_icell,l)
   enddo
-  call cfitsWrite("!data_dust/phase_function.fits.gz",S11_lambda_theta,shape(S11_lambda_theta))
+  call cfitsWrite("!"//trim(dust_dir)//"/phase_function.fits.gz",S11_lambda_theta,shape(S11_lambda_theta))
 
   if (lsepar_pola) then
      do l=1, n_lambda
         pol_lambda_theta(l,:) = -tab_s12_o_s11_pos(:,p_icell,l) ! Already normalized by S11
      enddo
-     call cfitsWrite("!data_dust/polarizability.fits.gz",pol_lambda_theta,shape(pol_lambda_theta))
+     call cfitsWrite("!"//trim(dust_dir)//"/polarizability.fits.gz",pol_lambda_theta,shape(pol_lambda_theta))
   endif
 
   deallocate(kappa_lambda,albedo_lambda,g_lambda,S11_lambda_theta,pol_lambda_theta,kappa_grain)

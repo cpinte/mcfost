@@ -658,11 +658,15 @@ subroutine initialisation_mcfost()
         i_arg = i_arg+1
         if (i_arg > n_args) call error("root_dir needed")
         call get_command_argument(i_arg,s)
-        root_dir=trim(root_dir)//"/"//s
+        if (s(1:1) == "/") then ! absolute path
+           root_dir = s
+        else
+           root_dir=trim(root_dir)//"/"//s
+        endif
         i_arg = i_arg+1
      case("-tmp_dir")
         i_arg = i_arg+1
-        if (i_arg > n_args) call error("root_dir needed")
+        if (i_arg > n_args) call error("tmp_dir needed")
         call get_command_argument(i_arg,tmp_dir)
         i_arg = i_arg+1
      case("-dust_prop")
@@ -2146,30 +2150,14 @@ subroutine save_data_prop(para, base_para)
 
   character(len=*), intent(in) :: para, base_para
 
-  character(len=1024) :: cmd
   integer ::  syst_status
 
   if (is_dir(trim(data_dir))) then
      write(*,*) "Directory "//trim(data_dir)//" already exists! Erasing it..."
-     cmd = 'rm -Rf '//trim(data_dir)
-     call system_call(cmd,syst_status)
+     call system_call('rm -Rf '//shell_quote(data_dir), syst_status)
   endif
 
-  ! Create the data folder
-  write (*,*) 'Creating directory '//trim(data_dir)
-  cmd = 'mkdir -p '//trim(data_dir)//" ; "// &
-       ! copy the parameter file
-       'cp '//trim(para)//' '//trim(data_dir)//" ; "// &
-       ! command line options
-       'echo " " >>  '//trim(data_dir)//'/'//trim(base_para)//" ; "// &
-       'echo "Executed command line : '//trim(cmd_opt)//'" >> '//trim(data_dir)//'/'//trim(base_para)//" ; "// &
-       ! date of calculation
-       'date >> '//trim(data_dir)//'/'//trim(base_para)//" ; "// &
-       ! computing machine
-       'uname -a >> '//trim(data_dir)//'/'//trim(base_para)//" ; "// &
-       ! id SHA
-       'echo sha = '//sha_id//' >> '//trim(data_dir)//'/'//trim(base_para)
-  call system_call(cmd,syst_status)
+  call create_data_dir(data_dir, para, base_para)
 
   return
 
@@ -2187,7 +2175,6 @@ subroutine save_data(para,base_para)
   character(len=*), intent(in) :: para, base_para
 
   integer :: syst_status
-  character(len=1024) :: cmd
 
   logical :: lnew_run, lmove_data
   integer :: etape, etape_start, etape_end
@@ -2199,8 +2186,7 @@ subroutine save_data(para,base_para)
 
   if (lhydrostatic .and. (.not. is_dir(trim(root_dir)//"/"//trim(seed_dir)//"/data_disk"))) then
      write (*,*) 'Creating directory '//trim(root_dir)//'/'//trim(seed_dir)//'/data_disk'
-     cmd = 'mkdir -p '//trim(root_dir)//'/'//trim(seed_dir)//'/data_disk'
-     call system_call(cmd, syst_status)
+     call system_call('mkdir -p '//shell_quote(trim(root_dir)//'/'//trim(seed_dir)//'/data_disk'), syst_status)
   endif
 
   if (lmono0) then
@@ -2261,37 +2247,61 @@ subroutine save_data(para,base_para)
            if (is_dir(trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(local_basename_data_dir)//'_old')) then
               call error('Directory '//trim(local_data_dir)//'_old already exists : exiting!')
            endif
-           cmd = 'mv '//trim(local_data_dir)//' '//trim(local_data_dir)//'_old'
-           call system_call(cmd,syst_status)
+           call system_call('mv '//shell_quote(local_data_dir)//' '//shell_quote(trim(local_data_dir)//'_old'), syst_status)
         endif
      endif
 
      if (lnew_run) then
-        ! Create the data folder
-        write (*,*) 'Creating directory '//trim(local_data_dir)
-        cmd = 'mkdir -p '//trim(local_data_dir)//" ; "// &
-             ! copy the parameter file
-             'cp '//trim(para)//' '//trim(local_data_dir)//" ; "// &
-             ! command line options
-             'echo " " >>  '//trim(local_data_dir)//'/'//trim(base_para)//" ; "// &
-             'echo "Executed command line : '//trim(cmd_opt)//'" >> '//trim(local_data_dir)//'/'//trim(base_para)//" ; "// &
-             ! date of calculation
-             'date >> '//trim(local_data_dir)//'/'//trim(base_para)//" ; "// &
-             ! computing machine
-             'uname -a >> '//trim(local_data_dir)//'/'//trim(base_para)//" ; "// &
-             ! id SHA
-             'echo sha = '//sha_id//' >> '//trim(local_data_dir)//'/'//trim(base_para)
+        call create_data_dir(local_data_dir, para, base_para)
         ! Copy the lambda file if needed
         if (lsed.and.(.not.lsed_complete).and.(.not.lmono0).and.(etape==1)) then
-           cmd = trim(cmd)//' ; cp '//trim(lambda_filename)//' '//trim(local_data_dir)
+           call system_call('cp '//shell_quote(lambda_filename)//' '//shell_quote(local_data_dir), syst_status)
         endif
-        call system_call(cmd,syst_status)
      endif
   enddo ! andape
 
   return
 
 end subroutine save_data
+
+!********************************************************************
+
+subroutine create_data_dir(dir, para, base_para)
+  ! Creates the data directory dir, copies the parameter file into it and appends
+  ! the command line, date, machine and git SHA of the run to the copy.
+  ! Paths are quoted for the shell and the command line is written with Fortran I/O,
+  ! so spaces or shell characters ($, `, ", ;) in user strings are never executed.
+
+  character(len=*), intent(in) :: dir, para, base_para
+
+  character(len=:), allocatable :: para_copy
+  integer :: syst_status, unit, ios
+
+  write (*,*) 'Creating directory '//trim(dir)
+  call system_call('mkdir -p '//shell_quote(dir), syst_status)
+  if (syst_status /= 0) call error("cannot create directory "//trim(dir))
+
+  call system_call('cp '//shell_quote(para)//' '//shell_quote(dir), syst_status)
+  if (syst_status /= 0) call error("cannot copy "//trim(para)//" to "//trim(dir))
+
+  para_copy = trim(dir)//'/'//trim(base_para)
+
+  open(newunit=unit, file=para_copy, status='old', position='append', action='write', iostat=ios)
+  if (ios /= 0) call error("cannot open "//para_copy)
+  write(unit,'(a)') " "
+  write(unit,'(a)') "Executed command line : "//trim(cmd_opt)
+  close(unit)
+
+  call system_call('date >> '//shell_quote(para_copy)//' ; uname -a >> '//shell_quote(para_copy), syst_status)
+
+  open(newunit=unit, file=para_copy, status='old', position='append', action='write', iostat=ios)
+  if (ios /= 0) call error("cannot open "//para_copy)
+  write(unit,'(a)') "sha = "//sha_id
+  close(unit)
+
+  return
+
+end subroutine create_data_dir
 
 !********************************************************************
 

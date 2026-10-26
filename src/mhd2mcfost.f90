@@ -69,7 +69,7 @@ module mhd2mcfost
            call error("Dust not handled yet for pluto models!")
         endif
 
-           cmd = "wc -l "//trim(density_files(1))//" > ntest.txt"
+           cmd = "wc -l < "//shell_quote(density_files(1))//" > ntest.txt"
            call system_call(cmd,syst_status)
            open(unit=1,file="ntest.txt",status="old")
            read(1,*) N_points

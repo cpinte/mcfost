@@ -787,8 +787,8 @@ subroutine mcfost_setup()
 
   call get_utils()
   ! Write date of the last time an update was searched for
-  cmd = "rm -rf "//trim(mcfost_utils)//"/.last_update"//" ; date +%s > "&
-       //trim(mcfost_utils)//"/.last_update"
+  cmd = "rm -rf "//shell_quote(trim(mcfost_utils)//"/.last_update")//" ; date +%s > "&
+       //shell_quote(trim(mcfost_utils)//"/.last_update")
   call system_call(cmd, syst_status)
 
   ! We do not need to download the parameter files if we use the sources
@@ -938,7 +938,7 @@ function mcfost_update(lforce_update, lmanual, n_days)
      call get_command_argument(0,current_binary)
      if (current_binary(1:1)/=".") then
         write(*,'(a28, $)') "Locating current binary ..."
-        cmd = "rm -rf which_mcfost_binary.txt && which "//trim(current_binary)// &
+        cmd = "rm -rf which_mcfost_binary.txt && which "//shell_quote(current_binary)// &
              " | awk '{print "//' "\"" $NF "\""'//"}' > which_mcfost_binary.txt"
         call system_call(cmd, syst_status)
 
@@ -958,7 +958,7 @@ function mcfost_update(lforce_update, lmanual, n_days)
 
      ! make binary executable and update it
      write(*,'(a20, $)') "Updating binary ..."
-     cmd = "chmod a+x mcfost_update/mcfost ; mv mcfost_update/mcfost "//trim(current_binary)//" ; rm -rf mcfost_update"
+     cmd = "chmod a+x mcfost_update/mcfost ; mv mcfost_update/mcfost "//shell_quote(current_binary)//" ; rm -rf mcfost_update"
      call system_call(cmd, syst_status)
      if (syst_status /= 0) then
         write(*,*) "ERROR : the update failed for some unknown reason"
@@ -971,7 +971,8 @@ function mcfost_update(lforce_update, lmanual, n_days)
   endif ! lupdate
 
   ! Write date of the last time an update was searched for
-  cmd = "rm -rf "//trim(mcfost_utils)//"/.last_update"//" ; date +%s > "//trim(mcfost_utils)//"/.last_update"
+  cmd = "rm -rf "//shell_quote(trim(mcfost_utils)//"/.last_update")//" ; date +%s > "// &
+       shell_quote(trim(mcfost_utils)//"/.last_update")
   call system_call(cmd, syst_status)
 
   mcfost_update = lupdate
@@ -1047,8 +1048,8 @@ subroutine exit_update(lmanual, n_days, lupdate)
      ! We try again tomorrow : Write date of the last time an update was searched for - (mcfost_auto_update -1) days
      write(*,*) "WARNING: Skipping auto-update. MCFOST will try again tomorrow."
      write(s,*) (n_days-1) * 3600 * 24
-     cmd = "rm -rf "//trim(mcfost_utils)//"/.last_update"//" ; expr `date +%s` - "&
-          //trim(s)//" > "//trim(mcfost_utils)//"/.last_update"
+     cmd = "rm -rf "//shell_quote(trim(mcfost_utils)//"/.last_update")//" ; expr `date +%s` - "&
+          //trim(s)//" > "//shell_quote(trim(mcfost_utils)//"/.last_update")
      call system_call(cmd, syst_status)
   endif
 
@@ -1277,28 +1278,29 @@ subroutine get_utils()
   if (.not.lok) call error("Cannot get MCFOST UTILS "//trim(utils_version_string())//" from "//trim(utils_url()), &
        msg2="this version may not be released yet")
 
-  cmd = "mkdir -p "//trim(mcfost_utils)//" ; curl -f -s -S -L --retry 3 --retry-delay 5 "// &
-       trim(utils_url())//"mcfost_utils.tgz -o "//trim(tarball)
+  cmd = "mkdir -p "//shell_quote(mcfost_utils)//" ; curl -f -s -S -L --retry 3 --retry-delay 5 "// &
+       trim(utils_url())//"mcfost_utils.tgz -o "//shell_quote(tarball)
   call system_call(cmd, syst_status)
   if (syst_status /= 0) then
-     call system_call("rm -f "//trim(tarball), syst_status)
+     call system_call("rm -f "//shell_quote(tarball), syst_status)
      call error("Error while downloading MCFOST UTILS")
   endif
 
   ! Integrity check: sha1sum (linux), shasum (macOS) or openssl
-  cmd = "{ sha1sum "//trim(tarball)//" || shasum -a 1 "//trim(tarball)//" || openssl sha1 -r "//trim(tarball)// &
-       " ; } 2>/dev/null | awk '{print $1}' > "//trim(tarball)//".sha1"
+  cmd = "{ sha1sum "//shell_quote(tarball)//" || shasum -a 1 "//shell_quote(tarball)// &
+       " || openssl sha1 -r "//shell_quote(tarball)// &
+       " ; } 2>/dev/null | awk '{print $1}' > "//shell_quote(trim(tarball)//".sha1")
   call system_call(cmd, syst_status)
   sha1_local = read_sha1(trim(tarball)//".sha1")
-  call system_call("rm -f "//trim(tarball)//".sha1", syst_status)
+  call system_call("rm -f "//shell_quote(trim(tarball)//".sha1"), syst_status)
   if (sha1_local /= sha1_server) then
-     call system_call("rm -f "//trim(tarball), syst_status)
+     call system_call("rm -f "//shell_quote(tarball), syst_status)
      call error("MCFOST UTILS download is corrupted (sha1 does not match)", &
           msg2="downloaded: "//trim(sha1_local)//", expected: "//trim(sha1_server))
   endif
 
   ! --no-same-owner: files belong to the user even if tar runs as root (e.g. setuid tar)
-  cmd = "tar xzf "//trim(tarball)//" --no-same-owner -C "//trim(mcfost_utils)//" && rm -f "//trim(tarball)
+  cmd = "tar xzf "//shell_quote(tarball)//" --no-same-owner -C "//shell_quote(mcfost_utils)//" && rm -f "//shell_quote(tarball)
   call system_call(cmd, syst_status)
   if (syst_status /= 0) call error("Error while extracting MCFOST UTILS")
 
@@ -1346,12 +1348,12 @@ subroutine get_utils_sha1(sha1, lok)
   integer :: syst_status
 
   filename = trim(mcfost_utils)//"/mcfost_utils.sha1.download"
-  call system_call("mkdir -p "//trim(mcfost_utils)//" ; curl -f -s -S -L --retry 3 --retry-delay 5 "// &
+  call system_call("mkdir -p "//shell_quote(mcfost_utils)//" ; curl -f -s -S -L --retry 3 --retry-delay 5 "// &
        trim(utils_url())//"mcfost_utils.sha1 -o "// &
-       trim(filename), syst_status)
+       shell_quote(filename), syst_status)
   sha1 = ""
   if (syst_status == 0) sha1 = read_sha1(filename)
-  call system_call("rm -f "//trim(filename), syst_status)
+  call system_call("rm -f "//shell_quote(filename), syst_status)
   lok = (len_trim(sha1) == 40)
 
 end subroutine get_utils_sha1
@@ -1547,22 +1549,47 @@ end function in_dir
 !************************************************************
 
 subroutine system_call(cmd, status)
-
-#if defined (__INTEL_COMPILER)
-  use IFPORT, only : system
-#endif
+  ! Runs cmd with the shell. Paths and other user strings must be quoted
+  ! with shell_quote. status: exit status of the command, or -1 if it could not be run
 
   implicit none
 
   character(len=*), intent(in) :: cmd
   integer, intent(out), optional :: status
 
-  status = system(cmd) ! linux
-  !call system(cmd, status) ! aix
+  integer :: exitstat, cmdstat
+
+  exitstat = 0
+  call execute_command_line(cmd, wait=.true., exitstat=exitstat, cmdstat=cmdstat)
+  if (cmdstat /= 0) exitstat = -1
+  if (present(status)) status = exitstat
 
   return
 
 end subroutine system_call
+
+!************************************************************
+
+function shell_quote(str) result(quoted)
+  ! Quotes str as a single shell word: 'str', with each ' written as '\''.
+  ! Nothing inside single quotes is interpreted by the shell (spaces, $, `, ", ;)
+
+  character(len=*), intent(in) :: str
+  character(len=:), allocatable :: quoted
+
+  integer :: i
+
+  quoted = "'"
+  do i=1, len_trim(str)
+     if (str(i:i) == "'") then
+        quoted = quoted//"'\''"
+     else
+        quoted = quoted//str(i:i)
+     endif
+  enddo
+  quoted = quoted//"'"
+
+end function shell_quote
 
 !************************************************************
 
