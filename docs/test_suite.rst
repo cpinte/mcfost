@@ -33,6 +33,9 @@ The parameter files of the benchmark of `Pinte et al. 2009 <https://ui.adsabs.ha
 (very optically thick disc, anisotropic scattering and polarisation, midplane optical depths from 10\ :sup:`3`
 to 10\ :sup:`6`) are in ``test_suite/benchmarks/Pinte2009``. The star of the benchmark is a blackbody: run them
 with the ``-star_bb`` option. See the README in that directory for the model and the comparisons.
+The description of the benchmark and the results of the seven codes of the paper are on the benchmark webpage,
+https://ipag.osug.fr/~pintec/benchmark/index.shtml (formerly at Exeter), and a copy is distributed with the
+MCFOST utils (``benchmarks/Pinte2009``).
 
 The parameter files of the benchmark of `Pascucci et al. 2004 <https://ui.adsabs.harvard.edu/abs/2004A&A...417..793P>`_
 (2D disc with isotropic scattering, visual optical depths from 0.1 to 100) are in

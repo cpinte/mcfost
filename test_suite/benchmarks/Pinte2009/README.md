@@ -35,9 +35,14 @@ spectrum, so use the `-star_bb` option for every run:
 optical depth ("Integ tau in midplane"), which must match the table above.
 
 The benchmark compared temperatures, SEDs, scattered light images and linear
-polarisation maps (circular polarisation was not compared). The results of
-all codes were published at http://www.astro.ex.ac.uk/people/cpinte/benchmark/
-(paper, section 3); that page may no longer be online.
+polarisation maps (circular polarisation was not compared). The description of
+the benchmark and the results of all codes (MCFOST, TORUS, MCMax, Pinball,
+RADMC, ProDiMo, RADICAL; anisotropic, isotropic and no scattering cases) were
+published on the benchmark webpage, first at Exeter
+(http://www.astro.ex.ac.uk/people/cpinte/benchmark/, paper section 3), now at
+https://ipag.osug.fr/~pintec/benchmark/index.shtml. A copy is distributed with
+the MCFOST utils, in `$MCFOST_UTILS/benchmarks/Pinte2009/` (run
+`mcfost -update_utils` if the directory is missing).
 
 The photon numbers are those used for MCFOST tests, not the values of the
 paper (not specified there): increase `nbr_photons_image` for Monte Carlo
