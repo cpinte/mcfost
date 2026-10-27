@@ -71,3 +71,11 @@ cuts along the major and minor axes (15 % up to 64 deg, medians 14 %), and the
 flux-weighted linear polarisation degree (24 %: MCMax is 10-20 % lower, the
 MCFOST 2009 maps, computed before the 2026 fix of multiple scattering, about
 8 % higher).
+
+`test_mcfost.py::test_pinte2009_temperature` (long test suite) runs the
+tau = 1e3 model with isotropic scattering (`-isotropic`) and without scattering
+(`-no_scattering`), and compares the midplane temperatures and the vertical cuts
+at 0.2 and 200 au with RADMC, ProDiMo, TORUS and MCFOST 2009 (isotropic) and
+RADICAL, ProDiMo and MCFOST 2009 (no scattering): medians within 3 %, largest
+differences 14 % (isotropic) and 18 % (no scattering, near the edges of the disc
+where the RADICAL and ProDiMo grids are coarser).

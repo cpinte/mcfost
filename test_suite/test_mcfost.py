@@ -706,6 +706,83 @@ def _check_pinte2009_images(root_dir, results):
             assert abs(P_mean/P_mean_ref - 1) < 0.30, f"polarisation degree differs from {code} at i = {incl} deg"
 
 
+# Pinte et al. 2009 benchmark, temperatures with isotropic scattering (compared with RADMC,
+# ProDiMo, TORUS and MCFOST 2009) and without scattering (RADICAL, ProDiMo, MCFOST 2009),
+# tau = 1e3. Largest differences with MCFOST 4.1.16 (October 2026): medians 3 %, points
+# 14 % (isotropic, ProDiMo at 200 au) and 18 % (no scattering, ProDiMo and RADICAL near
+# the inner and outer edges, where their grids are coarser).
+def _read_radmc_struct(filename):
+    # RADMC / RADICAL structure file: spherical grid (r [cm], theta from the pole [rad]) and
+    # temperature array (ir, itheta); returns the midplane temperature profile (r [au], T [K])
+    blocks = {}
+    key = None
+    for line in open(filename):
+        if line.startswith("#"):
+            key = line.strip("# \n")
+            blocks[key] = []
+        else:
+            blocks[key].extend(float(x) for x in line.split())
+    nr, nt = (int(x) for x in blocks["NR,NT"])
+    r = np.array(blocks["Spherical radius grid [cm] (middle of cell)"]) / 1.495978707e13
+    theta = np.array(blocks["Theta grid [rad, from pole] (middle of cell)"])
+    T = np.array(blocks["Temperature array (for ir=0,nr-1 do for it=0,nt-1 do ...)"]).reshape(nr, nt)
+    return r, T[:, np.argmin(abs(theta - np.pi/2))]
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("case, opt", [("iso", "-isotropic"), ("no_scatt", "-no_scattering")])
+def test_pinte2009_temperature(case, opt):
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    utils = os.environ.get("MCFOST_UTILS", os.path.join("..", "utils"))
+    results = os.path.join(utils, "benchmarks", "Pinte2009")
+    if not os.path.isdir(results):
+        pytest.skip("Pinte 2009 results not found in the MCFOST utils (mcfost -update_utils)")
+
+    root_dir = "Pinte2009_tau=1e3_"+case
+    clean_results(root_dir)
+    run_mcfost("benchmarks/Pinte2009/Pinte2009_tau=1e3.para", root_dir, "-star_bb +disk_struct "+opt, timeout=3600)
+    T = fits.getdata(root_dir+"/data_th/Temperature.fits.gz").astype(np.float64) # (z, r)
+    grid = fits.getdata(root_dir+"/data_disk/grid.fits.gz")
+    r = grid[0,0,0,:]
+
+    def load(filename, skip=0):
+        return np.loadtxt(results+"/"+filename, comments="#", skiprows=skip)
+
+    prodimo = "prodimo/tau=1e3_"+case+"/T/ProDiMo_ltau3_"
+    mcfost09 = "mcfost/tau=1e3_"+case+"/T/"
+    midplane = {"ProDiMo": load(prodimo+"z0.0.dat")[:,[0,2]], "MCFOST 2009": load(mcfost09+"Radial_temp_tau=1e3.txt")}
+    if case == "iso":
+        midplane["RADMC"] = np.transpose(_read_radmc_struct(results+"/radmc/tau=1e3_iso/T/struct_3E-8.out"))
+        midplane["TORUS"] = load("torus/tau=1e3_iso/T/tau=1e3_iso_radial.dat")
+    else:
+        midplane["RADICAL"] = np.transpose(_read_radmc_struct(results+"/radical/tau=1e3_no_scatt/T/struct_3E-8_noscat_radical.out"))
+    # vertical cuts (z [au], T [K]); ProDiMo files have 2 header lines without "#"
+    vertical = {(0.2, "ProDiMo"): load(prodimo+"r0.2.dat", 2)[:,[1,2]],
+                (200., "ProDiMo"): load(prodimo+"r200.dat", 2)[:,[1,2]],
+                (0.2, "MCFOST 2009"): load(mcfost09+"Vertical_temp_R=0.2AU_tau=1e3.txt"),
+                (200., "MCFOST 2009"): load(mcfost09+"Vertical_temp_R=200AU_tau=1e3.txt")}
+
+    for code, ref in midplane.items():
+        ref = ref[(ref[:,0] >= r.min()) & (ref[:,0] <= r.max())]
+        ratio = np.interp(np.log(ref[:,0]), np.log(r), T[0,:]) / ref[:,1]
+        print(code, "midplane temperature ratio:", ratio.min(), ratio.max(), "median", np.median(ratio))
+        assert abs(np.median(ratio) - 1) < 0.05, f"midplane temperature differs from {code}"
+        assert np.all(abs(ratio - 1) < 0.25), f"midplane temperature differs from {code}"
+
+    for (R, code), ref in vertical.items():
+        i = np.searchsorted(r, R)
+        f = np.log(R/r[i-1]) / np.log(r[i]/r[i-1])
+        z = np.exp((1-f) * np.log(grid[1,0,:,i-1]) + f * np.log(grid[1,0,:,i]))
+        T_R = (1-f) * T[:,i-1] + f * T[:,i]
+        z_ref = abs(ref[:,0])
+        mask = (z_ref >= z.min()) & (z_ref <= z.max())
+        ratio = np.interp(np.log(z_ref[mask]), np.log(z), T_R) / ref[mask,1]
+        print(code, "temperature ratio at R =", R, "au:", ratio.min(), ratio.max(), "median", np.median(ratio))
+        assert abs(np.median(ratio) - 1) < 0.05, f"temperature at R = {R} au differs from {code}"
+        assert np.all(abs(ratio - 1) < 0.25), f"temperature at R = {R} au differs from {code}"
+
+
 def test_sublimation_image():
     # An image run after a temperature run with dust sublimation must read back
     # the sublimation radius and use the same inner radius as the temperature run
