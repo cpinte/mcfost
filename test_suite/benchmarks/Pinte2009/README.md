@@ -47,3 +47,19 @@ the MCFOST utils, in `$MCFOST_UTILS/benchmarks/Pinte2009/` (run
 The photon numbers are those used for MCFOST tests, not the values of the
 paper (not specified there): increase `nbr_photons_image` for Monte Carlo
 images and polarisation at high inclinations.
+
+## Tests
+
+`test_mcfost.py::test_pinte2009_benchmark` (long test suite, `pytest --run-slow`)
+runs the tau = 1e3 and 1e6 models and compares the SEDs at the 10 inclinations
+with MCMax and MCFOST 2009, the midplane temperatures with MCMax, TORUS and
+MCFOST 2009, and the vertical temperatures at 0.2 and 200 au with MCMax and
+MCFOST 2009. The tau = 1e6 model is run with `-diff_approx`: the temperature of
+the optically thick midplane, not reached by the packets, is computed with the
+diffusion approximation (it is set to 1 K otherwise). Largest differences
+(MCFOST 4.1.16, October 2026):
+
+| Optical depth | SED per wavelength (i <= 70-76 deg) | SED median, all inclinations | Temperatures |
+|---|---|---|---|
+| 1e3 | 16 % | 8 % (81.4 deg) | 7.6 % |
+| 1e6 | 32 % (short wavelengths, 18 deg) | 3 % | 19 % (inner au, MCMax and TORUS) |
