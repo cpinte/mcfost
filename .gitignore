@@ -14,6 +14,7 @@ lib/include/*
 lib/lib/*
 src/libtmp/*
 src/.make_lastsystem
+src/.depend
 src/mcfost
 src/operating_system.f90
 src/sha.f90

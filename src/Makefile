@@ -270,7 +270,16 @@ OBJECTS= $(SOURCES:.f90=.o)
 # Compile
 main : mcfost
 
-#include .depend
+# Module dependencies (a.o : b.o when a.f90 uses a module of b.f90), generated from
+# the sources so that a parallel build (make -j) compiles each module first
+DEP_SOURCES = $(foreach f,$(SOURCES) mcfost.f90 mcfost2phantom.f90,$(firstword $(wildcard $(f) $(gdir)/$(f))))
+
+.depend : make_depend.sh $(DEP_SOURCES)
+	sh make_depend.sh $(DEP_SOURCES) > .depend
+
+ifeq (,$(filter clean cleanall cleandata cleandata_dust cleanGasmod,$(MAKECMDGOALS)))
+-include .depend
+endif
 
 all : mcfost libmcfost.a
 
@@ -374,7 +383,7 @@ release_utils :
 .PHONY : clean cleandata cleandata_dust cleanall
 
 clean :
-	rm -rf *.o $(gdir)/*.o *.mod _dust_prop*.tmp _voronoi.tmp *.i90 operating_system.f90 system.o libmcfost.a $(UNIT_TESTS)
+	rm -rf *.o $(gdir)/*.o *.mod _dust_prop*.tmp _voronoi.tmp *.i90 operating_system.f90 system.o libmcfost.a $(UNIT_TESTS) .depend
 	if test $(MCFOST_GIT) = 1 ; then rm -rf sha.f90; fi
 
 cleandata :
