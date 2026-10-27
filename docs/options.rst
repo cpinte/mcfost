@@ -208,13 +208,16 @@ specified wavelength and stops
 
 ``-aggregate <GMM_input_file> <GMM_output_file>``
 
-``-optical_depth_map``, ``-od``: generates a map of integrated optical depths from the centre of each cell.
+``-optical_depth_to_cell``, ``-tau_to_cell``: generates a map of integrated optical depths from the centre of each cell.
 4 directions are considered. In order: towards the star, +z, -z and +x.
-Results are stored in ``optical_depth_map.fits.gz``
+Results are stored in ``optical_depth_to_cell.fits.gz`` in the data directory
+
+``-optical_depth_map``, ``-tau_map``: map of the optical depth along the line of sight for each pixel of the image,
+stored in ``tau_map.fits.gz`` in the data directory
 
 ``-average_grain_size``: computes average grain size in each cell,
 weighted by their geometrical cross-section;
-Results are stored in ``average_grain_size.fits.gz``
+Results are stored in ``average_grain_size.fits.gz`` in the data directory
 
 ``-HG``: uses an Heynyey-Greenstein function
 

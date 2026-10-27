@@ -344,8 +344,9 @@ operating_system.f90 : sha.o
 		>> operating_system.f90
 	printf "end module os\n" >> operating_system.f90
 
-mcfost2prodimo :  mcfost mcfost2prodimo.o
-	$(FF) $(FFLAGS_EXE) -o mcfost2prodimo mcfost2prodimo.f90 $(LIBS_FITS)
+# Reads data_th/forProDiMo.fits.gz (written with -prodimo) and prints its content
+mcfost2prodimo : mcfost2prodimo.f90 libmcfost.a
+	$(FC) $(FFLAGS) -I. mcfost2prodimo.f90 -o mcfost2prodimo libmcfost.a $(LDFLAGS)
 
 #------------------------------------------------------------------------------#
 # Release
@@ -383,7 +384,7 @@ release_utils :
 .PHONY : clean cleandata cleandata_dust cleanall
 
 clean :
-	rm -rf *.o $(gdir)/*.o *.mod _dust_prop*.tmp _voronoi.tmp *.i90 operating_system.f90 system.o libmcfost.a $(UNIT_TESTS) .depend
+	rm -rf *.o $(gdir)/*.o *.mod _dust_prop*.tmp _voronoi.tmp *.i90 operating_system.f90 system.o libmcfost.a $(UNIT_TESTS) .depend mcfost2prodimo
 	if test $(MCFOST_GIT) = 1 ; then rm -rf sha.f90; fi
 
 cleandata :

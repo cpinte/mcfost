@@ -199,7 +199,7 @@ containing only a copy of the parameter file.
 Optical depth maps
 ^^^^^^^^^^^^^^^^^^
 
-Using the option ``-optical_depth_map`` or ``-od`` (in combination with ``-img``), mcfost will generate a fits file ``optical_depth_map.fits.gz`` of dimensions (n_rad, nz, n_az, 2) giving for the each cell the optical depth at the selected wavelentgh from the centre of the cell to r=0 and z=+infinity. When used in SED mode, the optical depth map will be computed at the wavelength closest to I band (e.g. 0.81 micron).
+Using the option ``-optical_depth_to_cell`` or ``-tau_to_cell`` (in combination with ``-img``), mcfost will generate a fits file ``optical_depth_to_cell.fits.gz`` in the data directory, of dimensions (n_rad, nz, n_az, 2) giving for the each cell the optical depth at the selected wavelentgh from the centre of the cell to r=0 and z=+infinity. When used in SED mode, the optical depth map will be computed at the wavelength closest to I band (e.g. 0.81 micron).
 
 Note that this option does not work yet when using a Voronoi mesh, the current implmentation only works for the rgular grids.
 

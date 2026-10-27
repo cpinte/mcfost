@@ -1540,9 +1540,7 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         lwrite_abundance=.true.
       case default
-        write(*,*) "Error: unknown option: "//trim(s)
-        write(*,*) "Use 'mcfost -h' to get list of available options"
-        call exit(0)
+        call error("unknown option: "//trim(s), msg2="Use 'mcfost -h' to get list of available options")
      end select
   enddo ! while
 
