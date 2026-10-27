@@ -3,7 +3,8 @@
 Parameter files for the 2D continuum radiative transfer
 benchmark of Pascucci et al. 2004, A&A 417, 793 (arXiv:astro-ph/0402357):
 temperature structure and SED of a passive disc with isotropic scattering, for
-visual optical depths from 0.1 to 100. The parameter files are the version 3.0
+visual optical depths from 0.1 to 100. MCFOST was first validated on this
+benchmark in Pinte et al. 2006, A&A 459, 797. The parameter files are the version 3.0
 files used for MCFOST previously (`src/Pascucci_3.0*.para`), converted to the
 4.1 format.
 
@@ -66,23 +67,20 @@ between codes; see the headers of the files and the paper for units.
 
 The SEDs in `allseds.dat` (RADMC, RADICAL) are lambda L_lambda in erg/s:
 MCFOST `sed_rt.fits.gz` (lambda F_lambda in W/m2 at 140 pc) multiplied by
-1e3 x 4 pi d^2. Check with MCFOST 4.1.16 and the tabulated cross-sections (`Pascucci_tau=1.para`,
-27/10/2026),
-median ratio MCFOST / reference:
+1e3 x 4 pi d^2. Largest differences with MCFOST 4.1.16 (27/10/2026), all
+wavelengths and both inclinations, MCFOST / RADMC and MCFOST / RADICAL:
 
-| Inclination | < 1 um | 1-10 um | 10-100 um | > 100 um |
+| Optical depth | SED vs RADMC | SED vs RADICAL | RADMC vs RADICAL | Midplane temperature |
 |---|---|---|---|---|
-| 12.5 deg (RADMC, RADICAL) | 0.90 | 0.98 | 1.02 | 1.03 |
-| 77.5 deg (RADMC, RADICAL) | 1.06 | 0.98 | 1.02 | 1.05 |
-
-The difference below 1 um is not explained yet: it is the same with the Mie
-cross-sections, and the direct stellar flux of MCFOST is within 2 % of the
-blackbody at these wavelengths.
+| 0.1 | 3.9 % | 3.9 % | 1.5 % | 2.1 % |
+| 1   | 8.1 % | 4.4 % | 7.7 % | 2.7 % |
+| 10  | 15.6 % | 9.1 % | 23 % | 3.9 % |
+| 100 (>= 1 um) | 11.8 % | 15.6 % | 7 % | 9.8 % |
 
 ## Tests
 
 `test_mcfost.py::test_pascucci_benchmark` runs these models and compares the
-SEDs above 1 um and the midplane temperatures with RADMC and RADICAL:
+SEDs and the midplane temperatures with RADMC and RADICAL:
 tau = 0.1 and 1 in the default test suite (pull requests), tau = 10 and 100
 with `pytest --run-slow`. The tests are skipped if the results are not in the
 utils.

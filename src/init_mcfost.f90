@@ -440,6 +440,9 @@ subroutine initialisation_mcfost()
   ! Benchmarks: selected by the name of the parameter file (without its directory)
   if (base_para(1:8)=="Pascucci") then
      lbenchmark_Pascucci = .true.
+     ! isotropic scattering, set here so that aniso_method is set accordingly below (the
+     ! ray-tracing used the Mie phase function while the Monte Carlo scattered isotropically)
+     lisotropic = .true.
      write(*,*) "Running Pascucci et al 2004 benchmark"
   else if (base_para(1:13)=="vanZadelhoff1") then
      lbenchmark_vanZadelhoff1 = .true.

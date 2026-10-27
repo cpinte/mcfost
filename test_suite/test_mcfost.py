@@ -502,15 +502,15 @@ def test_mdot_option():
 # Pascucci et al. 2004 benchmark: SEDs and midplane temperatures compared with the
 # RADMC and RADICAL results of the paper (distributed with the MCFOST utils).
 # Optically thin cases run for every pull request, optically thick ones with --run-slow.
-# Wavelengths below 1 um are not compared yet (X54: scattered light differs by up to
-# 15-20 %). Largest differences with MCFOST 4.1.16 (October 2026), SED and midplane
-# temperature: 4.4 % and 2.7 % (tau <= 1), 9.1 % and 3.9 % (tau = 10), 15.6 % and 9.8 %
-# (tau = 100, where RADMC and RADICAL differ by up to 7 %).
+# Largest differences with MCFOST 4.1.16 (October 2026), SED (all wavelengths, >= 1 um
+# for tau = 100 where some RADMC optical fluxes are 0) and midplane temperature: 3.9 % and
+# 2.1 % (tau = 0.1), 8.1 % and 2.7 % (tau = 1), 15.6 % and 3.9 % (tau = 10), 15.6 % and
+# 9.8 % (tau = 100); RADMC and RADICAL differ by up to 8, 23 and 7 % for tau = 1, 10, 100.
 _pascucci_cases = [
-    pytest.param("0.1", "01tau", 0.06, 0.05),
-    pytest.param("1", "1tau", 0.06, 0.05),
-    pytest.param("10", "10tau", 0.12, 0.06, marks=pytest.mark.slow),
-    pytest.param("100", "100tau", 0.20, 0.12, marks=pytest.mark.slow),
+    pytest.param("0.1", "01tau", 0.06, 0.0, 0.05),
+    pytest.param("1", "1tau", 0.10, 0.0, 0.05),
+    pytest.param("10", "10tau", 0.20, 0.0, 0.06, marks=pytest.mark.slow),
+    pytest.param("100", "100tau", 0.20, 1.0, 0.12, marks=pytest.mark.slow),
 ]
 
 
@@ -525,8 +525,8 @@ def _read_pascucci_seds(filename):
     return np.array([[float(x) for x in r[:3]] for r in rows if len(r) >= 3])
 
 
-@pytest.mark.parametrize("tau, ref_dir, sed_tol, temp_tol", _pascucci_cases)
-def test_pascucci_benchmark(tau, ref_dir, sed_tol, temp_tol):
+@pytest.mark.parametrize("tau, ref_dir, sed_tol, lambda_min, temp_tol", _pascucci_cases)
+def test_pascucci_benchmark(tau, ref_dir, sed_tol, lambda_min, temp_tol):
     if not compute_models:
         pytest.skip("Only run when computing models")
     results = _pascucci_results_dir()
@@ -553,8 +553,8 @@ def test_pascucci_benchmark(tau, ref_dir, sed_tol, temp_tol):
             # lambda.F_lambda [W/m2] at 140 pc -> lambda.L_lambda [erg/s]
             l_lambda = sed[0,0,k,:] * 1e3 * 4*np.pi * distance**2
             ratio = l_lambda / ref_incl[:,2]
-            mask = ref_incl[:,0] >= 1.0
-            print(code, "i =", incl, "SED ratio (>= 1 um):", ratio[mask].min(), ratio[mask].max())
+            mask = ref_incl[:,0] >= lambda_min
+            print(code, "i =", incl, "SED ratio:", ratio[mask].min(), ratio[mask].max())
             assert np.all(abs(ratio[mask] - 1) < sed_tol), \
                 f"SED differs from {code} at i = {incl} deg by more than {sed_tol}"
 
