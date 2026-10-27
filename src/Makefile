@@ -187,7 +187,7 @@ endif
 
 ifeq ($(OPENMP), yes)
     FFLAGS+= ${FOMPFLAGS}
-    CCLAGS+= ${FOMPFLAGS}
+    CCFLAGS+= ${COMPFLAGS}
 endif
 
 ifeq ($(IPO), yes)
