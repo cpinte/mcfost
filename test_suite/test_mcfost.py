@@ -583,6 +583,11 @@ def test_pascucci_benchmark(tau, ref_dir, sed_tol, lambda_min, temp_tol):
 #   the disc surface);
 # - temperatures inside the disc: 7.6 % (tau = 1e3), 19 % (tau = 1e6, inner au, where
 #   MCMax and TORUS differ by a similar amount).
+# tau = 1e6 also compares the 1 um images (stellar pixels excluded) with MCMax and MCFOST 2009
+# at the 10 inclinations, and TORUS at 70 and 87 deg: scattered flux 7.5 % (MCMax), cuts
+# along the major axis 15 % (i <= 64 deg) and medians of the major and minor axis cuts 14 %,
+# flux-weighted linear polarisation degree 24 % (MCMax is 10-20 % lower, MCFOST 2009 before
+# the multiple scattering fix of 2026 about 8 % higher).
 _pinte2009_cases = [
     pytest.param("1e3", 76.0, 0.25, 0.12, "", marks=pytest.mark.slow),
     pytest.param("1e6", 70.0, 0.40, 0.25, "-diff_approx", marks=pytest.mark.slow),
@@ -653,6 +658,52 @@ def test_pinte2009_benchmark(tau, incl_max, sed_tol, temp_tol, opt):
             ratio = np.interp(np.log(z_ref[mask]), np.log(z), T_R) / ref[mask,1]
             print(code, "temperature ratio at R =", R, "au:", ratio.min(), ratio.max())
             assert np.all(abs(ratio - 1) < temp_tol), f"temperature at R = {R} au differs from {code}"
+
+    if tau == "1e6":
+        _check_pinte2009_images(root_dir, results)
+
+
+def _check_pinte2009_images(root_dir, results):
+    # 1 um images and linear polarisation degree of the tau = 1e6 model
+    run_mcfost("benchmarks/Pinte2009/Pinte2009_tau=1e6.para", root_dir, "-star_bb -img 1.0", timeout=3600)
+    image = fits.getdata(root_dir+"/data_1.0/RT.fits.gz").astype(np.float64) # (Stokes, az, incl, y, x)
+    c = image.shape[-1] // 2
+
+    def properties(I, P):
+        # stellar pixels excluded; cuts averaged over 5 pixels along the major (x) and minor (y) axes
+        disc = I.copy()
+        disc[c-3:c+4,c-3:c+4] = 0.0
+        flux = disc.sum()
+        return flux, disc[c-2:c+3,:].mean(axis=0), disc[:,c-2:c+3].mean(axis=1), np.sum(P * disc) / flux
+
+    for k, incl in enumerate(_pinte2009_inclinations):
+        n = round(np.degrees(np.arccos(0.95 - 0.1*k)))
+        I = image[0,0,k]
+        P = np.sqrt(image[1,0,k]**2 + image[2,0,k]**2) / np.maximum(I, 1e-300)
+        flux, major, minor, P_mean = properties(I, P)
+        refs = [("MCFOST 2009", "mcfost/tau=1e6_aniso/images/intensity_map_inc{:03d}.fits.gz".format(n),
+                 "mcfost/tau=1e6_aniso/pola/linear_polarization_map_inc{:03d}.fits.gz".format(n), 1.0),
+                ("MCMax", "mcmax/tau=1e6_aniso/images/ImageF_i"+incl+"_l00001.00_fov00900.0.fits",
+                 "mcmax/tau=1e6_aniso/pola/ImageP_i"+incl+"_l00001.00_fov00900.0.fits", 1.0)]
+        if n in (70, 87): # TORUS: polarisation degree in %
+            refs.append(("TORUS", "torus/tau=1e6_aniso/images/tau=1e6_aniso_inc{:03d}_natural_image001.fits".format(n),
+                         "torus/tau=1e6_aniso/pola/tau=1e6_aniso_inc{:03d}_natural_pol001.fits".format(n), 0.01))
+        for code, image_file, pola_file, P_unit in refs:
+            I_ref = fits.getdata(results+"/"+image_file).astype(np.float64)
+            P_ref = fits.getdata(results+"/"+pola_file).astype(np.float64) * P_unit
+            flux_ref, major_ref, minor_ref, P_mean_ref = properties(I_ref, P_ref)
+            print(code, "i =", incl, "scattered flux ratio:", flux/flux_ref, "polarisation:", P_mean, P_mean_ref)
+            assert abs(flux/flux_ref - 1) < 0.10, f"1 um scattered flux differs from {code} at i = {incl} deg"
+            if code == "TORUS" and n == 87: # cuts and polarisation not consistent with the other codes
+                continue
+            for name, cut, cut_ref in [("major", major, major_ref), ("minor", minor, minor_ref)]:
+                mask = cut_ref > 1e-2 * cut_ref.max()
+                ratio = cut[mask] / cut_ref[mask]
+                print(code, "i =", incl, name, "axis cut ratio:", ratio.min(), ratio.max(), "median", np.median(ratio))
+                assert abs(np.median(ratio) - 1) < 0.20, f"{name} axis cut differs from {code} at i = {incl} deg"
+                if name == "major" and float(incl) <= 64:
+                    assert np.all(abs(ratio - 1) < 0.15), f"major axis cut differs from {code} at i = {incl} deg"
+            assert abs(P_mean/P_mean_ref - 1) < 0.30, f"polarisation degree differs from {code} at i = {incl} deg"
 
 
 def test_sublimation_image():

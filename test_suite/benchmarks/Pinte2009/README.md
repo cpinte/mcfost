@@ -63,3 +63,11 @@ diffusion approximation (it is set to 1 K otherwise). Largest differences
 |---|---|---|---|
 | 1e3 | 16 % | 8 % (81.4 deg) | 7.6 % |
 | 1e6 | 32 % (short wavelengths, 18 deg) | 3 % | 19 % (inner au, MCMax and TORUS) |
+
+For tau = 1e6, the test also computes the 1 um image and compares it with
+MCMax and MCFOST 2009 at the 10 inclinations (and TORUS at 70 and 87 deg),
+excluding the stellar pixels: scattered flux (largest difference 7.5 %, MCMax),
+cuts along the major and minor axes (15 % up to 64 deg, medians 14 %), and the
+flux-weighted linear polarisation degree (24 %: MCMax is 10-20 % lower, the
+MCFOST 2009 maps, computed before the 2026 fix of multiple scattering, about
+8 % higher).
