@@ -659,7 +659,7 @@ contains
     use disk_physics, only : compute_othin_sublimation_radius
     use mem
     use elements_type, only : wght_per_H, read_abundance
-    use grid, only : alloc_atomrt_grid, nHtot, ne, v_char, lmagnetized, vturb, T, icompute_atomRT, lcalc_ne, &
+    use grid, only : alloc_atomrt_grid, nHtot, ne, v_char, vturb, T, icompute_atomRT, lcalc_ne, &
          check_for_zero_electronic_density
 
     integer, intent(in) :: n_SPH
