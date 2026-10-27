@@ -78,3 +78,11 @@ median ratio MCFOST / reference:
 The difference below 1 um is not explained yet: it is the same with the Mie
 cross-sections, and the direct stellar flux of MCFOST is within 2 % of the
 blackbody at these wavelengths.
+
+## Tests
+
+`test_mcfost.py::test_pascucci_benchmark` runs these models and compares the
+SEDs above 1 um and the midplane temperatures with RADMC and RADICAL:
+tau = 0.1 and 1 in the default test suite (pull requests), tau = 10 and 100
+with `pytest --run-slow`. The tests are skipped if the results are not in the
+utils.

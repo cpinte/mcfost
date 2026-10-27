@@ -499,6 +499,78 @@ def test_mdot_option():
     assert "Mdot=" in stdout
 
 
+# Pascucci et al. 2004 benchmark: SEDs and midplane temperatures compared with the
+# RADMC and RADICAL results of the paper (distributed with the MCFOST utils).
+# Optically thin cases run for every pull request, optically thick ones with --run-slow.
+# Wavelengths below 1 um are not compared yet (X54: scattered light differs by up to
+# 15-20 %). Largest differences with MCFOST 4.1.16 (October 2026), SED and midplane
+# temperature: 4.4 % and 2.7 % (tau <= 1), 9.1 % and 3.9 % (tau = 10), 15.6 % and 9.8 %
+# (tau = 100, where RADMC and RADICAL differ by up to 7 %).
+_pascucci_cases = [
+    pytest.param("0.1", "01tau", 0.06, 0.05),
+    pytest.param("1", "1tau", 0.06, 0.05),
+    pytest.param("10", "10tau", 0.12, 0.06, marks=pytest.mark.slow),
+    pytest.param("100", "100tau", 0.20, 0.12, marks=pytest.mark.slow),
+]
+
+
+def _pascucci_results_dir():
+    utils = os.environ.get("MCFOST_UTILS", os.path.join("..", "utils"))
+    return os.path.join(utils, "benchmarks", "Pascucci2004")
+
+
+def _read_pascucci_seds(filename):
+    # lambda [um], inclination [deg], lambda.L_lambda [erg/s]; 2 header lines (n_lambda, n_incl)
+    rows = [l.split() for l in open(filename) if l.strip() and not l.lstrip().startswith(";")][2:]
+    return np.array([[float(x) for x in r[:3]] for r in rows if len(r) >= 3])
+
+
+@pytest.mark.parametrize("tau, ref_dir, sed_tol, temp_tol", _pascucci_cases)
+def test_pascucci_benchmark(tau, ref_dir, sed_tol, temp_tol):
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    results = _pascucci_results_dir()
+    if not os.path.isdir(results):
+        pytest.skip("Pascucci 2004 results not found in the MCFOST utils (mcfost -update_utils)")
+
+    root_dir = "Pascucci2004_tau="+tau
+    clean_results(root_dir)
+    # the benchmark mode (isotropic scattering, tabulated cross-sections) is selected by the
+    # name of the parameter file; +disk_struct writes the grid for the temperature comparison
+    run_mcfost("benchmarks/Pascucci2004/Pascucci_tau="+tau+".para", root_dir, "-star_bb +disk_struct",
+               timeout=3600)
+
+    sed = fits.getdata(root_dir+"/data_th/sed_rt.fits.gz").astype(np.float64)
+    temperature = fits.getdata(root_dir+"/data_th/Temperature.fits.gz").astype(np.float64)
+    r_midplane = fits.getdata(root_dir+"/data_disk/grid.fits.gz")[0,0,0,:] # au
+
+    au_to_cm = 1.495978707e13
+    distance = 140 * 3.0856775814913673e18 # cm
+    for code in ["RADMC", "RADICAL"]:
+        ref = _read_pascucci_seds(results+"/"+code+"/"+ref_dir+"/allseds.dat")
+        for k, incl in enumerate([12.5, 77.5]):
+            ref_incl = ref[ref[:,1] == incl]
+            # lambda.F_lambda [W/m2] at 140 pc -> lambda.L_lambda [erg/s]
+            l_lambda = sed[0,0,k,:] * 1e3 * 4*np.pi * distance**2
+            ratio = l_lambda / ref_incl[:,2]
+            mask = ref_incl[:,0] >= 1.0
+            print(code, "i =", incl, "SED ratio (>= 1 um):", ratio[mask].min(), ratio[mask].max())
+            assert np.all(abs(ratio[mask] - 1) < sed_tol), \
+                f"SED differs from {code} at i = {incl} deg by more than {sed_tol}"
+
+        # midplane temperature: (r [cm], theta [rad], T [K]), theta closest to pi/2
+        dtemp = np.loadtxt(results+"/"+code+"/"+ref_dir+"/dtemp.dat", skiprows=1)
+        theta = np.unique(dtemp[:,1])
+        theta_mid = theta[np.argmin(abs(theta - np.pi/2))]
+        mid = dtemp[dtemp[:,1] == theta_mid]
+        r = mid[:,0] / au_to_cm
+        T_mcfost = np.interp(np.log(r), np.log(r_midplane), temperature[0,:])
+        ratio = T_mcfost / mid[:,2]
+        print(code, "midplane temperature ratio:", ratio.min(), ratio.max())
+        assert np.all(abs(ratio - 1) < temp_tol), \
+            f"midplane temperature differs from {code} by more than {temp_tol}"
+
+
 def test_sublimation_image():
     # An image run after a temperature run with dust sublimation must read back
     # the sublimation radius and use the same inner radius as the temperature run

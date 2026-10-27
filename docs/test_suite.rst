@@ -38,3 +38,11 @@ The parameter files of the benchmark of `Pascucci et al. 2004 <https://ui.adsabs
 (2D disc with isotropic scattering, visual optical depths from 0.1 to 100) are in
 ``test_suite/benchmarks/Pascucci2004``, and the results of the five codes of the paper in the MCFOST utils
 (``benchmarks/Pascucci2004``). They also need the ``-star_bb`` option.
+
+The test suite compares the SEDs (above 1 micron) and midplane temperatures of the Pascucci et al. 2004
+models with the RADMC and RADICAL results: the optically thin cases (optical depths 0.1 and 1) run by
+default, including for every pull request, the optically thick ones (10 and 100, a few minutes) only with::
+
+     $ pytest --run-slow
+
+Long tests are marked ``@pytest.mark.slow`` (see ``test_suite/conftest.py``).
