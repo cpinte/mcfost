@@ -272,12 +272,14 @@ main : mcfost
 
 # Module dependencies (a.o : b.o when a.f90 uses a module of b.f90), generated from
 # the sources so that a parallel build (make -j) compiles each module first
-DEP_SOURCES = $(foreach f,$(SOURCES) mcfost.f90 mcfost2phantom.f90,$(firstword $(wildcard $(f) $(gdir)/$(f))))
+# sha.f90 and operating_system.f90 are generated (their modules are mapped by make_depend.sh):
+# as prerequisites of .depend, they made the recursive "make checkmcfost" of mcfost_env.o loop
+DEP_SOURCES = $(foreach f,$(filter-out sha.f90 operating_system.f90,$(SOURCES)) mcfost.f90 mcfost2phantom.f90,$(firstword $(wildcard $(f) $(gdir)/$(f))))
 
 .depend : make_depend.sh $(DEP_SOURCES)
 	sh make_depend.sh $(DEP_SOURCES) > .depend
 
-ifeq (,$(filter clean cleanall cleandata cleandata_dust cleanGasmod,$(MAKECMDGOALS)))
+ifeq (,$(filter clean cleanall cleandata cleandata_dust cleanGasmod checkmcfost,$(MAKECMDGOALS)))
 -include .depend
 endif
 

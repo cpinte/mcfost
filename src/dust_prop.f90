@@ -557,7 +557,6 @@ subroutine prop_grains(lambda)
   ! Case where Mueller matrices are provided as inputs added
   ! 20/04/2023
 
-  use benchmarks, only : Pascucci_cross_sections
 
   implicit none
 
@@ -681,6 +680,69 @@ subroutine prop_grains(lambda)
   return
 
 end subroutine prop_grains
+
+!******************************************************************************
+
+subroutine Pascucci_cross_sections(lambda)
+  ! Benchmark Pascucci et al 2004: replaces the grain properties computed with Mie
+  ! theory by the cross-sections tabulated for the benchmark (Pascucci_optSi.dat,
+  ! 0.12 micron astronomical silicate grains), interpolated in log-log at the
+  ! wavelength. Scattering is isotropic in the benchmark (g = 0).
+
+  use utils, only : in_dir
+
+  integer, intent(in) :: lambda
+
+  character(len=*), parameter :: filename = "Pascucci_optSi.dat"
+  integer, parameter :: n_tab = 61 ! wavelengths of the table
+
+  real(kind=dp), dimension(n_tab), save :: lambda_tab, Csca_tab, Cext_tab
+  logical, save :: lread = .false.
+
+  character(len=512) :: dir
+  real(kind=dp) :: wl, f, Cext, Csca
+  integer :: l, ios, unit
+
+  if (.not.lread) then
+     dir = in_dir(filename, dust_dir, status=ios)
+     if (ios /= 0) call error("dust file cannot be found: "//filename)
+     open(newunit=unit, file=trim(dir)//filename, status="old", action="read", iostat=ios)
+     if (ios /= 0) call error("cannot open "//trim(dir)//filename)
+     ! Skipping header (grain radius and number of wavelengths are in the header)
+     do l=1,11
+        read(unit,*)
+     enddo
+     do l=1, n_tab
+        read(unit,*,iostat=ios) lambda_tab(l), Csca_tab(l), Cext_tab(l) ! micron, m^2, m^2
+        if (ios /= 0) call error("cannot read "//filename)
+     enddo
+     close(unit)
+     lread = .true.
+  endif
+
+  if ((n_grains_tot /= 1) .or. (abs(r_grain(1) - 0.12) > 1e-3)) &
+       call error("Benchmark : a single grain size of 0.12 micron is needed for "//filename)
+
+  ! log-log interpolation (or extrapolation from the first or last 2 points)
+  wl = tab_lambda(lambda)
+  l = 1
+  do while ((l < n_tab-1) .and. (lambda_tab(l+1) <= wl))
+     l = l + 1
+  enddo
+  f = log(wl/lambda_tab(l)) / log(lambda_tab(l+1)/lambda_tab(l))
+  Cext = exp(log(Cext_tab(l)) + f * log(Cext_tab(l+1)/Cext_tab(l))) * m_to_mum**2 ! micron^2
+  Csca = exp(log(Csca_tab(l)) + f * log(Csca_tab(l+1)/Csca_tab(l))) * m_to_mum**2
+
+  C_ext(1,lambda) = Cext
+  C_sca(1,lambda) = Csca
+  C_abs(1,lambda) = Cext - Csca
+  C_abs_norm(1,lambda) = C_abs(1,lambda) * AU_to_cm * mum_to_cm**2
+  tab_albedo(1,lambda) = Csca / Cext
+  tab_g(1,lambda) = 0.0
+
+  return
+
+end subroutine Pascucci_cross_sections
 
 !******************************************************************************
 
