@@ -27,6 +27,7 @@ my_utils/
 
 #parameter files
 *.para
+!test_suite/benchmarks/*/*.para
 
 # unit test binaries (sources are test_suite/unit/*.f90)
 test_suite/unit/*

@@ -25,3 +25,11 @@ The test suite is performed in 2 steps.
 Running the reference and test solution takes ~ 14 minutes each on a macbook pro (Intel i7 4 cores at 2.8Ghz)
 
  .. note:: Comparisons with version earlier than v3.0.34 will fail as some definitions regarging the orientation of the images, and the Stokes vectors were changed. Those changes were validated manually.
+
+Benchmarks
+----------
+
+The parameter files of the benchmark of `Pinte et al. 2009 <https://ui.adsabs.harvard.edu/abs/2009A&A...498..967P>`_
+(very optically thick disc, anisotropic scattering and polarisation, midplane optical depths from 10\ :sup:`3`
+to 10\ :sup:`6`) are in ``test_suite/benchmarks/Pinte2009``. The star of the benchmark is a blackbody: run them
+with the ``-star_bb`` option. See the README in that directory for the model and the comparisons.
