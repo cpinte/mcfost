@@ -557,7 +557,7 @@ subroutine prop_grains(lambda)
   ! Case where Mueller matrices are provided as inputs added
   ! 20/04/2023
 
-  !use benchmarks, only : read_Pascucci_cross_sections
+  use benchmarks, only : Pascucci_cross_sections
 
   implicit none
 
@@ -662,6 +662,9 @@ subroutine prop_grains(lambda)
   enddo !k
 
   if (loverwrite_s12) call overwrite_s12(Pmax)
+
+  ! Benchmark: tabulated cross-sections instead of Mie theory
+  if (lbenchmark_Pascucci) call Pascucci_cross_sections(lambda)
 
   ! Verif normalization
   !-- do  k=1,n_grains_tot

@@ -14,8 +14,6 @@ module benchmarks
 
 subroutine init_Pascucci_benchmark()
 
-  !character(len=32) :: filename = "Pascucci_optSi.dat"
-
   write(*,*) "------------------------------------------------"
   write(*,*) "| Setting up the Pascucci et al 2004 benchmark |"
   write(*,*) "------------------------------------------------"
@@ -27,6 +25,7 @@ subroutine init_Pascucci_benchmark()
   dust_pop(1)%rho1g_avg = 3.6
 
   write(*,*) "! Forcing isotropic scattering                  |"
+  write(*,*) "! Cross-sections from Pascucci_optSi.dat         |"
   write(*,*) "-------------------------------------------------"
   lisotropic=.true.
 
@@ -36,48 +35,66 @@ end subroutine init_Pascucci_benchmark
 
 !*************************************************************
 
-!-- subroutine read_Pascucci_cross_sections(lambda, Cext, Csca)
-!-- ! Read cross-section table
-!-- ! Benchmark Pascucci et al. 2004
-!-- ! V band: line 15
-!--
-!--   use utils, only : in_dir
-!--
-!--   implicit none
-!--
-!--   integer, intent(in) :: lambda
-!--   real, intent(out) :: Cext, Csca
-!--
-!--   integer :: l, ios
-!--   real, dimension(61), save :: Cext_Pascucci, Csca_Pascucci
-!--
-!--   character(len=512) :: filename, dir
-!--
-!--   if (lambda == 1) then
-!--      filename = dust_pop(1)%indices(1)
-!--      dir = in_dir(filename, dust_dir,  status=ios)
-!--      if (ios /=0) call error("dust file cannot be found:"//trim(filename))
-!--      filename = trim(dir)//trim(filename) ;
-!--
-!--      open(unit=1,file=filename,status="old")
-!--      ! Skipping header
-!--      do l=1,11
-!--         read(1,*)
-!--      enddo
-!--
-!--      do l=1,n_lambda
-!--         read(1,*) tab_lambda(l), Csca_Pascucci(l), Cext_Pascucci(l)
-!--      enddo
-!--      close(unit=1)
-!--   endif
-!--
-!--   ! Convert to mum**2
-!--   Cext = Cext_Pascucci(lambda) * (m_to_mum)**2
-!--   Csca = Csca_Pascucci(lambda) * (m_to_mum)**2
-!--
-!--   return
-!--
-!-- end subroutine read_Pascucci_cross_sections
+subroutine Pascucci_cross_sections(lambda)
+  ! Benchmark Pascucci et al 2004: replaces the grain properties computed with Mie
+  ! theory by the cross-sections tabulated for the benchmark (Pascucci_optSi.dat,
+  ! 0.12 micron astronomical silicate grains), interpolated in log-log at the
+  ! wavelength. Scattering is isotropic in the benchmark (g = 0).
+
+  use utils, only : in_dir
+
+  integer, intent(in) :: lambda
+
+  character(len=*), parameter :: filename = "Pascucci_optSi.dat"
+  integer, parameter :: n_tab = 61 ! wavelengths of the table
+
+  real(kind=dp), dimension(n_tab), save :: lambda_tab, Csca_tab, Cext_tab
+  logical, save :: lread = .false.
+
+  character(len=512) :: dir
+  real(kind=dp) :: wl, f, Cext, Csca
+  integer :: l, ios, unit
+
+  if (.not.lread) then
+     dir = in_dir(filename, dust_dir, status=ios)
+     if (ios /= 0) call error("dust file cannot be found: "//filename)
+     open(newunit=unit, file=trim(dir)//filename, status="old", action="read", iostat=ios)
+     if (ios /= 0) call error("cannot open "//trim(dir)//filename)
+     ! Skipping header (grain radius and number of wavelengths are in the header)
+     do l=1,11
+        read(unit,*)
+     enddo
+     do l=1, n_tab
+        read(unit,*,iostat=ios) lambda_tab(l), Csca_tab(l), Cext_tab(l) ! micron, m^2, m^2
+        if (ios /= 0) call error("cannot read "//filename)
+     enddo
+     close(unit)
+     lread = .true.
+  endif
+
+  if ((n_grains_tot /= 1) .or. (abs(r_grain(1) - 0.12) > 1e-3)) &
+       call error("Benchmark : a single grain size of 0.12 micron is needed for "//filename)
+
+  ! log-log interpolation (or extrapolation from the first or last 2 points)
+  wl = tab_lambda(lambda)
+  l = 1
+  do while ((l < n_tab-1) .and. (lambda_tab(l+1) <= wl))
+     l = l + 1
+  enddo
+  f = log(wl/lambda_tab(l)) / log(lambda_tab(l+1)/lambda_tab(l))
+  Cext = exp(log(Cext_tab(l)) + f * log(Cext_tab(l+1)/Cext_tab(l))) * m_to_mum**2 ! micron^2
+  Csca = exp(log(Csca_tab(l)) + f * log(Csca_tab(l+1)/Csca_tab(l))) * m_to_mum**2
+
+  C_ext(1,lambda) = Cext
+  C_sca(1,lambda) = Csca
+  C_abs(1,lambda) = Cext - Csca
+  C_abs_norm(1,lambda) = C_abs(1,lambda) * AU_to_cm * mum_to_cm**2
+  tab_albedo(1,lambda) = Csca / Cext
+  tab_g(1,lambda) = 0.0
+
+  return
+
+end subroutine Pascucci_cross_sections
 
 !*************************************************************
 

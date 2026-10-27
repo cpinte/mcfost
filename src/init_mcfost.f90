@@ -437,29 +437,29 @@ subroutine initialisation_mcfost()
   ilen = index(para,'/',back=.true.) ! last position of the '/' character
   base_para = para(ilen+1:)
 
-  ! Benchmarks
-  if (para(1:8)=="Pascucci") then
+  ! Benchmarks: selected by the name of the parameter file (without its directory)
+  if (base_para(1:8)=="Pascucci") then
      lbenchmark_Pascucci = .true.
      write(*,*) "Running Pascucci et al 2004 benchmark"
-  else if (para(1:13)=="vanZadelhoff1") then
+  else if (base_para(1:13)=="vanZadelhoff1") then
      lbenchmark_vanZadelhoff1 = .true.
      write(*,*) "Running van Zadelhoff et al 2002 benchmark 1"
-  else if (para(1:13)=="vanZadelhoff2") then
+  else if (base_para(1:13)=="vanZadelhoff2") then
      lbenchmark_vanZadelhoff2 = .true.
      write(*,*) "Running van Zadelhoff et al 2002 benchmark 2"
-  else if (para(1:6)=="water1") then
+  else if (base_para(1:6)=="water1") then
      lbenchmark_water1 = .true.
      write(*,*) "Running water benchmark 1"
-  else if (para(1:6)=="water2") then
+  else if (base_para(1:6)=="water2") then
      lbenchmark_water2 = .true.
      write(*,*) "Running water benchmark 2"
-  else if (para(1:6)=="water3") then
+  else if (base_para(1:6)=="water3") then
      lbenchmark_water3 = .true.
      write(*,*) "Running water benchmark 3"
-  else if (para(1:8)=="Dutrey94") then
+  else if (base_para(1:8)=="Dutrey94") then
      lDutrey94 = .true.
      write(*,*) "Running comparison with Dutrey et al 1994"
-  else if (para(1:7)=="HH30mol") then
+  else if (base_para(1:7)=="HH30mol") then
      lHH30mol = .true.
      write(*,*) "Running comparison with Pety et al 2006"
   endif
