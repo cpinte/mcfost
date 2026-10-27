@@ -131,6 +131,25 @@ The 3rd and 4th HDUs contain the transition numbers and frequencies respectively
           The fits file also only contains the main HDU in that case.
 
 
+Outputs from Atomic Line calculations
+-------------------------------------
+
+An atomic line calculation (``-atom``) writes its results in one directory named after the atoms of the
+parameter file, e.g. ``data_H`` (or ``data_H_Ca`` for several atoms):
+
+-  A copy of the input parameter file, with the command line.
+
+-  ``<atom>.fits.gz``: level populations of each atom, and ``ne.fits.gz``: electron density.
+
+-  ``<atom>_line_*.fits.gz``: line maps (ray-traced images) and ``flux.fits.gz``: total flux.
+
+-  ``<atom>_colrate.fits.gz``, ``<atom>_radrate.fits.gz`` (``-output_rates``) and the other optional outputs.
+
+When the populations are read from a previous calculation (initial solution "from file"), or when the
+electron density of a previous calculation is reused, they are read from the directory of the previous
+run, which mcfost renames ``data_<atoms>_old`` at the start of the new run.
+
+
 Additional optional outputs
 ---------------------------
 

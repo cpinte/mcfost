@@ -8,7 +8,8 @@ module io_atom
    use abo, only             : get_Barklem_cross_data
    use collision_atom, only      : read_collisions
    use messages
-   use mcfost_env, only          : mcfost_utils
+   use mcfost_env, only          : mcfost_utils, data_dir_atom, restart_dir_atom
+   use utils, only               : system_call, shell_quote
    use grid, only                : T, vturb, B_char
    use fits_utils
    use wavelengths_gas, only : compute_line_bound
@@ -664,25 +665,12 @@ module io_atom
       write(iter_c, '(i0)') iter
       if (.not.present(step)) step=0
       write(step_c, '(i0)') step
-      !folder iterations must exist
       popsF = "iterations/"//trim(atom%ID)//'_iter'//trim(iter_c)//'_step'//trim(step_c)//'.fits.gz'
-
-   else
-      !check if data file already exist, can be the case if initial solutions is OLD_POPULATIONS
-      cmd = "ls "//popsF!trim(atom%ID)//".fits.gz"
-      call system_call(cmd, sys_status)
-      if (sys_status == 0) then !means the file exist
-
-         cmd = "mv "//trim(atom%ID)//".fits.gz"//" "//trim(atom%ID)//"_oldpop.fits.gz"
-         call system_call(cmd, sys_status)
-         if (sys_status /= 0) then
-            call error("Error in copying old pops!")
-         endif
-
-      endif
+      call system_call("mkdir -p "//shell_quote(trim(data_dir_atom)//"/iterations"), sys_status)
    endif
+   ! the data directory is new for each run: populations of a previous run are in restart_dir_atom
 
-   call ftinit(unit, fits_overwrite(trim(root_dir)//"/"//TRIM(popsF)), blocksize, status)
+   call ftinit(unit, fits_overwrite(trim(data_dir_atom)//"/"//TRIM(popsF)), blocksize, status)
    if (status > 0) then
       write(*,*) "Cannot create fits file ", popsF
       call print_error(status)
@@ -805,7 +793,9 @@ module io_atom
    status = 0
    call ftgiou(unit,status)
 
-   popsF = TRIM(atom%ID)//".fits.gz"
+   ! populations of the previous run (data directory moved to _old at the start of this run)
+   popsF = trim(restart_dir_atom)//"/"//TRIM(atom%ID)//".fits.gz"
+   write(*,*) " Reading populations from "//trim(popsF)
 
    call ftopen(unit, trim(popsF), 0, blocksize, status)
    if (status > 0) then

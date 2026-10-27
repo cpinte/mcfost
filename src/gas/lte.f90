@@ -11,6 +11,7 @@ module lte
    use constants
    use occupation_probability, only : wocc_n
    use parameters, only : ldissolve, n_cells, loutput_rates
+   use mcfost_env, only : data_dir_atom
    !$ use omp_lib
 
    implicit none
@@ -843,7 +844,7 @@ module lte
          dk = 1
       endif
 
-      open(unit, file=trim(atom%ID)//"_wi.txt", status="unknown")
+      open(unit, file=trim(data_dir_atom)//"/"//trim(atom%ID)//"_wi.txt", status="unknown")
       do k=1, n_cells, dk
          if (icompute_atomRT(k)>0) then
             write(unit,*) k
@@ -920,7 +921,7 @@ module lte
    Nj = Nstage
    if (atom%ID=="H") Nj = Nstage + 1 !for H-
 
-   open(unit, file=trim(atom%ID)//"_ltepops.txt", status="unknown")
+   open(unit, file=trim(data_dir_atom)//"/"//trim(atom%ID)//"_ltepops.txt", status="unknown")
    write(unit,*) "atom ", atom%ID, ' with ', Nj, " stages"
    write(unit,*) "xmh=",amu, "xmy=",wght_per_H,avgweight
    write(unit,*) "xmh*xmy=",amu*avgweight

@@ -1868,6 +1868,17 @@ subroutine initialisation_mcfost()
   call system_call(cmd, syst_status)
 
   data_dir = trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(basename_data_dir)
+  if (lemission_atom) then
+     if (n_atoms < 1) call error("-atom: no atom in the parameter file")
+     ! one directory for all the atoms of the run, e.g. data_H or data_H_Ca
+     basename_data_dir_atom = "data"
+     do i=1, n_atoms
+        basename_data_dir_atom = trim(basename_data_dir_atom)//"_"//trim(atom_ID(Atoms(i)%p%filename))
+     enddo
+     data_dir_atom = trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(basename_data_dir_atom)
+     ! restart files (populations, electron density) are read from the previous run, moved to _old
+     restart_dir_atom = trim(data_dir_atom)//"_old"
+  endif
   do imol=1, n_molecules
      data_dir2(imol) = trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(basename_data_dir2(imol))
   enddo
@@ -2214,12 +2225,16 @@ subroutine save_data(para,base_para)
         etape_end=1
      endif
   endif
+  if (lemission_atom) etape_end = etape_end + 1 ! data_<atoms> directory
 
   do etape=etape_start,etape_end
 
      if (etape == 1) then
         local_data_dir = data_dir
         local_basename_data_dir = basename_data_dir
+     else if (lemission_atom .and. (etape == etape_end)) then
+        local_data_dir = data_dir_atom
+        local_basename_data_dir = basename_data_dir_atom
      else
         local_data_dir = data_dir2(etape-1)
         local_basename_data_dir = basename_data_dir2(etape-1)
@@ -2312,6 +2327,30 @@ subroutine create_data_dir(dir, para, base_para)
   return
 
 end subroutine create_data_dir
+
+!********************************************************************
+
+function atom_ID(filename)
+  ! Element of an atomic model: first entry of the first line which is not a comment
+  ! (same convention as read_model_atom), e.g. "H" for H_6.atom
+
+  use uplow, only : to_lower
+
+  character(len=*), intent(in) :: filename
+  character(len=2) :: atom_ID
+
+  character(len=512) :: line
+  integer :: unit, ios, Nread
+
+  open(newunit=unit, file=trim(mcfost_utils)//"/Atoms/"//trim(filename), status="old", action="read", iostat=ios)
+  if (ios /= 0) call error("cannot open atomic model "//trim(filename))
+  call read_line(unit, "(A512)", line, Nread)
+  close(unit)
+  read(line,*,iostat=ios) atom_ID
+  if (ios /= 0) call error("cannot read the element of atomic model "//trim(filename))
+  atom_ID(2:2) = to_lower(atom_ID(2:2))
+
+end function atom_ID
 
 !********************************************************************
 
