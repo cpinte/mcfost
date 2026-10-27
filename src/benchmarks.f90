@@ -182,9 +182,6 @@ subroutine readMolecule_benchmark2()
 
   implicit none
 
-  real(kind=dp), parameter :: ergToEv = 6.24145d11
-  real(kind=dp), parameter :: hCgs = 6.626205d-27
-
   character(len=80) :: junk
   integer :: i, iPart
 
@@ -220,7 +217,7 @@ subroutine readMolecule_benchmark2()
   read(1,*) Aul(1:nTrans_tot)
 
   do i = 1, nTrans_tot
-     transFreq(i) = ((Level_energy(iTransUpper(i)) - Level_energy(iTransLower(i)))/ergToEV)/hcgs
+     transFreq(i) = (Level_energy(iTransUpper(i)) - Level_energy(iTransLower(i))) * eV_to_J / hp ! eV -> Hz
 
      ! Transformation Aul -> Bul
      Bul(i) = Aul(i) * (c_light**2)/(2.d0*hp*(transfreq(i))**3)

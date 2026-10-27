@@ -650,7 +650,7 @@ contains
 
     do lambda=1,n_lambda
        wl = tab_lambda(lambda) * 1e-6
-       spectrum(lambda) = (chi_ISM * 1.71 * Wdil * Blambda(wl,T_ISM_stars) + Blambda(wl,TCmb)) * wl
+       spectrum(lambda) = (chi_ISM * 1.71 * Wdil * Blambda(wl,T_ISM_stars) + Blambda(wl,T_Cmb)) * wl
     enddo
 
     !  Write the array to the FITS file.
@@ -727,7 +727,7 @@ contains
        n_sent_photons = sum(n_phot_envoyes_ISM(lambda,:))
 
        wl = tab_lambda(lambda) * 1e-6
-       photon_energy = (chi_ISM * 1.71 * Wdil * Blambda(wl,T_ISM_stars) + Blambda(wl,TCmb)) * wl & !lambda.F_lambda
+       photon_energy = (chi_ISM * 1.71 * Wdil * Blambda(wl,T_ISM_stars) + Blambda(wl,T_Cmb)) * wl & !lambda.F_lambda
            * (4.*pi*R_ISM**2) / n_sent_photons / pi
 
        do ri=1, n_rad

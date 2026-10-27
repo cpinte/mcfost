@@ -221,7 +221,7 @@ Option ``-origin`` or ``-o`` creates a fits file ``origin.fits.gz``, which fract
 Radiation field
 ^^^^^^^^^^^^^^^
 Option ``-output_J`` generates a fits file ``J.fits`` with the radiation field in each cell and at each wavelength in W/m2.
-Option ``-output_UV_field`` generates a fits file ``UV_field.fits`` with, for each cell,  the integrated radiation field between 912 and 200 angstroems (in Habing units).
+Option ``-output_UV_field`` generates a fits file ``UV_field.fits.gz`` with, for each cell, the radiation field integrated between 912 and 2050 angstroms, in Habing units (G\ :sub:`0`, 1.6e-3 erg cm\ :sup:`-2` s\ :sup:`-1`; the Draine field is 1.7 G\ :sub:`0`, van Dishoeck et al., arXiv:0806.0088). Up to version 4.1.16, the values were in Draine units despite the Habing label (i.e. 1.67 times lower) and integrated up to 2000 angstroms.
 
 Files for ProDiMo
 ^^^^^^^^^^^^^^^^^

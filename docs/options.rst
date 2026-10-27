@@ -146,7 +146,7 @@ than at inner radius
 
 ``-output_J``: outputs the radiation field in each cell
 
-``-output_UV_field``: output the UV radation field between 912 and 2000 Angströms in each cell. units: Habings
+``-output_UV_field``: output the UV radiation field between 912 and 2050 Angströms in each cell. Units: Habing (G\ :sub:`0`)
 
 ``-puffed_up_rim  <h_rim / h0> <r_rim> <delta_r>``: add a puffed up inner rim to the disc, with an increased scale height by a factor  <h rim / h0> and up to a radius r. The width over the scale goes back to normal is delta_r
 

@@ -96,7 +96,7 @@ contains
 
     use dust_ray_tracing, only : n_phot_envoyes
     use radiation_field, only : xJ_abs
-    use prodimo, only : chi_ISM, R_ISM, T_ISM_stars, Wdil, Tcmb
+    use prodimo, only : chi_ISM, R_ISM, T_ISM_stars, Wdil
     use temperature, only : E_disk
     use cylindrical_grid, only : volume
     use wavelengths, only : tab_lambda
@@ -128,7 +128,7 @@ contains
        n_sent_photons = sum(n_phot_envoyes_ISM(lambda,:))
        if (n_sent_photons > 0.) then ! We test if there were ISM packets
           wl = tab_lambda(lambda) * 1e-6
-          photon_energy = (chi_ISM * 1.71 * Wdil * Blambda(wl,T_ISM_stars) + Blambda(wl,TCmb)) * wl & !lambda.F_lambda
+          photon_energy = (chi_ISM * 1.71 * Wdil * Blambda(wl,T_ISM_stars) + Blambda(wl,T_Cmb)) * wl & !lambda.F_lambda
                * (4.*pi*R_ISM**2) / n_sent_photons / pi
 
           do icell=1, n_cells

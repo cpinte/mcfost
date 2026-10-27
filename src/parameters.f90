@@ -259,7 +259,6 @@ module parameters
 
   ! ISM radiation following ProDiMo's definitions
   real, parameter :: Wdil =  9.85357e-17
-  real, parameter :: TCmb = 2.73
   real, parameter :: T_ISM_stars = 20000.
   real :: chi_ISM = 1.0
 
