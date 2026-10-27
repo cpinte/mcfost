@@ -14,7 +14,7 @@ module see
     use messages, only : warning, error
     use collision_atom, only : collision_rates_atom_loc, collision_rates_hydrogen_loc, init_colrates_coeff_hydrogen, &
         CE_hydrogen, CI_hydrogen
-    use fits_utils, only : print_error
+    use fits_utils, only : print_error, fits_overwrite
     use lte, only : LTEpops_atom_loc, LTEpops_H_loc
 
     implicit none
@@ -1675,7 +1675,7 @@ module see
 
         !separate the rates in individual HDU for more clarity
 
-        call ftinit(unit,trim(atom%ID)//"_colrate.fits.gz",1,status)
+        call ftinit(unit,fits_overwrite(trim(atom%ID)//"_colrate.fits.gz"),1,status)
         if (status > 0) call print_error(status)
         call ftphpr(unit,.true.,-64,naxis,naxes,0,1,.true.,status)
         if (status > 0) call print_error(status)
@@ -1811,7 +1811,7 @@ module see
 
         !separate the rates in individual HDU for more clarity
 
-        call ftinit(unit,trim(atom%ID)//"_radrate.fits.gz",1,status)
+        call ftinit(unit,fits_overwrite(trim(atom%ID)//"_radrate.fits.gz"),1,status)
         if (status > 0) call print_error(status)
         call ftphpr(unit,.true.,-64,naxis,naxes,0,1,.true.,status)
         if (status > 0) call print_error(status)

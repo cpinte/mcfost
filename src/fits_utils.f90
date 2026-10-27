@@ -1,8 +1,10 @@
 module fits_utils
 
+  use messages, only : error
+
   implicit none
 
-  public :: cfitsWrite, print_error
+  public :: cfitsWrite, print_error, fits_overwrite
 
   private
 
@@ -26,7 +28,7 @@ subroutine cfitsWrite(filename,tab,dim)
 
   !  Create the new empty FITS file.
   blocksize=1
-  call ftinit(unit,trim(filename),blocksize,status)
+  call ftinit(unit,fits_overwrite(filename),blocksize,status)
 
   simple=.true.
   ! le signe - signifie que l'on ecrit des reels dans le fits
@@ -49,10 +51,8 @@ subroutine cfitsWrite(filename,tab,dim)
   call ftclos(unit, status)
   call ftfiou(unit, status)
 
-  !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  endif
+  !  Check for any error, and if so print out error messages and stop
+  if (status > 0) call print_error(status)
 
   return
 
@@ -84,7 +84,28 @@ subroutine print_error(status)
      call ftgmsg(errmessage)
   end do
 
+  ! A failed read or write would leave missing, incomplete or stale outputs
+  call error("FITS file input/output failed (see the FITSIO messages above)")
+
   return
 end subroutine print_error
+
+!***************************************************
+
+function fits_overwrite(filename) result(name)
+  ! FITSIO name to create filename, replacing an existing file ("!" prefix).
+  ! Outputs from a previous run are protected by the data directory backup
+  ! (data_*_old) and -no_backup: within a run, files are rewritten (e.g. iterations)
+
+  character(len=*), intent(in) :: filename
+  character(len=:), allocatable :: name
+
+  if (filename(1:1) == "!") then
+     name = trim(filename)
+  else
+     name = "!"//trim(filename)
+  endif
+
+end function fits_overwrite
 
 end module fits_utils

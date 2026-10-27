@@ -637,7 +637,7 @@ module elecdensity
    end if
 
 
-   call ftinit(unit,trim(ne_filename),blocksize,EOF)
+   call ftinit(unit,fits_overwrite(ne_filename),blocksize,EOF)
    !  Initialize parameters about the FITS image
    call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,EOF)
    ! Additional optional keywords

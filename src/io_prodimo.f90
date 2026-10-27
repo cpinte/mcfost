@@ -366,7 +366,7 @@ contains
     !  N = int f(a) da   <a^i> = 1/N * int int f(a) a^i da
     ! - separation of constribution
 
-    use fits_utils, only : print_error
+    use fits_utils, only : print_error, fits_overwrite
 
     integer :: status,unit,blocksize,bitpix,naxis
     integer, dimension(5) :: naxes
@@ -449,7 +449,7 @@ contains
 
     !  Create the new empty FITS file.
     blocksize=1
-    call ftinit(unit,trim(filename),blocksize,status)
+    call ftinit(unit,fits_overwrite(filename),blocksize,status)
 
     !------------------------------------------------------------------------------
     ! HDU 1 : grid

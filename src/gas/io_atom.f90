@@ -682,7 +682,7 @@ module io_atom
       endif
    endif
 
-   call ftinit(unit, trim(root_dir)//"/"//TRIM(popsF), blocksize, status)
+   call ftinit(unit, fits_overwrite(trim(root_dir)//"/"//TRIM(popsF)), blocksize, status)
    if (status > 0) then
       write(*,*) "Cannot create fits file ", popsF
       call print_error(status)
