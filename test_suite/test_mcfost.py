@@ -476,6 +476,29 @@ def test_seed_image():
     assert os.path.isfile(root_dir+"/seed=7/data_1.0/RT.fits.gz")
 
 
+@pytest.mark.parametrize("args", ["0 1e-8", "150 1e-8", "2 1e-8", "x 1e-8", "1 abc"])
+def test_mdot_option_invalid(args):
+    # -Mdot <star> <Mdot>: the star number used to index a fixed-size array without
+    # check (H6: -Mdot 0 or -Mdot 150 wrote outside the array); must stop with an error
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    root_dir = "ref3.0_mdot"
+    clean_results(root_dir)
+    result = subprocess.run((os.path.abspath(_mcfost_bin)+" test_data/ref3.0/ref3.0.para -op 1.0 -root_dir "
+                             +root_dir+" -Mdot "+args).split(), capture_output=True, text=True, timeout=60)
+    assert result.returncode != 0
+    assert "-Mdot" in result.stdout
+
+
+def test_mdot_option():
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    root_dir = "ref3.0_mdot"
+    clean_results(root_dir)
+    stdout = run_mcfost("test_data/ref3.0/ref3.0.para", root_dir, "-op 1.0 -Mdot 1 1e-8", timeout=60)
+    assert "Mdot=" in stdout
+
+
 def test_sublimation_image():
     # An image run after a temperature run with dust sublimation must read back
     # the sublimation radius and use the same inner radius as the temperature run

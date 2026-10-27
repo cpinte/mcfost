@@ -1467,13 +1467,18 @@ subroutine initialisation_mcfost()
         lstar_bb = .true.
      case("-Mdot")
         i_arg = i_arg + 1
+        if (i_arg+1 > n_args) call error("-Mdot needs a star number and an accretion rate")
         lforce_Mdot = .true.
         call get_command_argument(i_arg,s)
-        read(s,*) istar_Mdot
+        read(s,*,iostat=ios) istar_Mdot
+        if (ios /= 0) call error("-Mdot: cannot read the star number: "//trim(s))
+        if ((istar_Mdot < 1) .or. (istar_Mdot > nmax_stars)) &
+             call error("-Mdot: the star number must be between 1 and the number of stars, got: "//trim(s))
         star_force_Mdot(istar_Mdot) = .true.
         i_arg = i_arg + 1
         call get_command_argument(i_arg,s)
-        read(s,*) Mdot
+        read(s,*,iostat=ios) Mdot
+        if (ios /= 0) call error("-Mdot: cannot read the accretion rate: "//trim(s))
         star_Mdot(istar_Mdot) = Mdot
         i_arg = i_arg + 1
      case("-fargo3d","-fargo")
@@ -1638,6 +1643,8 @@ subroutine initialisation_mcfost()
   if (lstar_bb) star(:)%lb_body = .true.
 
   if (lforce_Mdot) then
+     if (any(star_force_Mdot(n_stars+1:))) &
+          call error("-Mdot: the star number is larger than the number of stars in the model")
      do i=1, n_stars
         if (i > nmax_stars) call error("Maximal number of stars is hard-coded to 100")
         if (star_force_Mdot(i)) then
