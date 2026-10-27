@@ -16,6 +16,7 @@ src/libtmp/*
 src/.make_lastsystem
 src/.depend
 src/mcfost
+src/mcfost2prodimo
 src/operating_system.f90
 src/sha.f90
 src/system.f90

@@ -5,11 +5,8 @@ module mcfost2ProDiMo
 
   implicit none
 
-  ! Spatial grid of mcfost
-  integer, parameter :: n_rad = 100
-  integer, parameter :: nz = 40
-  ! Wavelength grid of mcfost
-  integer, parameter :: n_lambda = 39
+  ! Spatial and wavelength grids of mcfost: read from the file (HDU 1 and 3)
+  integer :: n_rad, nz, n_lambda
 
   ! Data file
   character(len=512), parameter :: filename = "data_th/forProDiMo.fits.gz"
@@ -20,38 +17,38 @@ module mcfost2ProDiMo
      real :: diskmass, Teff, Rstar, Mstar, fUV, fUV_slope, rin, rout, amin, amax, aexp, rho_grain, a_settle
 
      ! Saptial grid (Unit: AU)
-     real, dimension(n_rad,nz) :: r_grid, z_grid
+     real, dimension(:,:), allocatable :: r_grid, z_grid
 
      ! Temperature structure (Unit: K)
-     real, dimension(n_rad,nz) :: temperature
+     real, dimension(:,:), allocatable :: temperature
 
      ! Wavelength bins (Unit: microns)
-     real, dimension(n_lambda) :: wavelengths
+     real, dimension(:), allocatable :: wavelengths
 
      ! input Stellar spectrum (lambda.F_lambda) (Units : W.m^-2)
      ! sum(F_lambda x dlambda = sigma Teff^4 in case of 1 star without UV excess)
-     real, dimension(n_lambda) :: J_star_input
+     real, dimension(:), allocatable :: J_star_input
 
      ! input ISM spectrum (lambda.F_lambda) (Units : W.m^-2)
-     real, dimension(n_lambda) :: J_ISM_input
+     real, dimension(:), allocatable :: J_ISM_input
 
      ! Radiation field
      ! lambda.J_lambda (Units : W.m^-2)
-     real, dimension(n_rad,nz,n_lambda) :: J, J_ISM
+     real, dimension(:,:,:), allocatable :: J, J_ISM
 
      ! Statictic of the radiation field (number of packets)
-     real, dimension(n_rad,nz,n_lambda) :: nJ, nJ_ISM
+     real, dimension(:,:,:), allocatable :: nJ, nJ_ISM
 
      ! Gas density assuming a gas/dust mass ratio of 100 (Unit: part.m-3)
-     real, dimension(n_rad,nz) :: density
+     real, dimension(:,:), allocatable :: density
 
      ! 0th, 1st, 2nd and 3rd moment of the grain size distribution
      ! 0th moment: unit = part.m-3
      ! 1th, 2nd and 3rd moment: units = micron, micron^2, micron^3
-     real, dimension(n_rad,nz,0:3) :: grain_size
+     real, dimension(:,:,:), allocatable :: grain_size
 
      ! Dust opacities (Units : AU^-1)
-     real, dimension(n_rad,nz,n_lambda) :: kappa_ext, kappa_abs
+     real, dimension(:,:,:), allocatable :: kappa_ext, kappa_abs
   end type mcfost_model
 
 contains
@@ -67,8 +64,8 @@ contains
     character(len=30) errtext
     character (len=80) errmessage, comment
 
-    real, dimension(n_rad,nz,2) :: grid
-    real, dimension(n_rad,nz,2,n_lambda) :: opacity
+    real, dimension(:,:,:), allocatable :: grid
+    real, dimension(:,:,:,:), allocatable :: opacity
 
     type(mcfost_model) :: mcfost
 
@@ -94,10 +91,11 @@ contains
     ! Check dimensions
     call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
     if (nfound /= 3) call error('failed to read the NAXISn keywords of HDU 1.')
-    if ((naxes(1) /= n_rad).or.(naxes(2) /= nz).or.(naxes(3) /= 2)) then
-       call error("HDU 1 does not have the right dimensions.")
-    endif
+    if (naxes(3) /= 2) call error("HDU 1 does not have the right dimensions.")
+    n_rad = naxes(1) ; nz = naxes(2)
     npixels=naxes(1)*naxes(2)*naxes(3)
+    allocate(grid(n_rad,nz,2), mcfost%r_grid(n_rad,nz), mcfost%z_grid(n_rad,nz), &
+         mcfost%temperature(n_rad,nz), mcfost%density(n_rad,nz), mcfost%grain_size(n_rad,nz,0:3))
 
     ! Keywords
     ! FTGKY[EDJKLS](unit,keyword, > keyval,comment,status)
@@ -107,7 +105,7 @@ contains
     call ftgkye(unit,'Rstar',mcfost%Rstar,comment,status)
     call ftgkye(unit,'Mstar',mcfost%Mstar,comment,status)
     call ftgkye(unit,'fUV',mcfost%fUV,comment,status)
-    call ftgkye(unit,'slope_UV',mcfost%slope_UV,comment,status)
+    call ftgkye(unit,'slope_UV',mcfost%fUV_slope,comment,status)
 
     call ftgkye(unit,'Rin',mcfost%rin,comment,status)
     call ftgkye(unit,'Rout',mcfost%rout,comment,status)
@@ -133,7 +131,7 @@ contains
     call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
     if (nfound /= 2) call error('failed to read the NAXISn keywords of HDU 2.')
     if ((naxes(1) /= n_rad).or.(naxes(2) /= nz)) then
-       write(*,*) naxes(1), "/=", n_lambda
+       write(*,*) naxes(1), naxes(2), "/=", n_rad, nz
        call error("HDU 2 does not have the right dimensions.")
     endif
     npixels=naxes(1)*naxes(2)
@@ -151,11 +149,12 @@ contains
     ! Check dimensions
     call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
     if (nfound /= 1) call error('failed to read the NAXISn keywords of HDU 3.')
-    if (naxes(1) /= n_lambda) then
-       write(*,*) naxes(1), '/=', n_lambda
-       call error("HDU 3 does not have the right dimensions.")
-    endif
+    n_lambda = naxes(1)
     npixels=naxes(1)
+    allocate(mcfost%wavelengths(n_lambda), mcfost%J_star_input(n_lambda), mcfost%J_ISM_input(n_lambda), &
+         mcfost%J(n_rad,nz,n_lambda), mcfost%J_ISM(n_rad,nz,n_lambda), mcfost%nJ(n_rad,nz,n_lambda), &
+         mcfost%nJ_ISM(n_rad,nz,n_lambda), mcfost%kappa_ext(n_rad,nz,n_lambda), mcfost%kappa_abs(n_rad,nz,n_lambda), &
+         opacity(n_rad,nz,2,n_lambda))
 
     ! read_image
     call ftgpve(unit,group,firstpix,npixels,nullval,mcfost%wavelengths,anynull,status)
@@ -359,7 +358,7 @@ program test
 
   integer :: iz
   real :: delz, int_dust1, int_dust2, int_dz, rho_gas, rho_dust1, n_dust, dust_to_gas_c, rho_gr, m_dust, rho_dust2
-  real, dimension(nz) :: dz
+  real, dimension(:), allocatable :: dz
 
   dust_to_gas_c = 0.01
 
@@ -367,6 +366,7 @@ program test
   thermal_const = hp*c_light/kb
 
   mcfost =  read_mcfost()
+  allocate(dz(nz))
 
   write(*,*) "Teff", mcfost%Teff
   write(*,*) "Rstar", mcfost%Rstar
@@ -456,7 +456,8 @@ program test
 
 
 
-    write(*,*) "TEST_density", sum(mcfost%grain_size(1,:,3) * mcfost%grain_size(1,:,0)) * 4./3. * pi * mcfost%rho_grain * 100., sum(mcfost%density(1,:)) *1e18
+    write(*,*) "TEST_density", sum(mcfost%grain_size(1,:,3) * mcfost%grain_size(1,:,0)) * 4./3. * pi * mcfost%rho_grain * 100., &
+         sum(mcfost%density(1,:)) *1e18
 
  !   write(*,*) int_dz,mcfost%z_grid(1,nz)-mcfost%z_grid(1,1)
     write(*,*) int_dust1,int_dust2
