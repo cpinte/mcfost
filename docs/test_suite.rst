@@ -35,5 +35,6 @@ to 10\ :sup:`6`) are in ``test_suite/benchmarks/Pinte2009``. The star of the ben
 with the ``-star_bb`` option. See the README in that directory for the model and the comparisons.
 
 The parameter files of the benchmark of `Pascucci et al. 2004 <https://ui.adsabs.harvard.edu/abs/2004A&A...417..793P>`_
-(2D disc with isotropic scattering, visual optical depths from 0.1 to 100), with the results of the five codes
-of the paper, are in ``test_suite/benchmarks/Pascucci2004``. They also need the ``-star_bb`` option.
+(2D disc with isotropic scattering, visual optical depths from 0.1 to 100) are in
+``test_suite/benchmarks/Pascucci2004``, and the results of the five codes of the paper in the MCFOST utils
+(``benchmarks/Pascucci2004``). They also need the ``-star_bb`` option.

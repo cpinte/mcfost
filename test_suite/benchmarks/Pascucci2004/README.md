@@ -1,6 +1,6 @@
 # Pascucci et al. 2004 benchmark
 
-Parameter files and reference results for the 2D continuum radiative transfer
+Parameter files for the 2D continuum radiative transfer
 benchmark of Pascucci et al. 2004, A&A 417, 793 (arXiv:astro-ph/0402357):
 temperature structure and SED of a passive disc with isotropic scattering, for
 visual optical depths from 0.1 to 100. The parameter files are the version 3.0
@@ -53,8 +53,11 @@ midplane optical depth ("Integ tau in midplane"): 0.1013, 1.013, 10.13 and
 
 ## Reference results
 
-`results/` contains the results of the five codes of the paper (MC3D,
-MCTRANSF, RADICAL, RADMC, STEINRAY) for the four optical depths (`01tau`,
+The results of the five codes of the paper are distributed with the MCFOST
+utils, in `$MCFOST_UTILS/benchmarks/Pascucci2004/` (added in October 2026:
+run `mcfost -update_utils` if the directory is missing)
+(MC3D,
+MCTRANSF, RADICAL, RADMC, STEINRAY), for the four optical depths (`01tau`,
 `1tau`, `10tau`, `100tau`), in the native formats in which they were
 distributed for the benchmark: temperature structures (e.g. `dtemp.dat`,
 `tm.dat`, `bench_tm.*`, `bencT*`) and SEDs at the three inclinations
