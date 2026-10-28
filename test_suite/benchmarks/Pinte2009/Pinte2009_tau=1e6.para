@@ -2,13 +2,13 @@
 
 #Number of photon packages
   1.28e7                  nbr_photons_eq_th  : T computation
-  1.28e3	          nbr_photons_lambda : SED computation
+  1.28e4	          nbr_photons_lambda : SED computation
   1.28e6                  nbr_photons_image  : images computation
 
 #Wavelength
   50  0.1 3000.0          n_lambda, lambda_min, lambda_max [mum] Do not change this line unless you know what you are doing
-  T T T 		  compute temperature?, compute sed?, use default wavelength grid for output ?
-  none.lambda		  wavelength file (if previous parameter is F)
+  T T F 		  compute temperature?, compute sed?, use default wavelength grid for output ?
+  Pinte2009.lambda	  wavelength file (if previous parameter is F)
   T T			  separation of different contributions?, stokes parameters?
 
 #Grid geometry and size

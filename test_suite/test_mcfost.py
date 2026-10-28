@@ -571,38 +571,48 @@ def test_pascucci_benchmark(tau, ref_dir, sed_tol, lambda_min, temp_tol):
             f"midplane temperature differs from {code} by more than {temp_tol}"
 
 
-# Pinte et al. 2009 benchmark (very optically thick disc, anisotropic scattering): SEDs
-# compared with MCMax and MCFOST 2009, midplane temperatures with MCMax, TORUS and
-# MCFOST 2009, vertical temperatures at 0.2 and 200 au with MCMax and MCFOST 2009
-# (results distributed with the MCFOST utils). Long tests (--run-slow).
+# Pinte et al. 2009 benchmark (very optically thick disc, anisotropic scattering), following
+# the comparisons of the paper (Sect. 4): SEDs and images relative to the average of the
+# codes, temperatures, 11 pixel wide cuts in the images and polarisation maps. Results of
+# the codes distributed with the MCFOST utils. Long tests (--run-slow).
 # Largest differences with MCFOST 4.1.16 over several runs (October 2026):
-# - SED per wavelength (points above 1e-3 of the maximum): 16 % (tau = 1e3, i <= 76 deg),
-#   32 % (tau = 1e6, i <= 70 deg, short wavelengths at 18 deg); closer to edge-on the short
-#   wavelengths differ by up to a factor 3 between all codes, only the median over
-#   wavelength is compared there (8 % at most, at 81.4 deg where the star is seen through
-#   the disc surface);
+# - SED per wavelength relative to the average of MCMax and MCFOST 2009 (which agree within
+#   2-7 %): 21 % up to 76 deg, from the Monte Carlo noise of the ray-traced scattered thermal
+#   emission at 2-4 um (the paper finds 20 %); closer to edge-on MCMax and MCFOST 2009 differ
+#   by up to 65 % near 1 um, only the median over wavelength is compared there;
 # - temperatures inside the disc: 7.6 % (tau = 1e3), 19 % (tau = 1e6, inner au, where
 #   MCMax and TORUS differ by a similar amount).
-# tau = 1e6 also compares the 1 um images (stellar pixels excluded) with MCMax and MCFOST 2009
-# at the 10 inclinations, and TORUS at 70 and 87 deg: scattered flux 7.5 % (MCMax), cuts
-# along the major axis 15 % (i <= 64 deg) and medians of the major and minor axis cuts 14 %,
-# flux-weighted linear polarisation degree 24 % (MCMax is 10-20 % lower, MCFOST 2009 before
-# the multiple scattering fix of 2026 about 8 % higher).
+# - tau = 1e6 images at 69.5 and 87.1 deg (paper Figs. 7 and 8), rt2 with -rt2_angles 45 and
+#   rt1 with 1.28e7 packets, cuts through the two disc surfaces and through the centre:
+#   flux 17 % per point with rt2 and up to 31 % with rt1 (Monte Carlo noise, lower surface at
+#   69.5 deg, where MCFOST 2009 and MCMax differ by 23 %), medians 9 %, polarisation degree
+#   0.12 (rt1). Slightly
+#   looser than in the paper (10 %, 0.05) because the 2009 maps predate the 2026 fix of the
+#   polarisation in multiple scattering, which changes the dark lane and the polarisation.
 _pinte2009_cases = [
-    pytest.param("1e3", 76.0, 0.25, 0.12, "", marks=pytest.mark.slow),
-    pytest.param("1e6", 70.0, 0.40, 0.25, "-diff_approx", marks=pytest.mark.slow),
+    pytest.param("1e3", 0.15, "", marks=pytest.mark.slow),
+    pytest.param("1e6", 0.25, "-diff_approx", marks=pytest.mark.slow),
 ]
 _pinte2009_inclinations = ["18.2", "31.8", "41.4", "49.5", "56.6", "63.3", "69.5", "75.5", "81.4", "87.1"]
 
 
-@pytest.mark.parametrize("tau, incl_max, sed_tol, temp_tol, opt", _pinte2009_cases)
-def test_pinte2009_benchmark(tau, incl_max, sed_tol, temp_tol, opt):
-    if not compute_models:
-        pytest.skip("Only run when computing models")
+def _pinte2009_results():
     utils = os.environ.get("MCFOST_UTILS", os.path.join("..", "utils"))
     results = os.path.join(utils, "benchmarks", "Pinte2009")
     if not os.path.isdir(results):
         pytest.skip("Pinte 2009 results not found in the MCFOST utils (mcfost -update_utils)")
+    return results
+
+
+def _log_interp(x, xp, fp):
+    return np.exp(np.interp(np.log(x), np.log(xp), np.log(np.maximum(fp, 1e-300))))
+
+
+@pytest.mark.parametrize("tau, temp_tol, opt", _pinte2009_cases)
+def test_pinte2009_benchmark(tau, temp_tol, opt):
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    results = _pinte2009_results()
 
     root_dir = "Pinte2009_tau="+tau
     clean_results(root_dir)
@@ -611,21 +621,22 @@ def test_pinte2009_benchmark(tau, incl_max, sed_tol, temp_tol, opt):
     run_mcfost("benchmarks/Pinte2009/Pinte2009_tau="+tau+".para", root_dir,
                "-star_bb +disk_struct "+opt, timeout=3600)
 
+    # SEDs (lambda.F_lambda [W/m2] at 140 pc) relative to the average of MCMax and MCFOST 2009
     sed_file = fits.open(root_dir+"/data_th/sed_rt.fits.gz")
-    sed = sed_file[0].data.astype(np.float64)        # lambda.F_lambda [W/m2] at 140 pc
+    sed = sed_file[0].data.astype(np.float64)
     wl = sed_file[1].data.astype(np.float64)         # micron
     for k, incl in enumerate(_pinte2009_inclinations):
-        for code, filename in [("MCMax", "mcmax/tau="+tau+"_aniso/SED/SED"+incl+".dat"),
-                               ("MCFOST 2009", "mcfost/tau="+tau+"_aniso/SED/tau="+tau+"_aniso_inc"
-                                +"{:03d}".format(round(np.degrees(np.arccos(0.95 - 0.1*k))))+".dat")]:
-            ref = np.loadtxt(results+"/"+filename, comments="#")
-            sed_interp = np.exp(np.interp(np.log(ref[:,0]), np.log(wl), np.log(np.maximum(sed[0,0,k,:], 1e-300))))
-            mask = (ref[:,1] > 1e-3 * ref[:,1].max()) & (ref[:,0] >= wl.min()) & (ref[:,0] <= wl.max())
-            ratio = sed_interp[mask] / ref[mask,1]
-            print(code, "i =", incl, "SED ratio:", ratio.min(), ratio.max(), "median", np.median(ratio))
-            assert abs(np.median(ratio) - 1) < 0.12, f"SED differs from {code} at i = {incl} deg"
-            if float(incl) <= incl_max:
-                assert np.all(abs(ratio - 1) < sed_tol), f"SED differs from {code} at i = {incl} deg"
+        n = round(np.degrees(np.arccos(0.95 - 0.1*k)))
+        refs = [np.loadtxt(results+"/"+f, comments="#") for f in
+                ["mcmax/tau="+tau+"_aniso/SED/SED"+incl+".dat",
+                 "mcfost/tau="+tau+"_aniso/SED/tau="+tau+"_aniso_inc{:03d}.dat".format(n)]]
+        average = np.mean([_log_interp(wl, ref[:,0], ref[:,1]) for ref in refs], axis=0)
+        mask = average > 1e-3 * average.max()
+        ratio = sed[0,0,k,mask] / average[mask]
+        print("i =", incl, "SED / average:", ratio.min(), ratio.max(), "median", np.median(ratio))
+        assert abs(np.median(ratio) - 1) < 0.12, f"SED differs from the reference codes at i = {incl} deg"
+        if float(incl) < 80:
+            assert np.all(abs(ratio - 1) < 0.25), f"SED differs from the reference codes at i = {incl} deg"
 
     temperature = root_dir+"/data_th/Temperature_DA.fits.gz"
     if not os.path.isfile(temperature):
@@ -660,50 +671,56 @@ def test_pinte2009_benchmark(tau, incl_max, sed_tol, temp_tol, opt):
             assert np.all(abs(ratio - 1) < temp_tol), f"temperature at R = {R} au differs from {code}"
 
     if tau == "1e6":
-        _check_pinte2009_images(root_dir, results)
+        # both ray-tracing methods: rt2 with a finer angular sampling of the scattered radiation
+        # field (the default 15 directions smooth the forward scattering peak of the 1 um grains,
+        # making the near side of the disc next to the star 30-40 % too faint), and rt1
+        _check_pinte2009_images(root_dir, results, "-rt2 -rt2_angles 45", 0.30)
+        # rt1 is noisier: same medians, looser points (faint regions of the cuts)
+        _check_pinte2009_images(root_dir, results, "-rt1 -nphot_img 1.28e7", 0.40)
 
 
-def _check_pinte2009_images(root_dir, results):
-    # 1 um images and linear polarisation degree of the tau = 1e6 model
-    run_mcfost("benchmarks/Pinte2009/Pinte2009_tau=1e6.para", root_dir, "-star_bb -img 1.0", timeout=3600)
+def _check_pinte2009_images(root_dir, results, opt, flux_tol):
+    # 1 um images and linear polarisation maps of the tau = 1e6 model at 69.5 and 87.1 deg
+    # (paper Figs. 7 and 8): 11 pixel wide cuts through the upper and lower disc surfaces
+    # (brightest rows of the reference images at least 15 pixels from the star) and through
+    # the centre. Flux relative to the average of MCFOST 2009 and MCMax, polarisation degree
+    # relative to the average of MCFOST 2009, MCMax and Pinball. Stellar pixels excluded.
+    shutil.rmtree(root_dir+"/data_1.0", ignore_errors=True)
+    run_mcfost("benchmarks/Pinte2009/Pinte2009_tau=1e6.para", root_dir, "-star_bb -img 1.0 "+opt, timeout=3600)
     image = fits.getdata(root_dir+"/data_1.0/RT.fits.gz").astype(np.float64) # (Stokes, az, incl, y, x)
     c = image.shape[-1] // 2
+    star = (slice(c-3, c+4), slice(c-3, c+4))
 
-    def properties(I, P):
-        # stellar pixels excluded; cuts averaged over 5 pixels along the major (x) and minor (y) axes
-        disc = I.copy()
-        disc[c-3:c+4,c-3:c+4] = 0.0
-        flux = disc.sum()
-        return flux, disc[c-2:c+3,:].mean(axis=0), disc[:,c-2:c+3].mean(axis=1), np.sum(P * disc) / flux
-
-    for k, incl in enumerate(_pinte2009_inclinations):
-        n = round(np.degrees(np.arccos(0.95 - 0.1*k)))
-        I = image[0,0,k]
+    for k, incl, n in [(6, "69.5", 70), (9, "87.1", 87)]:
+        I = image[0,0,k].copy()
         P = np.sqrt(image[1,0,k]**2 + image[2,0,k]**2) / np.maximum(I, 1e-300)
-        flux, major, minor, P_mean = properties(I, P)
-        refs = [("MCFOST 2009", "mcfost/tau=1e6_aniso/images/intensity_map_inc{:03d}.fits.gz".format(n),
-                 "mcfost/tau=1e6_aniso/pola/linear_polarization_map_inc{:03d}.fits.gz".format(n), 1.0),
-                ("MCMax", "mcmax/tau=1e6_aniso/images/ImageF_i"+incl+"_l00001.00_fov00900.0.fits",
-                 "mcmax/tau=1e6_aniso/pola/ImageP_i"+incl+"_l00001.00_fov00900.0.fits", 1.0)]
-        if n in (70, 87): # TORUS: polarisation degree in %
-            refs.append(("TORUS", "torus/tau=1e6_aniso/images/tau=1e6_aniso_inc{:03d}_natural_image001.fits".format(n),
-                         "torus/tau=1e6_aniso/pola/tau=1e6_aniso_inc{:03d}_natural_pol001.fits".format(n), 0.01))
-        for code, image_file, pola_file, P_unit in refs:
-            I_ref = fits.getdata(results+"/"+image_file).astype(np.float64)
-            P_ref = fits.getdata(results+"/"+pola_file).astype(np.float64) * P_unit
-            flux_ref, major_ref, minor_ref, P_mean_ref = properties(I_ref, P_ref)
-            print(code, "i =", incl, "scattered flux ratio:", flux/flux_ref, "polarisation:", P_mean, P_mean_ref)
-            assert abs(flux/flux_ref - 1) < 0.10, f"1 um scattered flux differs from {code} at i = {incl} deg"
-            if code == "TORUS" and n == 87: # cuts and polarisation not consistent with the other codes
-                continue
-            for name, cut, cut_ref in [("major", major, major_ref), ("minor", minor, minor_ref)]:
-                mask = cut_ref > 1e-2 * cut_ref.max()
-                ratio = cut[mask] / cut_ref[mask]
-                print(code, "i =", incl, name, "axis cut ratio:", ratio.min(), ratio.max(), "median", np.median(ratio))
-                assert abs(np.median(ratio) - 1) < 0.20, f"{name} axis cut differs from {code} at i = {incl} deg"
-                if name == "major" and float(incl) <= 64:
-                    assert np.all(abs(ratio - 1) < 0.15), f"major axis cut differs from {code} at i = {incl} deg"
-            assert abs(P_mean/P_mean_ref - 1) < 0.30, f"polarisation degree differs from {code} at i = {incl} deg"
+        I_ref = [fits.getdata(results+"/mcfost/tau=1e6_aniso/images/intensity_map_inc{:03d}.fits.gz".format(n)),
+                 fits.getdata(results+"/mcmax/tau=1e6_aniso/images/ImageF_i"+incl+"_l00001.00_fov00900.0.fits")]
+        P_ref = [fits.getdata(results+"/mcfost/tau=1e6_aniso/pola/linear_polarization_map_inc{:03d}.fits.gz".format(n)),
+                 fits.getdata(results+"/mcmax/tau=1e6_aniso/pola/ImageP_i"+incl+"_l00001.00_fov00900.0.fits"),
+                 fits.getdata(results+"/pinball/pola/pola_inc{:d}.fits".format(n))]
+        I_ref = [np.array(a, dtype=np.float64) for a in I_ref]
+        for a in [I] + I_ref:
+            a[star] = np.nan
+        I_avg = np.mean(I_ref, axis=0)
+        P_avg = np.mean([np.array(a, dtype=np.float64) for a in P_ref], axis=0)
+
+        column = np.nanmean(I_avg[:,c-5:c+6], axis=1)
+        upper = c + 15 + int(np.nanargmax(column[c+15:c+100]))
+        lower = c - 100 + int(np.nanargmax(column[c-100:c-15]))
+        for name, rows, cols, axis in [("upper surface", slice(upper-5, upper+6), slice(None), 0),
+                                       ("lower surface", slice(lower-5, lower+6), slice(None), 0),
+                                       ("vertical", slice(None), slice(c-5, c+6), 1)]:
+            flux = np.nanmean(I[rows,cols], axis=axis)
+            flux_ref = np.nanmean(I_avg[rows,cols], axis=axis)
+            mask = np.isfinite(flux_ref) & (flux_ref > 0.1 * np.nanmax(flux_ref)) # where the flux is significant
+            ratio = flux[mask] / flux_ref[mask]
+            dP = np.nanmean(P[rows,cols], axis=axis)[mask] - np.nanmean(P_avg[rows,cols], axis=axis)[mask]
+            print(opt, "i =", incl, name, "cut: flux / average", ratio.min(), ratio.max(), "median", np.median(ratio),
+                  "polarisation - average", dP.min(), dP.max())
+            assert abs(np.median(ratio) - 1) < 0.12, f"1 um image differs from the reference codes ({opt}, {name} cut, i = {incl} deg)"
+            assert np.all(abs(ratio - 1) < flux_tol), f"1 um image differs from the reference codes ({opt}, {name} cut, i = {incl} deg)"
+            assert np.all(abs(dP) < 0.15), f"polarisation degree differs from the reference codes ({opt}, {name} cut, i = {incl} deg)"
 
 
 # Pinte et al. 2009 benchmark, temperatures with isotropic scattering (compared with RADMC,

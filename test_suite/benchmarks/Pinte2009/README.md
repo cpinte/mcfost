@@ -24,6 +24,14 @@ Model (section 3 of the paper), common to the four files:
   parameters, 10 inclinations equally spaced in cos(i) = 0.05, ..., 0.95
   (i = 18.2 to 87.1 deg).
 
+The SEDs are computed at the 51 wavelengths of the benchmark
+(`Pinte2009.lambda`, MCFOST utils): with a wavelength file, the SED step uses
+narrow bins and the stellar flux is computed at each wavelength. With the
+default wavelength grid ("use default wavelength grid for output" = T), the
+stellar flux of an SED point is averaged over the logarithmic bin of the
+temperature grid, 9-19 % higher than the monochromatic value below 0.3 um for
+this 4000 K star.
+
 The star must be a blackbody: the parameter file can only select a stellar
 spectrum, so use the `-star_bb` option for every run:
 
