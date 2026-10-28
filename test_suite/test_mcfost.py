@@ -585,8 +585,8 @@ def test_pascucci_benchmark(tau, ref_dir, sed_tol, lambda_min, temp_tol):
 # - tau = 1e6 images at 69.5 and 87.1 deg (paper Figs. 7 and 8), rt2 with -rt2_angles 45 and
 #   rt1 with 1.28e7 packets, cuts through the two disc surfaces and through the centre:
 #   flux 17 % per point with rt2 and up to 31 % with rt1 (Monte Carlo noise, lower surface at
-#   69.5 deg, where MCFOST 2009 and MCMax differ by 23 %), medians 9 %, polarisation degree
-#   0.12 (rt1). Slightly
+#   69.5 deg, where MCFOST 2009 and MCMax differ by 23 %), medians 9 % with rt2 and up to
+#   14 % with rt1 (same cut), polarisation degree 0.12 (rt1). Slightly
 #   looser than in the paper (10 %, 0.05) because the 2009 maps predate the 2026 fix of the
 #   polarisation in multiple scattering, which changes the dark lane and the polarisation.
 _pinte2009_cases = [
@@ -674,12 +674,13 @@ def test_pinte2009_benchmark(tau, temp_tol, opt):
         # both ray-tracing methods: rt2 with a finer angular sampling of the scattered radiation
         # field (the default 15 directions smooth the forward scattering peak of the 1 um grains,
         # making the near side of the disc next to the star 30-40 % too faint), and rt1
-        _check_pinte2009_images(root_dir, results, "-rt2 -rt2_angles 45", 0.30)
-        # rt1 is noisier: same medians, looser points (faint regions of the cuts)
-        _check_pinte2009_images(root_dir, results, "-rt1 -nphot_img 1.28e7", 0.40)
+        _check_pinte2009_images(root_dir, results, "-rt2 -rt2_angles 45", 0.12, 0.30)
+        # rt1 is noisier, in particular on the faint lower surface at 69.5 deg (median 0.87-0.98
+        # of the reference average from run to run): looser medians and points
+        _check_pinte2009_images(root_dir, results, "-rt1 -nphot_img 1.28e7", 0.20, 0.40)
 
 
-def _check_pinte2009_images(root_dir, results, opt, flux_tol):
+def _check_pinte2009_images(root_dir, results, opt, median_tol, flux_tol):
     # 1 um images and linear polarisation maps of the tau = 1e6 model at 69.5 and 87.1 deg
     # (paper Figs. 7 and 8): 11 pixel wide cuts through the upper and lower disc surfaces
     # (brightest rows of the reference images at least 15 pixels from the star) and through
@@ -718,7 +719,7 @@ def _check_pinte2009_images(root_dir, results, opt, flux_tol):
             dP = np.nanmean(P[rows,cols], axis=axis)[mask] - np.nanmean(P_avg[rows,cols], axis=axis)[mask]
             print(opt, "i =", incl, name, "cut: flux / average", ratio.min(), ratio.max(), "median", np.median(ratio),
                   "polarisation - average", dP.min(), dP.max())
-            assert abs(np.median(ratio) - 1) < 0.12, f"1 um image differs from the reference codes ({opt}, {name} cut, i = {incl} deg)"
+            assert abs(np.median(ratio) - 1) < median_tol, f"1 um image differs from the reference codes ({opt}, {name} cut, i = {incl} deg)"
             assert np.all(abs(ratio - 1) < flux_tol), f"1 um image differs from the reference codes ({opt}, {name} cut, i = {incl} deg)"
             assert np.all(abs(dP) < 0.15), f"polarisation degree differs from the reference codes ({opt}, {name} cut, i = {incl} deg)"
 
