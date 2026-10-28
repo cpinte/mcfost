@@ -372,12 +372,15 @@ release_doc:
 # Local files are not distributed: update date (.last_update), installed release
 # (.sha1) and macOS metadata (COPYFILE_DISABLE: no AppleDouble ._* files,
 # --no-xattrs --no-mac-metadata: no extended attributes, unknown to GNU tar).
+# Files and directories made readable by all: tar extracting as root (setuid tar on
+# the ifort CI runner) keeps the archived owner and modes.
 UTILS_DIR = /user/publicdir/pintec/mcfost_utils
 UTILS_VERSION = $(shell cat ../utils/Version)
 
 release_utils :
 	@grep -q "required_utils_version = $(UTILS_VERSION)$$" mcfost_env.f90 || \
 	  { echo "../utils/Version ($(UTILS_VERSION)) differs from required_utils_version in mcfost_env.f90" ; exit 1 ; }
+	chmod -R u+rwX,go+rX ../utils
 	COPYFILE_DISABLE=1 tar czvf mcfost_utils.tgz --no-xattrs --no-mac-metadata --exclude=.last_update --exclude=.sha1 --exclude='*.download' \
 	  --exclude=.DS_Store --exclude='._*' -C../utils .
 	openssl sha1 mcfost_utils.tgz | awk '{print $$2}' > mcfost_utils.sha1

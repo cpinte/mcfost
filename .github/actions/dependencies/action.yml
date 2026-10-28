@@ -70,8 +70,10 @@ runs:
           ${{ env.MCFOST_INSTALL }}/lib/${{ matrix.compiler }}
         key: mcfost-TEST-deps-${{ matrix.os }}-${{ matrix.compiler }}-${{ hashFiles('lib/install.sh') }}
 
-    - name: unset setuid bit for tar if cache not found
-      if: matrix.compiler == 'ifort' && matrix.os == 'linux' && steps.cache-deps.outputs.cache-hit != 'true'
+    # also after a cache hit: otherwise mcfost -setup extracts the utils as root, keeping the
+    # archived owner, and files not readable by all are then unreadable by the tests
+    - name: unset setuid bit for tar once the cache is restored
+      if: matrix.compiler == 'ifort' && matrix.os == 'linux'
       shell: bash
       run: sudo chmod u-s /bin/tar
 
