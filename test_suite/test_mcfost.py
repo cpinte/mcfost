@@ -501,7 +501,7 @@ def test_mdot_option():
 
 # Pascucci et al. 2004 benchmark: SEDs and midplane temperatures compared with the
 # RADMC and RADICAL results of the paper (distributed with the MCFOST utils).
-# Optically thin cases run for every pull request, optically thick ones with --run-slow.
+# Optically thin cases run for every pull request, optically thick ones only locally (slow).
 # Largest differences with MCFOST 4.1.16 (October 2026), SED (all wavelengths, >= 1 um
 # for tau = 100 where some RADMC optical fluxes are 0) and midplane temperature: 3.9 % and
 # 2.1 % (tau = 0.1), 8.1 % and 2.7 % (tau = 1), 15.6 % and 3.9 % (tau = 10), 15.6 % and
@@ -574,7 +574,7 @@ def test_pascucci_benchmark(tau, ref_dir, sed_tol, lambda_min, temp_tol):
 # Pinte et al. 2009 benchmark (very optically thick disc, anisotropic scattering), following
 # the comparisons of the paper (Sect. 4): SEDs and images relative to the average of the
 # codes, temperatures, 11 pixel wide cuts in the images and polarisation maps. Results of
-# the codes distributed with the MCFOST utils. Long tests (--run-slow).
+# the codes distributed with the MCFOST utils. Long tests (local runs only).
 # Largest differences with MCFOST 4.1.16 over several runs (October 2026):
 # - SED per wavelength relative to the average of MCMax and MCFOST 2009 (which agree within
 #   2-7 %): 21 % up to 76 deg, from the Monte Carlo noise of the ray-traced scattered thermal

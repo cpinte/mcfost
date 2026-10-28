@@ -58,7 +58,7 @@ images and polarisation at high inclinations.
 
 ## Tests
 
-`test_mcfost.py::test_pinte2009_benchmark` (long test suite, `pytest --run-slow`)
+`test_mcfost.py::test_pinte2009_benchmark` (long test, local runs only, skipped on CI)
 runs the tau = 1e3 and 1e6 models and compares the SEDs at the 10 inclinations
 with MCMax and MCFOST 2009, the midplane temperatures with MCMax, TORUS and
 MCFOST 2009, and the vertical temperatures at 0.2 and 200 au with MCMax and

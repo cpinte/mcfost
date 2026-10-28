@@ -81,6 +81,6 @@ wavelengths and both inclinations, MCFOST / RADMC and MCFOST / RADICAL:
 
 `test_mcfost.py::test_pascucci_benchmark` runs these models and compares the
 SEDs and the midplane temperatures with RADMC and RADICAL:
-tau = 0.1 and 1 in the default test suite (pull requests), tau = 10 and 100
-with `pytest --run-slow`. The tests are skipped if the results are not in the
+tau = 0.1 and 1 in every run (including pull requests), tau = 10 and 100
+in local runs only (long tests, skipped on CI). The tests are skipped if the results are not in the
 utils.

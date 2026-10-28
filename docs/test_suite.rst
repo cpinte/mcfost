@@ -44,12 +44,13 @@ The parameter files of the benchmark of `Pascucci et al. 2004 <https://ui.adsabs
 
 The test suite compares the SEDs (above 1 micron) and midplane temperatures of the Pascucci et al. 2004
 models with the RADMC and RADICAL results: the optically thin cases (optical depths 0.1 and 1) run by
-default, including for every pull request, the optically thick ones (10 and 100, a few minutes) only with
-the option below. The long test suite also compares the Pinte et al. 2009 models with optical depths 10\ :sup:`3`
+in every run, including for every pull request, the optically thick ones (10 and 100, a few minutes) only in
+local runs. The long tests also compares the Pinte et al. 2009 models with optical depths 10\ :sup:`3`
 and 10\ :sup:`6` (SEDs, midplane and vertical temperatures, and for 10\ :sup:`6` the 1 micron scattered light
 images and linear polarisation degree) with the MCMax, TORUS and MCFOST 2009 results, and the temperatures with
-isotropic scattering and without scattering with RADMC, ProDiMo, RADICAL, TORUS and MCFOST 2009 (about 4 minutes)::
+isotropic scattering and without scattering with RADMC, ProDiMo, RADICAL, TORUS and MCFOST 2009.
 
-     $ pytest --run-slow
+Long tests are marked ``@pytest.mark.slow`` (see ``test_suite/conftest.py``): they run locally and are
+skipped on CI (environment variable ``CI=true``). To skip them locally::
 
-Long tests are marked ``@pytest.mark.slow`` (see ``test_suite/conftest.py``).
+     $ pytest -m "not slow"
