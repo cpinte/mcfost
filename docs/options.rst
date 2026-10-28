@@ -82,6 +82,17 @@ Options related to images
 
 ``-rt1`` or ``-rt2``: use ray-tracing method and force ray-tracing method
 
+``-rt2_angles <n>`` (default : 15): number of directions sampling the scattered radiation field
+in each cell in ray-tracing method 2 (``n`` x ``n`` directions, and ``n`` outgoing directions).
+The memory needed scales as ``n``\ :sup:`2`. Increase it for grains with a strongly forward
+scattering phase function (e.g. micron-sized grains in the optical and near-infrared), where the
+default sampling underestimates the multiply scattered light: for the Pinte et al. 2009 benchmark
+at 1 micron, the near side of the disc next to the star is 30-40 % too faint with 15 directions,
+and within 10 % with 45.
+
+``-rt2_star_angles <n>`` (default : 1000): number of directions for the first scattering of the
+stellar light in ray-tracing method 2.
+
 ``-no-rt``: do not output the ray-tracing results
 
 ``-mc``:  keep Monte-Carlo output in ray-tracing mode

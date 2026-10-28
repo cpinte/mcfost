@@ -103,14 +103,15 @@ subroutine alloc_ray_tracing()
 
   ! Variables for rt2
   ! n_phi_I and n_theta_I are the angular dimensions of the stored radiation field for rt2
-  ! 15 15 90 90 OK for benchmarks
-  n_phi_I = 15 ; ! 17/11/10 semble mieux si egal a nang_ray_tracing
-  n_theta_I = 15 ;
+  ! (multiple scattering), kept equal to nang_ray_tracing (17/11/10: works better)
+  ! Default 15: memory of I_spec scales as rt2_n_angles^2 x n_cells x threads
+  n_phi_I = rt2_n_angles
+  n_theta_I = rt2_n_angles
 
   ! Number of angular directions were the the scattered radiation field will be calculated
   ! We use a higher direction for the stellar radiation field, as it the radiation field is directive and not 2 or 3D
-  nang_ray_tracing = 15 ;
-  nang_ray_tracing_star = 1000 ;
+  nang_ray_tracing = rt2_n_angles
+  nang_ray_tracing_star = rt2_n_angles_star
 
   if (lisotropic) then
      n_phi_I = 1 ;
@@ -875,13 +876,13 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
 
   real :: s11
 
-  ! Many dimensions but small numbers (<1MB for default values)
-  real, dimension(N_super,N_super,n_theta_I,n_phi_I,nang_ray_tracing,0:1) :: tab_sin_scatt_norm
-  integer, dimension(N_super,N_super,n_theta_I,n_phi_I,nang_ray_tracing,0:1) :: tab_k
+  ! Many dimensions: <1MB for the default 15 angles, but 1.e2 MB for 45 (-rt2_angles): allocated
+  real, dimension(:,:,:,:,:,:), allocatable :: tab_sin_scatt_norm
+  integer, dimension(:,:,:,:,:,:), allocatable :: tab_k
 
-  real, dimension(n_theta_I,n_phi_I,nang_ray_tracing,0:1) :: s11_save
+  real, dimension(:,:,:,:), allocatable :: s11_save
   ! (Q,U) blocks of the rotation matrices of the scattering towards the observer
-  real(kind=dp), dimension(2,2,n_theta_I,n_phi_I,nang_ray_tracing,0:1) :: tab_rop, tab_rpo
+  real(kind=dp), dimension(:,:,:,:,:,:), allocatable :: tab_rop, tab_rpo
 
   ! Observer direction in reference frame
   uv0 = tab_uv_rt(ibin) ; w0 = tab_w_rt(ibin) ! epsilon needed here
@@ -891,6 +892,12 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   allocate(Inu(N_type_flux,n_theta_I,n_phi_I,n_cells), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error I_nu')
   Inu = 0.0_dp
+  allocate(tab_sin_scatt_norm(N_super,N_super,n_theta_I,n_phi_I,nang_ray_tracing,0:1), &
+       tab_k(N_super,N_super,n_theta_I,n_phi_I,nang_ray_tracing,0:1), &
+       s11_save(n_theta_I,n_phi_I,nang_ray_tracing,0:1), &
+       tab_rop(2,2,n_theta_I,n_phi_I,nang_ray_tracing,0:1), tab_rpo(2,2,n_theta_I,n_phi_I,nang_ray_tracing,0:1), &
+       stat=alloc_status)
+  if (alloc_status > 0) call error('Allocation error calc_Isca_rt2')
 
   id = 1
 
@@ -1130,7 +1137,7 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   !$omp enddo
   !$omp end parallel
 
-  deallocate(Inu)
+  deallocate(Inu, tab_sin_scatt_norm, tab_k, s11_save, tab_rop, tab_rpo)
   return
 
 end subroutine calc_Isca_rt2

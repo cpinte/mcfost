@@ -826,6 +826,20 @@ subroutine initialisation_mcfost()
         lscatt_ray_tracing1=.true.
         lscatt_ray_tracing2=.false.
         if (.not.lmc) loutput_mc=.false.
+     case("-rt2_angles")
+        i_arg = i_arg + 1
+        if (i_arg > n_args) call error("-rt2_angles needs a number of angles")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) rt2_n_angles
+        if ((ios /= 0) .or. (rt2_n_angles < 1)) call error("-rt2_angles: cannot read the number of angles: "//trim(s))
+        i_arg = i_arg + 1
+     case("-rt2_star_angles")
+        i_arg = i_arg + 1
+        if (i_arg > n_args) call error("-rt2_star_angles needs a number of angles")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) rt2_n_angles_star
+        if ((ios /= 0) .or. (rt2_n_angles_star < 1)) call error("-rt2_star_angles: cannot read the number of angles: "//trim(s))
+        i_arg = i_arg + 1
      case("-rt2")
         i_arg = i_arg + 1
         lscatt_ray_tracing=.true.
@@ -1995,6 +2009,9 @@ subroutine display_help()
   write(*,*) "        : -nphot_img : overwrite the value in the parameter file"
   write(*,*) "        : -rt : use ray-tracing method to compute images or SEDs (on by default)"
   write(*,*) "        : -rt1 or -rt2 : use ray-tracing method and force ray-tracing method"
+  write(*,*) "        : -rt2_angles <n> : angular sampling of the scattered radiation field in rt2 (default 15)"
+  write(*,*) "                            memory scales as n^2: increase for strongly forward scattering grains"
+  write(*,*) "        : -rt2_star_angles <n> : directions for the first scattering of the stellar light in rt2 (default 1000)"
   write(*,*) "        : -no-rt : do not output the ray-tracing results"
   write(*,*) "        : -mc :  keep Monte-Carlo output in ray-tracing mode"
   write(*,*) "        : -n_MC_bins <n_inclinations> <n_azimuth> (default : 10 1)"
