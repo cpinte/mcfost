@@ -270,6 +270,11 @@ OBJECTS= $(SOURCES:.f90=.o)
 # Compile
 main : mcfost
 
+# Every object waits for the system check (order-only): on a fresh tree or after a change of
+# compiler, checksys runs "make clean", which removed the .mod files of objects being compiled
+# in parallel (make -j)
+$(OBJECTS) voro++_wrapper.o $(XGBOOST_WRAPPER).o mcfost.o mcfost2phantom.o : | .make_lastsystem
+
 # Module dependencies (a.o : b.o when a.f90 uses a module of b.f90), generated from
 # the sources so that a parallel build (make -j) compiles each module first
 # sha.f90 and operating_system.f90 are generated (their modules are mapped by make_depend.sh):
