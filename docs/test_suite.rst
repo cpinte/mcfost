@@ -43,14 +43,14 @@ The parameter files of the benchmark of `Pascucci et al. 2004 <https://ui.adsabs
 (``benchmarks/Pascucci2004``). They also need the ``-star_bb`` option.
 
 The test suite compares the SEDs (above 1 micron) and midplane temperatures of the Pascucci et al. 2004
-models with the RADMC and RADICAL results: the optically thin cases (optical depths 0.1 and 1) run by
-in every run, including for every pull request, the optically thick ones (10 and 100, a few minutes) only in
-local runs. The long tests also compares the Pinte et al. 2009 models with optical depths 10\ :sup:`3`
+models with the RADMC and RADICAL results: the optically thin cases (optical depths 0.1 and 1) run
+everywhere, including for every pull request; the optically thick ones (10 and 100, a few minutes) run only
+locally. The long tests also compare the Pinte et al. 2009 models with optical depths 10\ :sup:`3`
 and 10\ :sup:`6` (SEDs, midplane and vertical temperatures, and for 10\ :sup:`6` the 1 micron scattered light
 images and linear polarisation degree) with the MCMax, TORUS and MCFOST 2009 results, and the temperatures with
 isotropic scattering and without scattering with RADMC, ProDiMo, RADICAL, TORUS and MCFOST 2009.
 
 Long tests are marked ``@pytest.mark.slow`` (see ``test_suite/conftest.py``): they run locally and are
-skipped on CI (environment variable ``CI=true``). To skip them locally::
+skipped on CI (environment variable ``CI=true``). They add about 10 minutes to a local run. To skip them::
 
      $ pytest -m "not slow"

@@ -6,6 +6,8 @@ import shutil
 import glob
 import os
 
+from conftest import ON_CI
+
 _mcfost_bin = "../src/mcfost"
 
 # Get list of models using directory names (filtering out hidden and AppleDouble files)
@@ -15,7 +17,7 @@ model_list = [
 ]
 
 # If running on CI, only run some of the tests
-#if os.environ.get('CI', None) == 'true':
+#if ON_CI:
 #    model_list = ["ref3.0","ref3.0_multi","debris","discF_00500"]
 
 #model_list = ["ref3.0"]#,"debris","discF_00500"]
@@ -176,7 +178,7 @@ def test_mol_map(model_name):
 @pytest.mark.parametrize("wl", wl_list)
 def test_image(model_name, wl):
 
-    if os.environ.get('CI', None) == 'true':
+    if ON_CI:
         if (model_name == "discF_00500"):
             # This requires too much memory on CI
             pytest.skip("Skipping images on phantom dump on CI")
@@ -246,7 +248,7 @@ def test_image(model_name, wl):
 def test_pola(model_name, wl):
     # Re-use previous calculation
 
-    if os.environ.get('CI', None) == 'true':
+    if ON_CI:
         if (model_name == "discF_00500"):
             # This requires too much memory on CI
             pytest.skip("Skipping images on phantom dump on CI")
@@ -288,7 +290,7 @@ def test_pola(model_name, wl):
 def test_contrib(model_name, wl):
     # Re-use previous calculation
 
-    if os.environ.get('CI', None) == 'true':
+    if ON_CI:
         if (model_name == "discF_00500"):
             # This requires too much memory on CI
             pytest.skip("Skipping images on phantom dump on CI")
