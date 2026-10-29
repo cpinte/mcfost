@@ -443,9 +443,9 @@ function temperature_filename(file) result(filename)
   character(len=*), intent(in) :: file
   character(len=1024) :: filename
 
-  if (file(1:1) == "/") then
+  if (index(file, "/") == 1) then
      filename = file
-  else if (file(1:10) == "./data_th/") then
+  else if (index(file, "./data_th/") == 1) then
      filename = trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(file(3:))
   else
      filename = trim(root_dir)//"/"//trim(file)

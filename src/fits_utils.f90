@@ -100,7 +100,7 @@ function fits_overwrite(filename) result(name)
   character(len=*), intent(in) :: filename
   character(len=:), allocatable :: name
 
-  if (filename(1:1) == "!") then
+  if (index(filename, "!") == 1) then
      name = trim(filename)
   else
      name = "!"//trim(filename)
