@@ -9,7 +9,7 @@ module ProDiMo
   use stars, only : star_spectrum, ProDiMo_star_HR, E_stars, R_ISM
   use read_params
   use sha
-  use utils, only : system_call
+  use utils, only : system_call, shell_quote, tmp_filename
   use messages
   use thermal_emission
   use mcfost_env
@@ -366,7 +366,7 @@ contains
     !  N = int f(a) da   <a^i> = 1/N * int int f(a) a^i da
     ! - separation of constribution
 
-    use fits_utils, only : print_error
+    use fits_utils, only : print_error, fits_overwrite
 
     integer :: status,unit,blocksize,bitpix,naxis
     integer, dimension(5) :: naxes
@@ -449,7 +449,7 @@ contains
 
     !  Create the new empty FITS file.
     blocksize=1
-    call ftinit(unit,trim(filename),blocksize,status)
+    call ftinit(unit,fits_overwrite(filename),blocksize,status)
 
     !------------------------------------------------------------------------------
     ! HDU 1 : grid
@@ -650,7 +650,7 @@ contains
 
     do lambda=1,n_lambda
        wl = tab_lambda(lambda) * 1e-6
-       spectrum(lambda) = (chi_ISM * 1.71 * Wdil * Blambda(wl,T_ISM_stars) + Blambda(wl,TCmb)) * wl
+       spectrum(lambda) = (chi_ISM * 1.71 * Wdil * Blambda(wl,T_ISM_stars) + Blambda(wl,T_Cmb)) * wl
     enddo
 
     !  Write the array to the FITS file.
@@ -727,7 +727,7 @@ contains
        n_sent_photons = sum(n_phot_envoyes_ISM(lambda,:))
 
        wl = tab_lambda(lambda) * 1e-6
-       photon_energy = (chi_ISM * 1.71 * Wdil * Blambda(wl,T_ISM_stars) + Blambda(wl,TCmb)) * wl & !lambda.F_lambda
+       photon_energy = (chi_ISM * 1.71 * Wdil * Blambda(wl,T_ISM_stars) + Blambda(wl,T_Cmb)) * wl & !lambda.F_lambda
            * (4.*pi*R_ISM**2) / n_sent_photons / pi
 
        do ri=1, n_rad
@@ -1167,7 +1167,6 @@ contains
     ! Create the *.in files for ProDiMo
     ! C. Pinte 17/03/2012
 
-    character(len=512) :: cmd
 
     character(len=128) :: line
     character(len=10) :: fmt
@@ -1179,12 +1178,11 @@ contains
 
     write (*,*) 'Creating directory '//trim(data_ProDiMo)
     ! Copy *.in files ()
-    cmd = 'mkdir -p '//trim(data_ProDiMo)//" ; "// &
-         "cp "//trim(ProDiMo_input_dir)//"/Elements.in "&
-         //trim(ProDiMo_input_dir)//"/LineTransferList.in "&
-         //trim(ProDiMo_input_dir)//"/Reactions.in "&
-         //trim(ProDiMo_input_dir)//"/Species.in "//trim(data_ProDiMo)
-    call system_call(cmd,syst_status)
+    call system_call('mkdir -p '//shell_quote(data_ProDiMo)//" ; "// &
+         "cp "//shell_quote(trim(ProDiMo_input_dir)//"/Elements.in")//" " &
+         //shell_quote(trim(ProDiMo_input_dir)//"/LineTransferList.in")//" " &
+         //shell_quote(trim(ProDiMo_input_dir)//"/Reactions.in")//" " &
+         //shell_quote(trim(ProDiMo_input_dir)//"/Species.in")//" "//shell_quote(data_ProDiMo), syst_status)
 
 
     ! Copy and modify Parameter.in
@@ -1328,8 +1326,8 @@ contains
     ! Copie temporaire et lecture du fichier de parameters
     ! car je ne connais pas le nom du fichier .par dans data_th
     n_files = 0
-    cmd = "ls data_th/*.par* | wc -l > n_files.tmp" ; call system_call(cmd, syst_status)
-    open(unit=1, file="n_files.tmp", status='old')
+    cmd = "ls data_th/*.par* | wc -l > "//shell_quote(tmp_filename("n_files.tmp")) ; call system_call(cmd, syst_status)
+    open(unit=1, file=tmp_filename("n_files.tmp"), status='old')
     read(1,*) n_files
     close(unit=1,status="delete")
 

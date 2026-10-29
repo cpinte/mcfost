@@ -1304,13 +1304,13 @@ contains
                 lupdate_photosphere = .true.
                 star(i)%T = max(xyzmh_ptmass(13,i),100.)
                 ! deriving radius from luminosity (Reff is not correct in dump)
-                star(i)%r = sqrt(xyzmh_ptmass(12,i) * uWatt / Lsun) * (Tsun/star(i)%T)**2
+                star(i)%r = sqrt(xyzmh_ptmass(12,i) * uWatt / Lsun) * (Teff_Sun/star(i)%T)**2
              else if (xyzmh_ptmass(14,i) > tiny_real) then
                 ! sink particle Reff is defined
                 write(*,*) "Using Reff and Lum from phantom:"
                 lupdate_photosphere = .true.
                 star(i)%r = xyzmh_ptmass(14,i) * ulength_m / Rsun
-                star(i)%T =  Tsun * (xyzmh_ptmass(12,i) * uWatt / Lsun)**0.25 / sqrt(star(i)%r)
+                star(i)%T =  Teff_Sun * (xyzmh_ptmass(12,i) * uWatt / Lsun)**0.25 / sqrt(star(i)%r)
              else if (xyzmh_ptmass(12,i) > tiny_real) then
                 ! We use the luminosity and a radius estimate
                 write(*,*) "Using Lum from phantom + effective radius from sink:"
@@ -1318,7 +1318,7 @@ contains
                 star(i)%r = 0.001
                 if (xyzmh_ptmass(12,i) > tiny_real) then
                    star(i)%r = max(xyzmh_ptmass(5,i),xyzmh_ptmass(6,i)) * ulength_m / Rsun
-                   if (star(i)%r > 0.) star(i)%T =  Tsun * (xyzmh_ptmass(12,i) * uWatt / Lsun)**0.25 / sqrt(star(i)%r)
+                   if (star(i)%r > 0.) star(i)%T =  Teff_Sun * (xyzmh_ptmass(12,i) * uWatt / Lsun)**0.25 / sqrt(star(i)%r)
                 endif
              else
                 if (lupdate_photosphere) then ! if we updated the 1st sink

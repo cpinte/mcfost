@@ -557,7 +557,6 @@ subroutine prop_grains(lambda)
   ! Case where Mueller matrices are provided as inputs added
   ! 20/04/2023
 
-  !use benchmarks, only : read_Pascucci_cross_sections
 
   implicit none
 
@@ -663,6 +662,9 @@ subroutine prop_grains(lambda)
 
   if (loverwrite_s12) call overwrite_s12(Pmax)
 
+  ! Benchmark: tabulated cross-sections instead of Mie theory
+  if (lbenchmark_Pascucci) call Pascucci_cross_sections(lambda)
+
   ! Verif normalization
   !-- do  k=1,n_grains_tot
   !--    norm = 0.0
@@ -678,6 +680,69 @@ subroutine prop_grains(lambda)
   return
 
 end subroutine prop_grains
+
+!******************************************************************************
+
+subroutine Pascucci_cross_sections(lambda)
+  ! Benchmark Pascucci et al 2004: replaces the grain properties computed with Mie
+  ! theory by the cross-sections tabulated for the benchmark (Pascucci_optSi.dat,
+  ! 0.12 micron astronomical silicate grains), interpolated in log-log at the
+  ! wavelength. Scattering is isotropic in the benchmark (g = 0).
+
+  use utils, only : in_dir
+
+  integer, intent(in) :: lambda
+
+  character(len=*), parameter :: filename = "Pascucci_optSi.dat"
+  integer, parameter :: n_tab = 61 ! wavelengths of the table
+
+  real(kind=dp), dimension(n_tab), save :: lambda_tab, Csca_tab, Cext_tab
+  logical, save :: lread = .false.
+
+  character(len=512) :: dir
+  real(kind=dp) :: wl, f, Cext, Csca
+  integer :: l, ios, unit
+
+  if (.not.lread) then
+     dir = in_dir(filename, dust_dir, status=ios)
+     if (ios /= 0) call error("dust file cannot be found: "//filename)
+     open(newunit=unit, file=trim(dir)//filename, status="old", action="read", iostat=ios)
+     if (ios /= 0) call error("cannot open "//trim(dir)//filename)
+     ! Skipping header (grain radius and number of wavelengths are in the header)
+     do l=1,11
+        read(unit,*)
+     enddo
+     do l=1, n_tab
+        read(unit,*,iostat=ios) lambda_tab(l), Csca_tab(l), Cext_tab(l) ! micron, m^2, m^2
+        if (ios /= 0) call error("cannot read "//filename)
+     enddo
+     close(unit)
+     lread = .true.
+  endif
+
+  if ((n_grains_tot /= 1) .or. (abs(r_grain(1) - 0.12) > 1e-3)) &
+       call error("Benchmark : a single grain size of 0.12 micron is needed for "//filename)
+
+  ! log-log interpolation (or extrapolation from the first or last 2 points)
+  wl = tab_lambda(lambda)
+  l = 1
+  do while ((l < n_tab-1) .and. (lambda_tab(l+1) <= wl))
+     l = l + 1
+  enddo
+  f = log(wl/lambda_tab(l)) / log(lambda_tab(l+1)/lambda_tab(l))
+  Cext = exp(log(Cext_tab(l)) + f * log(Cext_tab(l+1)/Cext_tab(l))) * m_to_mum**2 ! micron^2
+  Csca = exp(log(Csca_tab(l)) + f * log(Csca_tab(l+1)/Csca_tab(l))) * m_to_mum**2
+
+  C_ext(1,lambda) = Cext
+  C_sca(1,lambda) = Csca
+  C_abs(1,lambda) = Cext - Csca
+  C_abs_norm(1,lambda) = C_abs(1,lambda) * AU_to_cm * mum_to_cm**2
+  tab_albedo(1,lambda) = Csca / Cext
+  tab_g(1,lambda) = 0.0
+
+  return
+
+end subroutine Pascucci_cross_sections
 
 !******************************************************************************
 
@@ -1358,6 +1423,10 @@ subroutine write_dust_prop()
 
   real, dimension(:), allocatable :: kappa_lambda,albedo_lambda,g_lambda
   real, dimension(:,:), allocatable :: S11_lambda_theta, pol_lambda_theta, kappa_grain
+  character(len=1024) :: dust_dir
+
+  ! data_dir is data_th at this stage: the directory created by save_data_prop is rebuilt
+  dust_dir = trim(root_dir)//"/"//trim(seed_dir)//"/data_dust"
 
   write(*,*) "Writing dust properties"
   ! Rewrite step2 on top of step1 (we still get step 1 if step 2 does not finish)
@@ -1382,30 +1451,30 @@ subroutine write_dust_prop()
   kappa_lambda=real((kappa(icell,:)*kappa_factor(icell)/AU_to_cm)/(dust_mass(icell)/(volume(icell)*AU_to_cm**3))) ! cm^2/g
   albedo_lambda=tab_albedo_pos(icell,:)
 
-  call cfitsWrite("!data_dust/lambda.fits.gz",real(tab_lambda),shape(tab_lambda))
-  call cfitsWrite("!data_dust/kappa.fits.gz",kappa_lambda,shape(kappa_lambda))
-  call cfitsWrite("!data_dust/albedo.fits.gz",albedo_lambda,shape(albedo_lambda))
+  call cfitsWrite("!"//trim(dust_dir)//"/lambda.fits.gz",real(tab_lambda),shape(tab_lambda))
+  call cfitsWrite("!"//trim(dust_dir)//"/kappa.fits.gz",kappa_lambda,shape(kappa_lambda))
+  call cfitsWrite("!"//trim(dust_dir)//"/albedo.fits.gz",albedo_lambda,shape(albedo_lambda))
 
   if (aniso_method==2) then
      g_lambda=tab_g_pos(icell,:)
-     call cfitsWrite("!data_dust/g.fits.gz",g_lambda,shape(g_lambda))
+     call cfitsWrite("!"//trim(dust_dir)//"/g.fits.gz",g_lambda,shape(g_lambda))
   endif
 
   do l=1, n_lambda
      kappa_grain(l,:) = C_abs(:,l) * mum_to_cm**2 / M_grain(:) ! cm^2/g
   enddo
-  call cfitsWrite("!data_dust/kappa_grain.fits.gz",kappa_grain,shape(kappa_grain)) ! lambda, n_grains
+  call cfitsWrite("!"//trim(dust_dir)//"/kappa_grain.fits.gz",kappa_grain,shape(kappa_grain)) ! lambda, n_grains
 
   do l=1, n_lambda
      S11_lambda_theta(l,:)= tab_s11_pos(:,p_icell,l)
   enddo
-  call cfitsWrite("!data_dust/phase_function.fits.gz",S11_lambda_theta,shape(S11_lambda_theta))
+  call cfitsWrite("!"//trim(dust_dir)//"/phase_function.fits.gz",S11_lambda_theta,shape(S11_lambda_theta))
 
   if (lsepar_pola) then
      do l=1, n_lambda
         pol_lambda_theta(l,:) = -tab_s12_o_s11_pos(:,p_icell,l) ! Already normalized by S11
      enddo
-     call cfitsWrite("!data_dust/polarizability.fits.gz",pol_lambda_theta,shape(pol_lambda_theta))
+     call cfitsWrite("!"//trim(dust_dir)//"/polarizability.fits.gz",pol_lambda_theta,shape(pol_lambda_theta))
   endif
 
   deallocate(kappa_lambda,albedo_lambda,g_lambda,S11_lambda_theta,pol_lambda_theta,kappa_grain)

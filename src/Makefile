@@ -187,7 +187,7 @@ endif
 
 ifeq ($(OPENMP), yes)
     FFLAGS+= ${FOMPFLAGS}
-    CCLAGS+= ${FOMPFLAGS}
+    CCFLAGS+= ${COMPFLAGS}
 endif
 
 ifeq ($(IPO), yes)
@@ -270,7 +270,23 @@ OBJECTS= $(SOURCES:.f90=.o)
 # Compile
 main : mcfost
 
-#include .depend
+# Every object waits for the system check (order-only): on a fresh tree or after a change of
+# compiler, checksys runs "make clean", which removed the .mod files of objects being compiled
+# in parallel (make -j)
+$(OBJECTS) voro++_wrapper.o $(XGBOOST_WRAPPER).o mcfost.o mcfost2phantom.o : | .make_lastsystem
+
+# Module dependencies (a.o : b.o when a.f90 uses a module of b.f90), generated from
+# the sources so that a parallel build (make -j) compiles each module first
+# sha.f90 and operating_system.f90 are generated (their modules are mapped by make_depend.sh):
+# as prerequisites of .depend, they made the recursive "make checkmcfost" of mcfost_env.o loop
+DEP_SOURCES = $(foreach f,$(filter-out sha.f90 operating_system.f90,$(SOURCES)) mcfost.f90 mcfost2phantom.f90,$(firstword $(wildcard $(f) $(gdir)/$(f))))
+
+.depend : make_depend.sh $(DEP_SOURCES)
+	sh make_depend.sh $(DEP_SOURCES) > .depend
+
+ifeq (,$(filter clean cleanall cleandata cleandata_dust cleanGasmod checkmcfost,$(MAKECMDGOALS)))
+-include .depend
+endif
 
 all : mcfost libmcfost.a
 
@@ -335,8 +351,9 @@ operating_system.f90 : sha.o
 		>> operating_system.f90
 	printf "end module os\n" >> operating_system.f90
 
-mcfost2prodimo :  mcfost mcfost2prodimo.o
-	$(FF) $(FFLAGS_EXE) -o mcfost2prodimo mcfost2prodimo.f90 $(LIBS_FITS)
+# Reads data_th/forProDiMo.fits.gz (written with -prodimo) and prints its content
+mcfost2prodimo : mcfost2prodimo.f90 libmcfost.a
+	$(FC) $(FFLAGS) -I. mcfost2prodimo.f90 -o mcfost2prodimo libmcfost.a $(LDFLAGS)
 
 #------------------------------------------------------------------------------#
 # Release
@@ -355,12 +372,15 @@ release_doc:
 # Local files are not distributed: update date (.last_update), installed release
 # (.sha1) and macOS metadata (COPYFILE_DISABLE: no AppleDouble ._* files,
 # --no-xattrs --no-mac-metadata: no extended attributes, unknown to GNU tar).
+# Files and directories made readable by all: tar extracting as root (setuid tar on
+# the ifort CI runner) keeps the archived owner and modes.
 UTILS_DIR = /user/publicdir/pintec/mcfost_utils
 UTILS_VERSION = $(shell cat ../utils/Version)
 
 release_utils :
 	@grep -q "required_utils_version = $(UTILS_VERSION)$$" mcfost_env.f90 || \
 	  { echo "../utils/Version ($(UTILS_VERSION)) differs from required_utils_version in mcfost_env.f90" ; exit 1 ; }
+	chmod -R u+rwX,go+rX ../utils
 	COPYFILE_DISABLE=1 tar czvf mcfost_utils.tgz --no-xattrs --no-mac-metadata --exclude=.last_update --exclude=.sha1 --exclude='*.download' \
 	  --exclude=.DS_Store --exclude='._*' -C../utils .
 	openssl sha1 mcfost_utils.tgz | awk '{print $$2}' > mcfost_utils.sha1
@@ -374,7 +394,7 @@ release_utils :
 .PHONY : clean cleandata cleandata_dust cleanall
 
 clean :
-	rm -rf *.o $(gdir)/*.o *.mod _dust_prop*.tmp _voronoi.tmp *.i90 operating_system.f90 system.o libmcfost.a $(UNIT_TESTS)
+	rm -rf *.o $(gdir)/*.o *.mod _dust_prop*.tmp _voronoi.tmp *.i90 operating_system.f90 system.o libmcfost.a $(UNIT_TESTS) .depend mcfost2prodimo
 	if test $(MCFOST_GIT) = 1 ; then rm -rf sha.f90; fi
 
 cleandata :

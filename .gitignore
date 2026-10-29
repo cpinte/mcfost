@@ -14,7 +14,9 @@ lib/include/*
 lib/lib/*
 src/libtmp/*
 src/.make_lastsystem
+src/.depend
 src/mcfost
+src/mcfost2prodimo
 src/operating_system.f90
 src/sha.f90
 src/system.f90
@@ -26,6 +28,7 @@ my_utils/
 
 #parameter files
 *.para
+!test_suite/benchmarks/*/*.para
 
 # unit test binaries (sources are test_suite/unit/*.f90)
 test_suite/unit/*

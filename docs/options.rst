@@ -82,6 +82,17 @@ Options related to images
 
 ``-rt1`` or ``-rt2``: use ray-tracing method and force ray-tracing method
 
+``-rt2_angles <n>`` (default : 15): number of directions sampling the scattered radiation field
+in each cell in ray-tracing method 2 (``n`` x ``n`` directions, and ``n`` outgoing directions).
+The memory needed scales as ``n``\ :sup:`2`. Increase it for grains with a strongly forward
+scattering phase function (e.g. micron-sized grains in the optical and near-infrared), where the
+default sampling underestimates the multiply scattered light: for the Pinte et al. 2009 benchmark
+at 1 micron, the near side of the disc next to the star is 30-40 % too faint with 15 directions,
+and within 10 % with 45.
+
+``-rt2_star_angles <n>`` (default : 1000): number of directions for the first scattering of the
+stellar light in ray-tracing method 2.
+
 ``-no-rt``: do not output the ray-tracing results
 
 ``-mc``:  keep Monte-Carlo output in ray-tracing mode
@@ -146,7 +157,7 @@ than at inner radius
 
 ``-output_J``: outputs the radiation field in each cell
 
-``-output_UV_field``: output the UV radation field between 912 and 2000 Angströms in each cell. units: Habings
+``-output_UV_field``: output the UV radiation field between 912 and 2050 Angströms in each cell. Units: Habing (G\ :sub:`0`)
 
 ``-puffed_up_rim  <h_rim / h0> <r_rim> <delta_r>``: add a puffed up inner rim to the disc, with an increased scale height by a factor  <h rim / h0> and up to a radius r. The width over the scale goes back to normal is delta_r
 
@@ -208,13 +219,16 @@ specified wavelength and stops
 
 ``-aggregate <GMM_input_file> <GMM_output_file>``
 
-``-optical_depth_map``, ``-od``: generates a map of integrated optical depths from the centre of each cell.
+``-optical_depth_to_cell``, ``-tau_to_cell``: generates a map of integrated optical depths from the centre of each cell.
 4 directions are considered. In order: towards the star, +z, -z and +x.
-Results are stored in ``optical_depth_map.fits.gz``
+Results are stored in ``optical_depth_to_cell.fits.gz`` in the data directory
+
+``-optical_depth_map``, ``-tau_map``: map of the optical depth along the line of sight for each pixel of the image,
+stored in ``tau_map.fits.gz`` in the data directory
 
 ``-average_grain_size``: computes average grain size in each cell,
 weighted by their geometrical cross-section;
-Results are stored in ``average_grain_size.fits.gz``
+Results are stored in ``average_grain_size.fits.gz`` in the data directory
 
 ``-HG``: uses an Heynyey-Greenstein function
 

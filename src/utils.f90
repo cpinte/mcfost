@@ -782,14 +782,12 @@ end function get_NH
 
 subroutine mcfost_setup()
 
-  character(len=512) :: cmd, s
-  integer ::  syst_status, mcfost_git
+  character(len=512) :: s
+  integer ::  mcfost_git
 
   call get_utils()
   ! Write date of the last time an update was searched for
-  cmd = "rm -rf "//trim(mcfost_utils)//"/.last_update"//" ; date +%s > "&
-       //trim(mcfost_utils)//"/.last_update"
-  call system_call(cmd, syst_status)
+  call write_last_update(0_8)
 
   ! We do not need to download the parameter files if we use the sources
   call get_environment_variable('MCFOST_GIT',s)
@@ -819,8 +817,11 @@ function mcfost_update(lforce_update, lmanual, n_days)
 
   character(len=512) :: cmd, url, url_sha1, last_version, current_binary
   character(len=40) :: mcfost_sha1, mcfost_update_sha1
+  character(len=:), allocatable :: version_tmp, binary_tmp
   integer ::  syst_status, ios
 
+  version_tmp = tmp_filename("version.txt")
+  binary_tmp = tmp_filename("which_mcfost_binary.txt")
 
   ! Last version
   write(*,*) "Checking last version ..."
@@ -828,7 +829,7 @@ function mcfost_update(lforce_update, lmanual, n_days)
   !cmd = "wget "//trim(webpage)//"/version.txt -q -T 5 -t 3"
   !cmd = "curl "//trim(webpage)//"version.txt -O -s"
   cmd = "curl "//trim(raw_webpage)//trim(version_file)//&
-       ' -s | grep mcfost_release | awk ''NF>1{print $NF}'' | sed s/\"//g > version.txt'
+       ' -s | grep mcfost_release | awk ''NF>1{print $NF}'' | sed s/\"//g > '//shell_quote(version_tmp)
   call system_call(cmd, syst_status)
   if (syst_status/=0) then
      write(*,*) "ERROR: Cannot connect to MCFOST server."
@@ -837,7 +838,7 @@ function mcfost_update(lforce_update, lmanual, n_days)
   endif
 
   ios=0
-  open(unit=1, file="version.txt", status='old',iostat=ios)
+  open(unit=1, file=version_tmp, status='old',iostat=ios)
   read(1,*,iostat=ios) last_version
   close(unit=1,status="delete",iostat=ios)
   if ( (ios/=0) .or. (.not.is_digit(last_version(1:1)))) then
@@ -938,14 +939,14 @@ function mcfost_update(lforce_update, lmanual, n_days)
      call get_command_argument(0,current_binary)
      if (current_binary(1:1)/=".") then
         write(*,'(a28, $)') "Locating current binary ..."
-        cmd = "rm -rf which_mcfost_binary.txt && which "//trim(current_binary)// &
-             " | awk '{print "//' "\"" $NF "\""'//"}' > which_mcfost_binary.txt"
+        cmd = "which "//shell_quote(current_binary)// &
+             " | awk '{print "//' "\"" $NF "\""'//"}' > "//shell_quote(binary_tmp)
         call system_call(cmd, syst_status)
 
         ios=0
-        open(unit=1, file="which_mcfost_binary.txt", status='old',iostat=ios)
+        open(unit=1, file=binary_tmp, status='old',iostat=ios)
         read(1,*,iostat=ios) current_binary
-        close(unit=1,iostat=ios)
+        close(unit=1,status="delete",iostat=ios)
 
         if ( (ios/=0) .or. (.not.is_digit(last_version(1:1)))) then
            write(*,*) ""
@@ -958,7 +959,7 @@ function mcfost_update(lforce_update, lmanual, n_days)
 
      ! make binary executable and update it
      write(*,'(a20, $)') "Updating binary ..."
-     cmd = "chmod a+x mcfost_update/mcfost ; mv mcfost_update/mcfost "//trim(current_binary)//" ; rm -rf mcfost_update"
+     cmd = "chmod a+x mcfost_update/mcfost ; mv mcfost_update/mcfost "//shell_quote(current_binary)//" ; rm -rf mcfost_update"
      call system_call(cmd, syst_status)
      if (syst_status /= 0) then
         write(*,*) "ERROR : the update failed for some unknown reason"
@@ -971,8 +972,7 @@ function mcfost_update(lforce_update, lmanual, n_days)
   endif ! lupdate
 
   ! Write date of the last time an update was searched for
-  cmd = "rm -rf "//trim(mcfost_utils)//"/.last_update"//" ; date +%s > "//trim(mcfost_utils)//"/.last_update"
-  call system_call(cmd, syst_status)
+  call write_last_update(0_8)
 
   mcfost_update = lupdate
 
@@ -1036,9 +1036,6 @@ subroutine exit_update(lmanual, n_days, lupdate)
   integer, intent(in) :: n_days
   logical, intent(out) :: lupdate
 
-  character(len=512) :: cmd, s
-  integer :: syst_status
-
   if (lmanual) then
      write(*,*) "Exiting."
      call exit(1)
@@ -1046,10 +1043,7 @@ subroutine exit_update(lmanual, n_days, lupdate)
      lupdate = .false.
      ! We try again tomorrow : Write date of the last time an update was searched for - (mcfost_auto_update -1) days
      write(*,*) "WARNING: Skipping auto-update. MCFOST will try again tomorrow."
-     write(s,*) (n_days-1) * 3600 * 24
-     cmd = "rm -rf "//trim(mcfost_utils)//"/.last_update"//" ; expr `date +%s` - "&
-          //trim(s)//" > "//trim(mcfost_utils)//"/.last_update"
-     call system_call(cmd, syst_status)
+     call write_last_update(int(n_days-1,kind=8) * 86400_8)
   endif
 
   return
@@ -1143,8 +1137,12 @@ subroutine mcfost_v()
   character(len=512) :: cmd, last_version
   integer ::  syst_status, line_number, ios
   character(len=128) :: sline_number
+  character(len=:), allocatable :: version_tmp, history_tmp, line_tmp
 
   syst_status = 0
+  version_tmp = tmp_filename("version.txt")
+  history_tmp = tmp_filename("history.txt")
+  line_tmp = tmp_filename("line_number.txt")
 
   write(*,*) "Binary compiled the ",__DATE__," at ",__TIME__
 #if defined (__INTEL_COMPILER)
@@ -1161,12 +1159,12 @@ subroutine mcfost_v()
   ! Last version
   write(*,*) "Checking last version ..."
   cmd = "curl "//trim(raw_webpage)//trim(version_file)//&
-       ' -s | grep mcfost_release | awk ''NF>1{print $NF}'' | sed s/\"//g > version.txt'
+       ' -s | grep mcfost_release | awk ''NF>1{print $NF}'' | sed s/\"//g > '//shell_quote(version_tmp)
   call system_call(cmd, syst_status)
   if (syst_status/=0) &
        call error("Cannot get MCFOST last version number (Error 1)","'"//trim(cmd)//"' did not run as expected.")
 
-  open(unit=1, file="version.txt", status='old',iostat=ios)
+  open(unit=1, file=version_tmp, status='old',iostat=ios)
   read(1,*,iostat=ios) last_version
   close(unit=1,status="delete",iostat=ios)
 
@@ -1182,14 +1180,14 @@ subroutine mcfost_v()
      ! Last version
      write(*,*)
      write(*,*) "Getting MCFOST history ..."
-     cmd = "curl "//trim(webpage)//"history.txt -O -s"
+     cmd = "curl "//trim(webpage)//"history.txt -s -o "//shell_quote(history_tmp)
      call system_call(cmd, syst_status)
      if (syst_status/=0) call error("Cannot get MCFOST history")
 
      ! Getting line number of current version in history
-     cmd = "grep -n "//trim(mcfost_release)//" history.txt | awk -F : '{print $1}' > line_number.txt"
+     cmd = "grep -n "//trim(mcfost_release)//" "//shell_quote(history_tmp)//" | awk -F : '{print $1}' > "//shell_quote(line_tmp)
      call system_call(cmd, syst_status)
-     open(unit=1, file="line_number.txt", status='old',iostat=ios)
+     open(unit=1, file=line_tmp, status='old',iostat=ios)
      read(1,*,iostat=ios) line_number
      close(unit=1,status="delete",iostat=ios)
 
@@ -1198,7 +1196,7 @@ subroutine mcfost_v()
         if (line_number > 1) then
            write(sline_number,*)  line_number-1
            write(*,*) "Changes since your version:"
-           cmd = "head -"//trim(adjustl(sline_number))//" history.txt ; rm -rf history.txt"
+           cmd = "head -"//trim(adjustl(sline_number))//" "//shell_quote(history_tmp)//" ; rm -f "//shell_quote(history_tmp)
            call system_call(cmd, syst_status)
         else
            write(*,*) "No changes found since your version (?????)"
@@ -1207,7 +1205,7 @@ subroutine mcfost_v()
         write(*,*) "Full history is available with mcfost -h"
         write(*,*) "The new version can be downloaded with mcfost -u"
      else
-        cmd = "rm -rf history.txt"
+        cmd = "rm -f "//shell_quote(history_tmp)
         call system_call(cmd, syst_status)
         write(*,*) "ERROR: I did not find any modifications in the history"
         write(*,*) "Exiting"
@@ -1277,28 +1275,29 @@ subroutine get_utils()
   if (.not.lok) call error("Cannot get MCFOST UTILS "//trim(utils_version_string())//" from "//trim(utils_url()), &
        msg2="this version may not be released yet")
 
-  cmd = "mkdir -p "//trim(mcfost_utils)//" ; curl -f -s -S -L --retry 3 --retry-delay 5 "// &
-       trim(utils_url())//"mcfost_utils.tgz -o "//trim(tarball)
+  cmd = "mkdir -p "//shell_quote(mcfost_utils)//" ; curl -f -s -S -L --retry 3 --retry-delay 5 "// &
+       trim(utils_url())//"mcfost_utils.tgz -o "//shell_quote(tarball)
   call system_call(cmd, syst_status)
   if (syst_status /= 0) then
-     call system_call("rm -f "//trim(tarball), syst_status)
+     call system_call("rm -f "//shell_quote(tarball), syst_status)
      call error("Error while downloading MCFOST UTILS")
   endif
 
   ! Integrity check: sha1sum (linux), shasum (macOS) or openssl
-  cmd = "{ sha1sum "//trim(tarball)//" || shasum -a 1 "//trim(tarball)//" || openssl sha1 -r "//trim(tarball)// &
-       " ; } 2>/dev/null | awk '{print $1}' > "//trim(tarball)//".sha1"
+  cmd = "{ sha1sum "//shell_quote(tarball)//" || shasum -a 1 "//shell_quote(tarball)// &
+       " || openssl sha1 -r "//shell_quote(tarball)// &
+       " ; } 2>/dev/null | awk '{print $1}' > "//shell_quote(trim(tarball)//".sha1")
   call system_call(cmd, syst_status)
   sha1_local = read_sha1(trim(tarball)//".sha1")
-  call system_call("rm -f "//trim(tarball)//".sha1", syst_status)
+  call system_call("rm -f "//shell_quote(trim(tarball)//".sha1"), syst_status)
   if (sha1_local /= sha1_server) then
-     call system_call("rm -f "//trim(tarball), syst_status)
+     call system_call("rm -f "//shell_quote(tarball), syst_status)
      call error("MCFOST UTILS download is corrupted (sha1 does not match)", &
           msg2="downloaded: "//trim(sha1_local)//", expected: "//trim(sha1_server))
   endif
 
   ! --no-same-owner: files belong to the user even if tar runs as root (e.g. setuid tar)
-  cmd = "tar xzf "//trim(tarball)//" --no-same-owner -C "//trim(mcfost_utils)//" && rm -f "//trim(tarball)
+  cmd = "tar xzf "//shell_quote(tarball)//" --no-same-owner -C "//shell_quote(mcfost_utils)//" && rm -f "//shell_quote(tarball)
   call system_call(cmd, syst_status)
   if (syst_status /= 0) call error("Error while extracting MCFOST UTILS")
 
@@ -1346,12 +1345,12 @@ subroutine get_utils_sha1(sha1, lok)
   integer :: syst_status
 
   filename = trim(mcfost_utils)//"/mcfost_utils.sha1.download"
-  call system_call("mkdir -p "//trim(mcfost_utils)//" ; curl -f -s -S -L --retry 3 --retry-delay 5 "// &
+  call system_call("mkdir -p "//shell_quote(mcfost_utils)//" ; curl -f -s -S -L --retry 3 --retry-delay 5 "// &
        trim(utils_url())//"mcfost_utils.sha1 -o "// &
-       trim(filename), syst_status)
+       shell_quote(filename), syst_status)
   sha1 = ""
   if (syst_status == 0) sha1 = read_sha1(filename)
-  call system_call("rm -f "//trim(filename), syst_status)
+  call system_call("rm -f "//shell_quote(filename), syst_status)
   lok = (len_trim(sha1) == 40)
 
 end subroutine get_utils_sha1
@@ -1547,22 +1546,118 @@ end function in_dir
 !************************************************************
 
 subroutine system_call(cmd, status)
-
-#if defined (__INTEL_COMPILER)
-  use IFPORT, only : system
-#endif
+  ! Runs cmd with the shell. Paths and other user strings must be quoted
+  ! with shell_quote. status: exit status of the command, or -1 if it could not be run
 
   implicit none
 
   character(len=*), intent(in) :: cmd
   integer, intent(out), optional :: status
 
-  status = system(cmd) ! linux
-  !call system(cmd, status) ! aix
+  integer :: exitstat, cmdstat
+
+  exitstat = 0
+  call execute_command_line(cmd, wait=.true., exitstat=exitstat, cmdstat=cmdstat)
+  if (cmdstat /= 0) exitstat = -1
+  if (present(status)) status = exitstat
 
   return
 
 end subroutine system_call
+
+!************************************************************
+
+function shell_quote(str) result(quoted)
+  ! Quotes str as a single shell word: 'str', with each ' written as '\''.
+  ! Nothing inside single quotes is interpreted by the shell (spaces, $, `, ", ;)
+
+  character(len=*), intent(in) :: str
+  character(len=:), allocatable :: quoted
+
+  integer :: i
+
+  quoted = "'"
+  do i=1, len_trim(str)
+     if (str(i:i) == "'") then
+        quoted = quoted//"'\''"
+     else
+        quoted = quoted//str(i:i)
+     endif
+  enddo
+  quoted = quoted//"'"
+
+end function shell_quote
+
+!************************************************************
+
+function tmp_filename(name) result(filename)
+  ! Name of a temporary file unique to this process: $TMPDIR/mcfost_<pid>_<name>
+  ! ($TMPDIR defaults to /tmp). Jobs running in the same directory no longer
+  ! share temporary files, and the working directory may be read-only.
+
+  use iso_c_binding, only : c_int
+
+  character(len=*), intent(in) :: name
+  character(len=:), allocatable :: filename
+
+  interface
+     function c_getpid() bind(C, name="getpid") result(pid)
+       import :: c_int
+       integer(c_int) :: pid
+     end function c_getpid
+  end interface
+
+  character(len=512) :: tmpdir
+  character(len=16) :: spid
+  integer :: l, status
+
+  call get_environment_variable("TMPDIR", tmpdir, length=l, status=status)
+  if ((status /= 0) .or. (l == 0)) tmpdir = "/tmp"
+  write(spid,'(i0)') c_getpid()
+  filename = trim(tmpdir)//"/mcfost_"//trim(spid)//"_"//trim(name)
+
+end function tmp_filename
+
+!************************************************************
+
+function unix_time()
+  ! Current time in seconds since 1970-01-01 UTC (as "date +%s"), from the C library
+
+  use iso_c_binding, only : c_long, c_ptr, c_null_ptr
+
+  integer(kind=8) :: unix_time
+
+  interface
+     function c_time(tloc) bind(C, name="time") result(t)
+       import :: c_long, c_ptr
+       type(c_ptr), value :: tloc
+       integer(c_long) :: t
+     end function c_time
+  end interface
+
+  unix_time = int(c_time(c_null_ptr), kind=8)
+
+end function unix_time
+
+!************************************************************
+
+subroutine write_last_update(offset)
+  ! Records the time of the last search for an update in the utils directory,
+  ! minus offset seconds (to search again earlier than mcfost_auto_update days)
+
+  integer(kind=8), intent(in) :: offset
+
+  integer :: unit, ios
+
+  open(newunit=unit, file=trim(mcfost_utils)//"/.last_update", status="replace", action="write", iostat=ios)
+  if (ios /= 0) then
+     call warning("cannot write "//trim(mcfost_utils)//"/.last_update")
+     return
+  endif
+  write(unit,'(i0)') unix_time() - offset
+  close(unit)
+
+end subroutine write_last_update
 
 !************************************************************
 

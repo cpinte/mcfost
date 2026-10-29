@@ -12,7 +12,7 @@ module output
   use utils
   use Voronoi_grid
   use grid
-  use fits_utils, only : cfitsWrite, print_error
+  use fits_utils, only : cfitsWrite, print_error, fits_overwrite
   use wavelengths
   use wavelengths_gas, only : tab_lambda_nm
   use stars, only : E_stars
@@ -655,7 +655,7 @@ subroutine write_stokes_fits()
 
       !  Create the new empty FITS file.
      blocksize=1
-     call ftinit(unit,trim(filename),blocksize,status)
+     call ftinit(unit,fits_overwrite(filename),blocksize,status)
 
       !  Initialize parameters about the FITS image
      simple=.true.
@@ -735,7 +735,7 @@ subroutine write_stokes_fits()
 
   !  Create the new empty FITS file.
   blocksize=1
-  call ftinit(unit,trim(filename),blocksize,status)
+  call ftinit(unit,fits_overwrite(filename),blocksize,status)
 
   !  Initialize parameters about the FITS image
   simple=.true.
@@ -861,7 +861,7 @@ subroutine ecriture_map_ray_tracing()
 
   !  Create the new empty FITS file.
   blocksize=1
-  call ftinit(unit,trim(filename),blocksize,status)
+  call ftinit(unit,fits_overwrite(filename),blocksize,status)
 
   !  Initialize parameters about the FITS image
   simple=.true.
@@ -1110,7 +1110,7 @@ subroutine write_tau_surface(imol)
 
   !  Create the new empty FITS file.
   blocksize=1
-  call ftinit(unit,trim(filename),blocksize,status)
+  call ftinit(unit,fits_overwrite(filename),blocksize,status)
 
   !  Initialize parameters about the FITS image
   simple=.true.
@@ -1220,7 +1220,7 @@ subroutine write_tau_map(imol)
 
   !  Create the new empty FITS file.
   blocksize=1
-  call ftinit(unit,trim(filename),blocksize,status)
+  call ftinit(unit,fits_overwrite(filename),blocksize,status)
 
   !  Initialize parameters about the FITS image
   simple=.true.
@@ -1310,7 +1310,7 @@ subroutine ecriture_sed_ray_tracing()
 
   !  Create the new empty FITS file.
   blocksize=1
-  call ftinit(unit,trim(filename),blocksize,status)
+  call ftinit(unit,fits_overwrite(filename),blocksize,status)
 
   !  Initialize parameters about the FITS image
   simple=.true.
@@ -1407,7 +1407,7 @@ subroutine write_origin()
 
   !  Create the new empty FITS file.
   blocksize=1
-  call ftinit(unit,trim(filename),blocksize,status)
+  call ftinit(unit,fits_overwrite(filename),blocksize,status)
 
   !  Initialize parameters about the FITS image
   simple=.true.
@@ -1447,7 +1447,7 @@ subroutine write_optical_depth_to_cell(lambda)
   character(len=512) :: filename
 
   write(*,*) "Writing disc optical_depth_map.fits.gz for wl=", real(tab_lambda(lambda),kind=sp), "microns"
-  filename = "!optical_depth_to_cell.fits.gz"
+  filename = trim(data_dir)//"/optical_depth_to_cell.fits.gz"
   call write_column(2, filename, lambda)
   write(*,*) "Done"
   call exit(0)
@@ -1461,7 +1461,7 @@ subroutine write_column_density()
   character(len=512) :: filename
 
   write(*,*) "Writing column density"
-  filename = trim(root_dir)//"/data_disk/column_density.fits.gz"
+  filename = trim(root_dir)//"/"//trim(seed_dir)//"/data_disk/column_density.fits.gz"
   call write_column(1, filename)
 
   return
@@ -1512,7 +1512,7 @@ subroutine write_column(type, filename, lambda)
 
   !  Create the new empty FITS file.
   blocksize=1
-  call ftinit(unit,trim(filename),blocksize,status)
+  call ftinit(unit,fits_overwrite(filename),blocksize,status)
 
   !  Initialize parameters about the FITS image
   simple=.true.
@@ -1589,7 +1589,7 @@ subroutine reemission_stats()
 
   !  Create the new empty FITS file.
   blocksize=1
-  call ftinit(unit,trim(filename),blocksize,status)
+  call ftinit(unit,fits_overwrite(filename),blocksize,status)
 
   !  Initialize parameters about the FITS image
   simple=.true.
@@ -1651,7 +1651,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
   allocate(dens(n_cells), vol(n_cells), dust_dens(n_cells,n_grains_tot), stat = alloc_status)
   if (alloc_status > 0) call error('Allocation error density tables for fits file')
 
-  filename = trim(root_dir)//"/data_disk/gas_density.fits.gz"
+  filename = trim(root_dir)//"/"//trim(seed_dir)//"/data_disk/gas_density.fits.gz"
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
@@ -1659,7 +1659,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
 
   !  Create the new empty FITS file.
   blocksize=1
-  call ftinit(unit,trim(filename),blocksize,status)
+  call ftinit(unit,fits_overwrite(filename),blocksize,status)
 
   !  Initialize parameters about the FITS image
   simple=.true.
@@ -1713,7 +1713,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
 
   ! ********************************************************************************
   if (lparticle_density) then
-     filename = trim(root_dir)//"/data_disk/dust_particle_density.fits.gz"
+     filename = trim(root_dir)//"/"//trim(seed_dir)//"/data_disk/dust_particle_density.fits.gz"
 
      !  Get an unused Logical Unit Number to use to open the FITS file.
      status=0
@@ -1721,7 +1721,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
 
      !  Create the new empty FITS file.
      blocksize=1
-     call ftinit(unit,trim(filename),blocksize,status)
+     call ftinit(unit,fits_overwrite(filename),blocksize,status)
 
      !  Initialize parameters about the FITS image
      simple=.true.
@@ -1779,7 +1779,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
   endif ! lparticle_density
 
   ! ********************************************************************************
-  filename = trim(root_dir)//"/data_disk/dust_mass_density.fits.gz"
+  filename = trim(root_dir)//"/"//trim(seed_dir)//"/data_disk/dust_mass_density.fits.gz"
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
@@ -1787,7 +1787,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
 
   !  Create the new empty FITS file.
   blocksize=1
-  call ftinit(unit,trim(filename),blocksize,status)
+  call ftinit(unit,fits_overwrite(filename),blocksize,status)
 
   !  Initialize parameters about the FITS image
   simple=.true.
@@ -1839,7 +1839,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
   if (status > 0) call print_error(status)
 
   ! ********************************************************************************
-  filename = trim(root_dir)//"/data_disk/grain_sizes.fits.gz"
+  filename = trim(root_dir)//"/"//trim(seed_dir)//"/data_disk/grain_sizes.fits.gz"
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
@@ -1847,7 +1847,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
 
   !  Create the new empty FITS file.
   blocksize=1
-  call ftinit(unit,trim(filename),blocksize,status)
+  call ftinit(unit,fits_overwrite(filename),blocksize,status)
 
   !  Initialize parameters about the FITS image
   simple=.true.
@@ -1881,7 +1881,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
   if (status > 0) call print_error(status)
 
   ! ********************************************************************************
-  filename = trim(root_dir)//"/data_disk/grain_sizes_min.fits.gz"
+  filename = trim(root_dir)//"/"//trim(seed_dir)//"/data_disk/grain_sizes_min.fits.gz"
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
@@ -1889,7 +1889,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
 
   !  Create the new empty FITS file.
   blocksize=1
-  call ftinit(unit,trim(filename),blocksize,status)
+  call ftinit(unit,fits_overwrite(filename),blocksize,status)
 
   !  Initialize parameters about the FITS image
   simple=.true.
@@ -1923,7 +1923,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
   if (status > 0) call print_error(status)
 
   ! ********************************************************************************
-  filename = trim(root_dir)//"/data_disk/grain_sizes_max.fits.gz"
+  filename = trim(root_dir)//"/"//trim(seed_dir)//"/data_disk/grain_sizes_max.fits.gz"
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
@@ -1931,7 +1931,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
 
   !  Create the new empty FITS file.
   blocksize=1
-  call ftinit(unit,trim(filename),blocksize,status)
+  call ftinit(unit,fits_overwrite(filename),blocksize,status)
 
   !  Initialize parameters about the FITS image
   simple=.true.
@@ -1965,7 +1965,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
   if (status > 0) call print_error(status)
 
   ! ********************************************************************************
-  filename = trim(root_dir)//"/data_disk/grain_masses.fits.gz"
+  filename = trim(root_dir)//"/"//trim(seed_dir)//"/data_disk/grain_masses.fits.gz"
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
@@ -1973,7 +1973,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
 
   !  Create the new empty FITS file.
   blocksize=1
-  call ftinit(unit,trim(filename),blocksize,status)
+  call ftinit(unit,fits_overwrite(filename),blocksize,status)
 
   !  Initialize parameters about the FITS image
   simple=.true.
@@ -2007,7 +2007,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
   if (status > 0) call print_error(status)
 
   ! ********************************************************************************
-  filename = trim(root_dir)//"/data_disk/volume.fits.gz"
+  filename = trim(root_dir)//"/"//trim(seed_dir)//"/data_disk/volume.fits.gz"
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
@@ -2015,7 +2015,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
 
   !  Create the new empty FITS file.
   blocksize=1
-  call ftinit(unit,trim(filename),blocksize,status)
+  call ftinit(unit,fits_overwrite(filename),blocksize,status)
 
   !  Initialize parameters about the FITS image
   simple=.true.
@@ -2063,7 +2063,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
   if (status > 0) call print_error(status)
 
   ! ********************************************************************************
-  filename = trim(root_dir)//"/data_disk/grid.fits.gz"
+  filename = trim(root_dir)//"/"//trim(seed_dir)//"/data_disk/grid.fits.gz"
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
@@ -2071,7 +2071,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
 
   !  Create the new empty FITS file.
   blocksize=1
-  call ftinit(unit,trim(filename),blocksize,status)
+  call ftinit(unit,fits_overwrite(filename),blocksize,status)
 
   !  Initialize parameters about the FITS image
   simple=.true.
@@ -2157,7 +2157,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
 
   ! ********************************************************************************
   if (lvelocity) then
-     filename = trim(root_dir)//"/data_disk/velocity.fits.gz"
+     filename = trim(root_dir)//"/"//trim(seed_dir)//"/data_disk/velocity.fits.gz"
 
      !  Get an unused Logical Unit Number to use to open the FITS file.
      status=0
@@ -2165,7 +2165,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
 
      !  Create the new empty FITS file.
      blocksize=1
-     call ftinit(unit,trim(filename),blocksize,status)
+     call ftinit(unit,fits_overwrite(filename),blocksize,status)
 
      !  Initialize parameters about the FITS image
      simple=.true.
@@ -2313,7 +2313,7 @@ subroutine ecriture_J(step)
 
   !  Create the new empty FITS file.
   blocksize=1
-  call ftinit(unit,trim(filename),blocksize,status)
+  call ftinit(unit,fits_overwrite(filename),blocksize,status)
 
   !  Initialize parameters about the FITS image
   simple=.true.
@@ -2404,9 +2404,9 @@ subroutine ecriture_UV_field()
 
   real, dimension(n_cells) :: G
 
-  ! D'apr�s van Dishoeck et al. (2008) le champs FUV de Draine est de 2.67e-3 erg cm-2 s-1
-  ! That is 2.67e-6 W / m2
-  ! C'est entre 912 et 2000 Angstr�ms (la borne sup�rieure varie un peu d'un papier � l'autre).
+  ! FUV field in Habing units (G0): integrated between 912 and 2050 Angstroms and divided by
+  ! the integrated Habing field, 1.6e-3 erg cm-2 s-1 = 1.6e-6 W/m2 (the Draine field is 1.7 G0)
+  ! van Dishoeck, Jonkheid & van Hemert, arXiv:0806.0088, p. 7
 
   filename = trim(data_dir)//"/UV_field.fits.gz"
 
@@ -2420,7 +2420,7 @@ subroutine ecriture_UV_field()
 
   !  Create the new empty FITS file.
   blocksize=1
-  call ftinit(unit,trim(filename),blocksize,status)
+  call ftinit(unit,fits_overwrite(filename),blocksize,status)
 
   !  Initialize parameters about the FITS image
   simple=.true.
@@ -2458,7 +2458,7 @@ subroutine ecriture_UV_field()
   ! the e means real*4
   call ftppre(unit,group,fpixel,nelements,G,status)
 
-  call ftpkys(unit,'BUNIT',"Habing",'[912-2000] AA, following formulae by van Dischoeck et al 2008',status)
+  call ftpkys(unit,'BUNIT',"Habing",'G0, 912-2050 AA, arXiv:0806.0088',status)
 
   !  Close the file and free the unit number.
   call ftclos(unit, status)
@@ -2500,8 +2500,8 @@ function compute_UV_field() result(G)
   enddo
   lamb(:) = tab_lambda(:) * 1e-6 ! en m
 
-  ! van Dischoeck 2008
-  wl(:) = span(0.0912,0.2,n) * 1e-6 ! en m
+  ! van Dishoeck et al. (arXiv:0806.0088): 912 - 2050 Angstroms
+  wl(:) = span(0.0912,0.2050,n) * 1e-6 ! en m
   delta_wl = (wl(n) - wl(1))/(n-1.) ! en m
   do icell=1,n_cells
      do l=1,n
@@ -2509,7 +2509,7 @@ function compute_UV_field() result(G)
      enddo
 
      ! integration trapeze
-     G(icell) = (sum(J_interp(:)) - 0.5 * (J_interp(1) + J_interp(n)) ) * delta_wl / 2.67e-6
+     G(icell) = (sum(J_interp(:)) - 0.5 * (J_interp(1) + J_interp(n)) ) * delta_wl / Habing_field ! G0
   enddo ! icell
 
 !---  ! Le petit et al
@@ -2570,7 +2570,7 @@ subroutine ecriture_temperature(iTemperature)
 
      !  Create the new empty FITS file.
      blocksize=1
-     call ftinit(unit,trim(filename),blocksize,status)
+     call ftinit(unit,fits_overwrite(filename),blocksize,status)
 
      !  Initialize parameters about the FITS image
      simple=.true.
@@ -2629,7 +2629,7 @@ subroutine ecriture_temperature(iTemperature)
 
      !  Create the new empty FITS file.
      blocksize=1
-     call ftinit(unit,trim(filename),blocksize,status)
+     call ftinit(unit,fits_overwrite(filename),blocksize,status)
 
      !  Initialize parameters about the FITS image
      simple=.true.
@@ -2691,7 +2691,7 @@ subroutine ecriture_temperature(iTemperature)
 
      !  Create the new empty FITS file.
      blocksize=1
-     call ftinit(unit,trim(filename),blocksize,status)
+     call ftinit(unit,fits_overwrite(filename),blocksize,status)
 
      !  Initialize parameters about the FITS image
      simple=.true.
@@ -2875,7 +2875,7 @@ subroutine ecriture_temperature_hydro_iter(iter)
   call ftgiou(unit, status)
 
   blocksize = 1
-  call ftinit(unit, trim(filename), blocksize, status)
+  call ftinit(unit,fits_overwrite(filename),blocksize,status)
 
   simple = .true.
   bitpix = -32
@@ -2941,7 +2941,7 @@ subroutine ecriture_gas_density_hydro_iter(iter)
 
   ! Ensure data_disk directory exists
   if (.not. is_dir(trim(root_dir)//"/"//trim(seed_dir)//"/data_disk")) then
-     cmd = "mkdir -p "//trim(root_dir)//"/"//trim(seed_dir)//"/data_disk"
+     cmd = "mkdir -p "//shell_quote(trim(root_dir)//"/"//trim(seed_dir)//"/data_disk")
      call system_call(cmd, syst_status)
   endif
 
@@ -2976,7 +2976,7 @@ subroutine ecriture_gas_density_hydro_iter(iter)
   filename = "!"//trim(root_dir)//"/"//trim(seed_dir)//"/data_disk/gas_density_iter"//trim(iter_str)//".fits.gz"
   status = 0
   call ftgiou(unit, status)
-  call ftinit(unit, trim(filename), blocksize, status)
+  call ftinit(unit,fits_overwrite(filename),blocksize,status)
   call ftphpr(unit, simple, bitpix, naxis, naxes, 0, 1, extend, status)
   call ftpkys(unit, 'UNIT', "g.cm^-3", ' ', status)
   call ftpkyj(unit, 'ITER', iter, 'Hydrostatic iteration', status)
@@ -2991,7 +2991,7 @@ subroutine ecriture_gas_density_hydro_iter(iter)
   filename = "!"//trim(root_dir)//"/"//trim(seed_dir)//"/data_disk/gas_density.fits.gz"
   status = 0
   call ftgiou(unit, status)
-  call ftinit(unit, trim(filename), blocksize, status)
+  call ftinit(unit,fits_overwrite(filename),blocksize,status)
   call ftphpr(unit, simple, bitpix, naxis, naxes, 0, 1, extend, status)
   call ftpkys(unit, 'UNIT', "g.cm^-3", ' ', status)
   call ftpkyj(unit, 'ITER', iter, 'Hydrostatic iteration', status)
@@ -3061,7 +3061,7 @@ subroutine ecriture_Tex(imol,ext)
 
   !  Create the new empty FITS file.
   blocksize=1
-  call ftinit(unit,trim(filename),blocksize,status)
+  call ftinit(unit,fits_overwrite(filename),blocksize,status)
 
   !  Initialize parameters about the FITS image
   simple=.true.
@@ -3135,7 +3135,7 @@ subroutine taille_moyenne_grains()
      a_moyen(icell) = sqrt(a_moyen(icell) / total_sum)
   enddo
 
-  filename = "average_grain_size.fits.gz"
+  filename = trim(data_dir)//"/average_grain_size.fits.gz"
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
@@ -3143,7 +3143,7 @@ subroutine taille_moyenne_grains()
 
   !  Create the new empty FITS file.
   blocksize=1
-  call ftinit(unit,trim(filename),blocksize,status)
+  call ftinit(unit,fits_overwrite(filename),blocksize,status)
 
   !  Initialize parameters about the FITS image
   simple=.true.
@@ -3214,7 +3214,7 @@ subroutine ecriture_sed(ised)
 
   !  Create the new empty FITS file.
   blocksize=1
-  call ftinit(unit,trim(filename),blocksize,status)
+  call ftinit(unit,fits_overwrite(filename),blocksize,status)
 
   !  Initialize parameters about the FITS image
   simple=.true.
@@ -3380,7 +3380,7 @@ subroutine ecriture_pops(imol,ext)
 
   !  Create the new empty FITS file.
   blocksize=1
-  call ftinit(unit,trim(filename),blocksize,status)
+  call ftinit(unit,fits_overwrite(filename),blocksize,status)
 
   simple=.true.
   ! the - sign means we write reals in the fits
@@ -3442,7 +3442,7 @@ subroutine ecriture_spectre(imol)
 
   !  Create the new empty FITS file.
   blocksize=1
-  call ftinit(unit,trim(filename),blocksize,status)
+  call ftinit(unit,fits_overwrite(filename),blocksize,status)
 
   simple=.true.
   extend=.true.
@@ -3688,7 +3688,7 @@ subroutine ecriture_spectre(imol)
 
      !  Create the new empty FITS file.
      blocksize=1
-     call ftinit(unit,trim(filename),blocksize,status)
+     call ftinit(unit,fits_overwrite(filename),blocksize,status)
 
      simple=.true.
      ! the - sign means we write reals in the fits
@@ -3796,8 +3796,8 @@ subroutine write_atomic_maps(atom)
                call ftgiou (unit,status)
 
 
-               call ftinit(unit,trim(atom%ID)//"_line_"//trim(adjustl(transition))//&
-                                    trim(adjustl(im_ori))//".fits.gz",blocksize,status)
+               call ftinit(unit,fits_overwrite(trim(data_dir_atom)//"/"//trim(atom%ID)//"_line_"//trim(adjustl(transition))//&
+                                    trim(adjustl(im_ori))//".fits.gz"),blocksize,status)
 
                call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
                if (status > 0) call print_error(status)
@@ -3879,7 +3879,8 @@ subroutine write_atomic_maps(atom)
          lam0 = real(atom%lines(kr)%lambda0)
          write(transition, '(1F6.4)') lam0*m_to_km !line j that we follow among all lines.
          ! write(transition, '(1I6)') nint(lam0*10)
-         call ftinit(unit,trim(atom%ID)//"_line_"//trim(adjustl(transition))//".fits.gz",blocksize,status)
+         call ftinit(unit,fits_overwrite(trim(data_dir_atom)//"/"//trim(atom%ID)//"_line_"// &
+              trim(adjustl(transition))//".fits.gz"),blocksize,status)
 
          !In image mode, Nblue and Nred (so Nlambda) takes into account possible velocity shifts
          ! naxes(3) = atom%lines(kr)%Nred+dk_max - atom%lines(kr)%Nblue-dk_min +1
@@ -3994,7 +3995,7 @@ subroutine write_total_flux()
 
     !  Create the new empty FITS file.
 
-   call ftinit(unit,"flux.fits.gz",blocksize,status)
+   call ftinit(unit,fits_overwrite(trim(data_dir_atom)//"/flux.fits.gz"),blocksize,status)
 
    naxis = 3
    naxes(1) = N_lambda

@@ -16,6 +16,7 @@ module Opacity_atom
    use constants, only          : c_light
    use molecular_emission, only  : v_proj, ds
    use utils, only               : linear_1D_sorted
+   use mcfost_env, only          : data_dir_atom
    !$ use omp_lib
 
    implicit none
@@ -1078,8 +1079,10 @@ module Opacity_atom
 
       call ftgiou(unit,status)
       call ftgiou(unit2,status)
-      open(unit, file=trim(filename_chi),form="unformatted",status='unknown',access="stream",iostat=status)
-      open(unit2, file=trim(filename_eta),form="unformatted",status='unknown',access="stream",iostat=status)
+      open(unit, file=trim(data_dir_atom)//"/"//trim(filename_chi),form="unformatted",status='unknown', &
+           access="stream",iostat=status)
+      open(unit2, file=trim(data_dir_atom)//"/"//trim(filename_eta),form="unformatted",status='unknown', &
+           access="stream",iostat=status)
       !write wavelength first
       write(unit,iostat=status) shape(chi_tmp)
       write(unit2,iostat=status) shape(eta_tmp)

@@ -3,7 +3,7 @@ module Voronoi_grid
   use constants
   use mcfost_env
   use parameters
-  use utils, only : system_call
+  use utils, only : system_call, shell_quote, tmp_filename
   use sort, only : Knuth_shuffle, index_quicksort
   use naleat, only : seed, stream, gtype
   use cylindrical_grid, only : volume
@@ -759,19 +759,22 @@ module Voronoi_grid
     character(len=512), intent(in) :: filename
     character(len=40), intent(out) :: voronoi_sha1
     character(len=512) :: cmd
+    character(len=:), allocatable :: sha1_tmp
     integer :: ios, syst_status
 
+    sha1_tmp = tmp_filename("voronoi.sha1")
+
     if (operating_system=="Linux ") then
-       cmd = "sha1sum  "//trim(filename)//" > voronoi.sha1"
+       cmd = "sha1sum  "//shell_quote(filename)//" > "//shell_quote(sha1_tmp)
     else if (operating_system=="Darwin") then
-       cmd = "openssl sha1 "//trim(filename)//" | awk '{print $2}' > voronoi.sha1"
+       cmd = "openssl sha1 "//shell_quote(filename)//" | awk '{print $2}' > "//shell_quote(sha1_tmp)
     else
        write(*,*) "Unknown operatinf system"
        write(*,*) "Can't compute sha1 of "//trim(filename)
        return
     endif
     call system_call(cmd, syst_status)
-    open(unit=1, file="voronoi.sha1", status='old',iostat=ios)
+    open(unit=1, file=sha1_tmp, status='old',iostat=ios)
     read(1,*,iostat=ios) voronoi_sha1
     close(unit=1,status="delete",iostat=ios)
 

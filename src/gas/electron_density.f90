@@ -24,9 +24,9 @@ module elecdensity
    use constants
    use messages, only : Error, Warning
    use input, only : nb_proc
-   use mcfost_env, only : dp
+   use mcfost_env, only : dp, data_dir_atom, restart_dir_atom
    use parameters, only : n_cells
-   use utils, only : progress_bar, is_nan_infinity, interp_dp
+   use utils, only : progress_bar, is_nan_infinity, interp_dp, is_file
    use grid, only : T, ne, nHtot, icompute_atomRT
    use fits_utils
    !$ use omp_lib
@@ -595,18 +595,7 @@ module elecdensity
    character(len=512) :: cmd
 
 
-   !check if data file already exist, can be the case if initial solutions is OLD_POPULATIONS
-   cmd = "ls "//trim(ne_filename)
-   call system_call(cmd, sys_status)
-   if (sys_status == 0) then !means the file exist
-
-      cmd = "mv "//trim(ne_filename)//" "//"ne_old.fits.gz"
-      call system_call(cmd, sys_status)
-      if (sys_status /= 0) then
-         call error("Error in copying old ne!")
-      endif
-
-   endif
+   ! the data directory is new for each run: ne of a previous run is in restart_dir_atom
 
    !get unique unit number
    call ftgiou(unit,EOF)
@@ -637,7 +626,7 @@ module elecdensity
    end if
 
 
-   call ftinit(unit,trim(ne_filename),blocksize,EOF)
+   call ftinit(unit,fits_overwrite(trim(data_dir_atom)//"/"//ne_filename),blocksize,EOF)
    !  Initialize parameters about the FITS image
    call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,EOF)
    ! Additional optional keywords
@@ -660,18 +649,17 @@ module elecdensity
    logical, intent(out) :: lelectron_read
    integer :: unit, status, blocksize, naxis,group, bitpix, fpixel
    logical :: extend, simple, anynull
-   integer :: nelements, naxis2(4), sys_status, naxis_found, hdutype
-   character(len=512) :: cmd, some_comments
+   integer :: nelements, naxis2(4), naxis_found, hdutype
+   character(len=512) :: some_comments, filename
    real :: nullval
 
-   !check if data file already exist, otherwise lead and return .false.
-   cmd = "ls "//trim(ne_filename)
-   call system_call(cmd, sys_status)
-   if (sys_status == 0) then !means the file exist
-      write(*,*) " Reading old ne.fits.gz file"
+   ! electron density of the previous run (data directory moved to _old at the start of this run)
+   filename = trim(restart_dir_atom)//"/"//ne_filename
+   if (is_file(filename)) then
+      write(*,*) " Reading old electron density "//trim(filename)
       lelectron_read = .true.
    else
-      write(*,*) " found no ne.fits.gz"
+      write(*,*) " found no "//trim(filename)
       lelectron_read = .false.
       return
    endif
@@ -679,7 +667,7 @@ module elecdensity
    status = 0
    call ftgiou(unit,status)
 
-   call ftopen(unit, trim(ne_filename), 0, blocksize, status)
+   call ftopen(unit, trim(filename), 0, blocksize, status)
    if (status > 0) then
       write(*,*) "Cannot open electron file! ", ne_filename
       call print_error(status)

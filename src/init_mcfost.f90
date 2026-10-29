@@ -293,7 +293,8 @@ subroutine initialisation_mcfost()
   implicit none
 
   integer :: ios, n_args, i_arg, nx, ny, syst_status, imol, i
-  integer :: current_date, update_date, mcfost_auto_update, ntheta, nazimuth, ilen
+  integer :: mcfost_auto_update, ntheta, nazimuth, ilen
+  integer(kind=8) :: current_date, update_date
   real(kind=dp) :: wvl
   real :: opt_zoom, utils_version, PA
 
@@ -352,25 +353,26 @@ subroutine initialisation_mcfost()
   ! sources (MCFOST_GIT=1), which would be replaced by the last release
   mcfost_auto_update = 7
   call get_environment_variable('MCFOST_AUTO_UPDATE',s)
-  if (s/="") read(s,*) mcfost_auto_update
+  if (s/="") then
+     read(s,*,iostat=ios) mcfost_auto_update
+     if (ios /= 0) call error("MCFOST_AUTO_UPDATE must be an integer number of days (0 to disable), got: "//trim(s))
+  endif
   call get_environment_variable('MCFOST_GIT',s)
   if (trim(s)=="1") mcfost_auto_update = 0
 
   if (mcfost_auto_update > 0) then
-     cmd = 'date +%s > date.tmp' ;   call system_call(cmd, syst_status)
-     open(unit=1,file="date.tmp",status="old")
-     read(1,*) current_date
-     close(unit=1,status="delete")
+     current_date = unix_time()
 
+     ! if the file .last_update does not exist or cannot be read, I assume mcfost is old
+     update_date = 0
      if (is_file(trim(mcfost_utils)//"/.last_update")) then
-        open(unit=1,file=trim(mcfost_utils)//"/.last_update",status="old")
-        read(1,*) update_date
-        close(unit=1)
-     else
-        update_date = 0 ! if the file .last_update does not exist, I assume mcfost is old
+        open(unit=1,file=trim(mcfost_utils)//"/.last_update",status="old",iostat=ios)
+        if (ios == 0) read(1,*,iostat=ios) update_date
+        if (ios /= 0) update_date = 0
+        close(unit=1,iostat=ios)
      endif
 
-     if ( (current_date-update_date) > mcfost_auto_update*86400) then
+     if ( (current_date-update_date) > int(mcfost_auto_update,kind=8)*86400_8) then
         write(n_chiffres,fmt="(i4)") ceiling(log10(1.0*mcfost_auto_update))
         fmt1 = '(" Your version of mcfost is more than ", i'//adjustl(trim(n_chiffres))//'," days old")'
         write(*,fmt=fmt1) mcfost_auto_update
@@ -435,29 +437,32 @@ subroutine initialisation_mcfost()
   ilen = index(para,'/',back=.true.) ! last position of the '/' character
   base_para = para(ilen+1:)
 
-  ! Benchmarks
-  if (para(1:8)=="Pascucci") then
+  ! Benchmarks: selected by the name of the parameter file (without its directory)
+  if (base_para(1:8)=="Pascucci") then
      lbenchmark_Pascucci = .true.
+     ! isotropic scattering, set here so that aniso_method is set accordingly below (the
+     ! ray-tracing used the Mie phase function while the Monte Carlo scattered isotropically)
+     lisotropic = .true.
      write(*,*) "Running Pascucci et al 2004 benchmark"
-  else if (para(1:13)=="vanZadelhoff1") then
+  else if (base_para(1:13)=="vanZadelhoff1") then
      lbenchmark_vanZadelhoff1 = .true.
      write(*,*) "Running van Zadelhoff et al 2002 benchmark 1"
-  else if (para(1:13)=="vanZadelhoff2") then
+  else if (base_para(1:13)=="vanZadelhoff2") then
      lbenchmark_vanZadelhoff2 = .true.
      write(*,*) "Running van Zadelhoff et al 2002 benchmark 2"
-  else if (para(1:6)=="water1") then
+  else if (base_para(1:6)=="water1") then
      lbenchmark_water1 = .true.
      write(*,*) "Running water benchmark 1"
-  else if (para(1:6)=="water2") then
+  else if (base_para(1:6)=="water2") then
      lbenchmark_water2 = .true.
      write(*,*) "Running water benchmark 2"
-  else if (para(1:6)=="water3") then
+  else if (base_para(1:6)=="water3") then
      lbenchmark_water3 = .true.
      write(*,*) "Running water benchmark 3"
-  else if (para(1:8)=="Dutrey94") then
+  else if (base_para(1:8)=="Dutrey94") then
      lDutrey94 = .true.
      write(*,*) "Running comparison with Dutrey et al 1994"
-  else if (para(1:7)=="HH30mol") then
+  else if (base_para(1:7)=="HH30mol") then
      lHH30mol = .true.
      write(*,*) "Running comparison with Pety et al 2006"
   endif
@@ -658,11 +663,15 @@ subroutine initialisation_mcfost()
         i_arg = i_arg+1
         if (i_arg > n_args) call error("root_dir needed")
         call get_command_argument(i_arg,s)
-        root_dir=trim(root_dir)//"/"//s
+        if (s(1:1) == "/") then ! absolute path
+           root_dir = s
+        else
+           root_dir=trim(root_dir)//"/"//s
+        endif
         i_arg = i_arg+1
      case("-tmp_dir")
         i_arg = i_arg+1
-        if (i_arg > n_args) call error("root_dir needed")
+        if (i_arg > n_args) call error("tmp_dir needed")
         call get_command_argument(i_arg,tmp_dir)
         i_arg = i_arg+1
      case("-dust_prop")
@@ -817,6 +826,20 @@ subroutine initialisation_mcfost()
         lscatt_ray_tracing1=.true.
         lscatt_ray_tracing2=.false.
         if (.not.lmc) loutput_mc=.false.
+     case("-rt2_angles")
+        i_arg = i_arg + 1
+        if (i_arg > n_args) call error("-rt2_angles needs a number of angles")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) rt2_n_angles
+        if ((ios /= 0) .or. (rt2_n_angles < 1)) call error("-rt2_angles: cannot read the number of angles: "//trim(s))
+        i_arg = i_arg + 1
+     case("-rt2_star_angles")
+        i_arg = i_arg + 1
+        if (i_arg > n_args) call error("-rt2_star_angles needs a number of angles")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) rt2_n_angles_star
+        if ((ios /= 0) .or. (rt2_n_angles_star < 1)) call error("-rt2_star_angles: cannot read the number of angles: "//trim(s))
+        i_arg = i_arg + 1
      case("-rt2")
         i_arg = i_arg + 1
         lscatt_ray_tracing=.true.
@@ -1461,13 +1484,18 @@ subroutine initialisation_mcfost()
         lstar_bb = .true.
      case("-Mdot")
         i_arg = i_arg + 1
+        if (i_arg+1 > n_args) call error("-Mdot needs a star number and an accretion rate")
         lforce_Mdot = .true.
         call get_command_argument(i_arg,s)
-        read(s,*) istar_Mdot
+        read(s,*,iostat=ios) istar_Mdot
+        if (ios /= 0) call error("-Mdot: cannot read the star number: "//trim(s))
+        if ((istar_Mdot < 1) .or. (istar_Mdot > nmax_stars)) &
+             call error("-Mdot: the star number must be between 1 and the number of stars, got: "//trim(s))
         star_force_Mdot(istar_Mdot) = .true.
         i_arg = i_arg + 1
         call get_command_argument(i_arg,s)
-        read(s,*) Mdot
+        read(s,*,iostat=ios) Mdot
+        if (ios /= 0) call error("-Mdot: cannot read the accretion rate: "//trim(s))
         star_Mdot(istar_Mdot) = Mdot
         i_arg = i_arg + 1
      case("-fargo3d","-fargo")
@@ -1526,9 +1554,7 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         lwrite_abundance=.true.
       case default
-        write(*,*) "Error: unknown option: "//trim(s)
-        write(*,*) "Use 'mcfost -h' to get list of available options"
-        call exit(0)
+        call error("unknown option: "//trim(s), msg2="Use 'mcfost -h' to get list of available options")
      end select
   enddo ! while
 
@@ -1632,6 +1658,8 @@ subroutine initialisation_mcfost()
   if (lstar_bb) star(:)%lb_body = .true.
 
   if (lforce_Mdot) then
+     if (any(star_force_Mdot(n_stars+1:))) &
+          call error("-Mdot: the star number is larger than the number of stars in the model")
      do i=1, n_stars
         if (i > nmax_stars) call error("Maximal number of stars is hard-coded to 100")
         if (star_force_Mdot(i)) then
@@ -1854,6 +1882,17 @@ subroutine initialisation_mcfost()
   call system_call(cmd, syst_status)
 
   data_dir = trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(basename_data_dir)
+  if (lemission_atom) then
+     if (n_atoms < 1) call error("-atom: no atom in the parameter file")
+     ! one directory for all the atoms of the run, e.g. data_H or data_H_Ca
+     basename_data_dir_atom = "data"
+     do i=1, n_atoms
+        basename_data_dir_atom = trim(basename_data_dir_atom)//"_"//trim(atom_ID(Atoms(i)%p%filename))
+     enddo
+     data_dir_atom = trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(basename_data_dir_atom)
+     ! restart files (populations, electron density) are read from the previous run, moved to _old
+     restart_dir_atom = trim(data_dir_atom)//"_old"
+  endif
   do imol=1, n_molecules
      data_dir2(imol) = trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(basename_data_dir2(imol))
   enddo
@@ -1970,6 +2009,9 @@ subroutine display_help()
   write(*,*) "        : -nphot_img : overwrite the value in the parameter file"
   write(*,*) "        : -rt : use ray-tracing method to compute images or SEDs (on by default)"
   write(*,*) "        : -rt1 or -rt2 : use ray-tracing method and force ray-tracing method"
+  write(*,*) "        : -rt2_angles <n> : angular sampling of the scattered radiation field in rt2 (default 15)"
+  write(*,*) "                            memory scales as n^2: increase for strongly forward scattering grains"
+  write(*,*) "        : -rt2_star_angles <n> : directions for the first scattering of the stellar light in rt2 (default 1000)"
   write(*,*) "        : -no-rt : do not output the ray-tracing results"
   write(*,*) "        : -mc :  keep Monte-Carlo output in ray-tracing mode"
   write(*,*) "        : -n_MC_bins <n_inclinations> <n_azimuth> (default : 10 1)"
@@ -2146,30 +2188,14 @@ subroutine save_data_prop(para, base_para)
 
   character(len=*), intent(in) :: para, base_para
 
-  character(len=1024) :: cmd
   integer ::  syst_status
 
   if (is_dir(trim(data_dir))) then
      write(*,*) "Directory "//trim(data_dir)//" already exists! Erasing it..."
-     cmd = 'rm -Rf '//trim(data_dir)
-     call system_call(cmd,syst_status)
+     call system_call('rm -Rf '//shell_quote(data_dir), syst_status)
   endif
 
-  ! Create the data folder
-  write (*,*) 'Creating directory '//trim(data_dir)
-  cmd = 'mkdir -p '//trim(data_dir)//" ; "// &
-       ! copy the parameter file
-       'cp '//trim(para)//' '//trim(data_dir)//" ; "// &
-       ! command line options
-       'echo " " >>  '//trim(data_dir)//'/'//trim(base_para)//" ; "// &
-       'echo "Executed command line : '//trim(cmd_opt)//'" >> '//trim(data_dir)//'/'//trim(base_para)//" ; "// &
-       ! date of calculation
-       'date >> '//trim(data_dir)//'/'//trim(base_para)//" ; "// &
-       ! computing machine
-       'uname -a >> '//trim(data_dir)//'/'//trim(base_para)//" ; "// &
-       ! id SHA
-       'echo sha = '//sha_id//' >> '//trim(data_dir)//'/'//trim(base_para)
-  call system_call(cmd,syst_status)
+  call create_data_dir(data_dir, para, base_para)
 
   return
 
@@ -2187,7 +2213,6 @@ subroutine save_data(para,base_para)
   character(len=*), intent(in) :: para, base_para
 
   integer :: syst_status
-  character(len=1024) :: cmd
 
   logical :: lnew_run, lmove_data
   integer :: etape, etape_start, etape_end
@@ -2199,8 +2224,7 @@ subroutine save_data(para,base_para)
 
   if (lhydrostatic .and. (.not. is_dir(trim(root_dir)//"/"//trim(seed_dir)//"/data_disk"))) then
      write (*,*) 'Creating directory '//trim(root_dir)//'/'//trim(seed_dir)//'/data_disk'
-     cmd = 'mkdir -p '//trim(root_dir)//'/'//trim(seed_dir)//'/data_disk'
-     call system_call(cmd, syst_status)
+     call system_call('mkdir -p '//shell_quote(trim(root_dir)//'/'//trim(seed_dir)//'/data_disk'), syst_status)
   endif
 
   if (lmono0) then
@@ -2218,12 +2242,16 @@ subroutine save_data(para,base_para)
         etape_end=1
      endif
   endif
+  if (lemission_atom) etape_end = etape_end + 1 ! data_<atoms> directory
 
   do etape=etape_start,etape_end
 
      if (etape == 1) then
         local_data_dir = data_dir
         local_basename_data_dir = basename_data_dir
+     else if (lemission_atom .and. (etape == etape_end)) then
+        local_data_dir = data_dir_atom
+        local_basename_data_dir = basename_data_dir_atom
      else
         local_data_dir = data_dir2(etape-1)
         local_basename_data_dir = basename_data_dir2(etape-1)
@@ -2261,37 +2289,85 @@ subroutine save_data(para,base_para)
            if (is_dir(trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(local_basename_data_dir)//'_old')) then
               call error('Directory '//trim(local_data_dir)//'_old already exists : exiting!')
            endif
-           cmd = 'mv '//trim(local_data_dir)//' '//trim(local_data_dir)//'_old'
-           call system_call(cmd,syst_status)
+           call system_call('mv '//shell_quote(local_data_dir)//' '//shell_quote(trim(local_data_dir)//'_old'), syst_status)
         endif
      endif
 
      if (lnew_run) then
-        ! Create the data folder
-        write (*,*) 'Creating directory '//trim(local_data_dir)
-        cmd = 'mkdir -p '//trim(local_data_dir)//" ; "// &
-             ! copy the parameter file
-             'cp '//trim(para)//' '//trim(local_data_dir)//" ; "// &
-             ! command line options
-             'echo " " >>  '//trim(local_data_dir)//'/'//trim(base_para)//" ; "// &
-             'echo "Executed command line : '//trim(cmd_opt)//'" >> '//trim(local_data_dir)//'/'//trim(base_para)//" ; "// &
-             ! date of calculation
-             'date >> '//trim(local_data_dir)//'/'//trim(base_para)//" ; "// &
-             ! computing machine
-             'uname -a >> '//trim(local_data_dir)//'/'//trim(base_para)//" ; "// &
-             ! id SHA
-             'echo sha = '//sha_id//' >> '//trim(local_data_dir)//'/'//trim(base_para)
+        call create_data_dir(local_data_dir, para, base_para)
         ! Copy the lambda file if needed
         if (lsed.and.(.not.lsed_complete).and.(.not.lmono0).and.(etape==1)) then
-           cmd = trim(cmd)//' ; cp '//trim(lambda_filename)//' '//trim(local_data_dir)
+           call system_call('cp '//shell_quote(lambda_filename)//' '//shell_quote(local_data_dir), syst_status)
         endif
-        call system_call(cmd,syst_status)
      endif
   enddo ! andape
 
   return
 
 end subroutine save_data
+
+!********************************************************************
+
+subroutine create_data_dir(dir, para, base_para)
+  ! Creates the data directory dir, copies the parameter file into it and appends
+  ! the command line, date, machine and git SHA of the run to the copy.
+  ! Paths are quoted for the shell and the command line is written with Fortran I/O,
+  ! so spaces or shell characters ($, `, ", ;) in user strings are never executed.
+
+  character(len=*), intent(in) :: dir, para, base_para
+
+  character(len=:), allocatable :: para_copy
+  integer :: syst_status, unit, ios
+
+  write (*,*) 'Creating directory '//trim(dir)
+  call system_call('mkdir -p '//shell_quote(dir), syst_status)
+  if (syst_status /= 0) call error("cannot create directory "//trim(dir))
+
+  call system_call('cp '//shell_quote(para)//' '//shell_quote(dir), syst_status)
+  if (syst_status /= 0) call error("cannot copy "//trim(para)//" to "//trim(dir))
+
+  para_copy = trim(dir)//'/'//trim(base_para)
+
+  open(newunit=unit, file=para_copy, status='old', position='append', action='write', iostat=ios)
+  if (ios /= 0) call error("cannot open "//para_copy)
+  write(unit,'(a)') " "
+  write(unit,'(a)') "Executed command line : "//trim(cmd_opt)
+  close(unit)
+
+  call system_call('date >> '//shell_quote(para_copy)//' ; uname -a >> '//shell_quote(para_copy), syst_status)
+
+  open(newunit=unit, file=para_copy, status='old', position='append', action='write', iostat=ios)
+  if (ios /= 0) call error("cannot open "//para_copy)
+  write(unit,'(a)') "sha = "//sha_id
+  close(unit)
+
+  return
+
+end subroutine create_data_dir
+
+!********************************************************************
+
+function atom_ID(filename)
+  ! Element of an atomic model: first entry of the first line which is not a comment
+  ! (same convention as read_model_atom), e.g. "H" for H_6.atom
+
+  use uplow, only : to_lower
+
+  character(len=*), intent(in) :: filename
+  character(len=2) :: atom_ID
+
+  character(len=512) :: line
+  integer :: unit, ios, Nread
+
+  open(newunit=unit, file=trim(mcfost_utils)//"/Atoms/"//trim(filename), status="old", action="read", iostat=ios)
+  if (ios /= 0) call error("cannot open atomic model "//trim(filename))
+  call read_line(unit, "(A512)", line, Nread)
+  close(unit)
+  read(line,*,iostat=ios) atom_ID
+  if (ios /= 0) call error("cannot read the element of atomic model "//trim(filename))
+  atom_ID(2:2) = to_lower(atom_ID(2:2))
+
+end function atom_ID
 
 !********************************************************************
 

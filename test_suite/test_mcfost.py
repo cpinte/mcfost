@@ -6,6 +6,8 @@ import shutil
 import glob
 import os
 
+from conftest import ON_CI
+
 _mcfost_bin = "../src/mcfost"
 
 # Get list of models using directory names (filtering out hidden and AppleDouble files)
@@ -15,7 +17,7 @@ model_list = [
 ]
 
 # If running on CI, only run some of the tests
-#if os.environ.get('CI', None) == 'true':
+#if ON_CI:
 #    model_list = ["ref3.0","ref3.0_multi","debris","discF_00500"]
 
 #model_list = ["ref3.0"]#,"debris","discF_00500"]
@@ -176,7 +178,7 @@ def test_mol_map(model_name):
 @pytest.mark.parametrize("wl", wl_list)
 def test_image(model_name, wl):
 
-    if os.environ.get('CI', None) == 'true':
+    if ON_CI:
         if (model_name == "discF_00500"):
             # This requires too much memory on CI
             pytest.skip("Skipping images on phantom dump on CI")
@@ -246,7 +248,7 @@ def test_image(model_name, wl):
 def test_pola(model_name, wl):
     # Re-use previous calculation
 
-    if os.environ.get('CI', None) == 'true':
+    if ON_CI:
         if (model_name == "discF_00500"):
             # This requires too much memory on CI
             pytest.skip("Skipping images on phantom dump on CI")
@@ -288,7 +290,7 @@ def test_pola(model_name, wl):
 def test_contrib(model_name, wl):
     # Re-use previous calculation
 
-    if os.environ.get('CI', None) == 'true':
+    if ON_CI:
         if (model_name == "discF_00500"):
             # This requires too much memory on CI
             pytest.skip("Skipping images on phantom dump on CI")
@@ -455,6 +457,350 @@ def test_mol_nlte():
 
     lines = fits.getdata(root_dir+"/data_CO/lines.fits.gz")
     assert np.all(np.isfinite(lines)) and lines.max() > 0
+
+
+def test_seed_image():
+    # With -seed, results are written in root_dir/seed=<n>: an image run with the same
+    # seed must read the temperature computed there (J5: Tfile ignored seed_dir)
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    root_dir = "ref3.0_seed"
+    clean_results(root_dir)
+    os.makedirs(root_dir, exist_ok=True)
+    para = root_dir+"/seed.para"
+    make_para("test_data/ref3.0/ref3.0.para", para, {})
+
+    run_mcfost(para, root_dir, "-seed 7", timeout=300)
+    assert os.path.isfile(root_dir+"/seed=7/data_th/Temperature.fits.gz")
+
+    stdout = run_mcfost(para, root_dir, "-seed 7 -img 1.0", timeout=300)
+    assert "seed=7/data_th/Temperature.fits.gz" in stdout
+    assert os.path.isfile(root_dir+"/seed=7/data_1.0/RT.fits.gz")
+
+
+@pytest.mark.parametrize("args", ["0 1e-8", "150 1e-8", "2 1e-8", "x 1e-8", "1 abc"])
+def test_mdot_option_invalid(args):
+    # -Mdot <star> <Mdot>: the star number used to index a fixed-size array without
+    # check (H6: -Mdot 0 or -Mdot 150 wrote outside the array); must stop with an error
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    root_dir = "ref3.0_mdot"
+    clean_results(root_dir)
+    result = subprocess.run((os.path.abspath(_mcfost_bin)+" test_data/ref3.0/ref3.0.para -op 1.0 -root_dir "
+                             +root_dir+" -Mdot "+args).split(), capture_output=True, text=True, timeout=60)
+    assert result.returncode != 0
+    assert "-Mdot" in result.stdout
+
+
+def test_mdot_option():
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    root_dir = "ref3.0_mdot"
+    clean_results(root_dir)
+    stdout = run_mcfost("test_data/ref3.0/ref3.0.para", root_dir, "-op 1.0 -Mdot 1 1e-8", timeout=60)
+    assert "Mdot=" in stdout
+
+
+# Pascucci et al. 2004 benchmark: SEDs and midplane temperatures compared with the
+# RADMC and RADICAL results of the paper (distributed with the MCFOST utils).
+# Optically thin cases run for every pull request, optically thick ones only locally (slow).
+# Largest differences with MCFOST 4.1.16 (October 2026), SED (all wavelengths, >= 1 um
+# for tau = 100 where some RADMC optical fluxes are 0) and midplane temperature: 3.9 % and
+# 2.1 % (tau = 0.1), 8.1 % and 2.7 % (tau = 1), 15.6 % and 3.9 % (tau = 10), 15.6 % and
+# 9.8 % (tau = 100); RADMC and RADICAL differ by up to 8, 23 and 7 % for tau = 1, 10, 100.
+_pascucci_cases = [
+    pytest.param("0.1", "01tau", 0.06, 0.0, 0.05),
+    pytest.param("1", "1tau", 0.10, 0.0, 0.05),
+    pytest.param("10", "10tau", 0.20, 0.0, 0.06, marks=pytest.mark.slow),
+    pytest.param("100", "100tau", 0.20, 1.0, 0.12, marks=pytest.mark.slow),
+]
+
+
+def _pascucci_results_dir():
+    utils = os.environ.get("MCFOST_UTILS", os.path.join("..", "utils"))
+    return os.path.join(utils, "benchmarks", "Pascucci2004")
+
+
+def _read_pascucci_seds(filename):
+    # lambda [um], inclination [deg], lambda.L_lambda [erg/s]; 2 header lines (n_lambda, n_incl)
+    rows = [l.split() for l in open(filename) if l.strip() and not l.lstrip().startswith(";")][2:]
+    return np.array([[float(x) for x in r[:3]] for r in rows if len(r) >= 3])
+
+
+@pytest.mark.parametrize("tau, ref_dir, sed_tol, lambda_min, temp_tol", _pascucci_cases)
+def test_pascucci_benchmark(tau, ref_dir, sed_tol, lambda_min, temp_tol):
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    results = _pascucci_results_dir()
+    if not os.path.isdir(results):
+        pytest.skip("Pascucci 2004 results not found in the MCFOST utils (mcfost -update_utils)")
+
+    root_dir = "Pascucci2004_tau="+tau
+    clean_results(root_dir)
+    # the benchmark mode (isotropic scattering, tabulated cross-sections) is selected by the
+    # name of the parameter file; +disk_struct writes the grid for the temperature comparison
+    run_mcfost("benchmarks/Pascucci2004/Pascucci_tau="+tau+".para", root_dir, "-star_bb +disk_struct",
+               timeout=3600)
+
+    sed = fits.getdata(root_dir+"/data_th/sed_rt.fits.gz").astype(np.float64)
+    temperature = fits.getdata(root_dir+"/data_th/Temperature.fits.gz").astype(np.float64)
+    r_midplane = fits.getdata(root_dir+"/data_disk/grid.fits.gz")[0,0,0,:] # au
+
+    au_to_cm = 1.495978707e13
+    distance = 140 * 3.0856775814913673e18 # cm
+    for code in ["RADMC", "RADICAL"]:
+        ref = _read_pascucci_seds(results+"/"+code+"/"+ref_dir+"/allseds.dat")
+        for k, incl in enumerate([12.5, 77.5]):
+            ref_incl = ref[ref[:,1] == incl]
+            # lambda.F_lambda [W/m2] at 140 pc -> lambda.L_lambda [erg/s]
+            l_lambda = sed[0,0,k,:] * 1e3 * 4*np.pi * distance**2
+            ratio = l_lambda / ref_incl[:,2]
+            mask = ref_incl[:,0] >= lambda_min
+            print(code, "i =", incl, "SED ratio:", ratio[mask].min(), ratio[mask].max())
+            assert np.all(abs(ratio[mask] - 1) < sed_tol), \
+                f"SED differs from {code} at i = {incl} deg by more than {sed_tol}"
+
+        # midplane temperature: (r [cm], theta [rad], T [K]), theta closest to pi/2
+        dtemp = np.loadtxt(results+"/"+code+"/"+ref_dir+"/dtemp.dat", skiprows=1)
+        theta = np.unique(dtemp[:,1])
+        theta_mid = theta[np.argmin(abs(theta - np.pi/2))]
+        mid = dtemp[dtemp[:,1] == theta_mid]
+        r = mid[:,0] / au_to_cm
+        T_mcfost = np.interp(np.log(r), np.log(r_midplane), temperature[0,:])
+        ratio = T_mcfost / mid[:,2]
+        print(code, "midplane temperature ratio:", ratio.min(), ratio.max())
+        assert np.all(abs(ratio - 1) < temp_tol), \
+            f"midplane temperature differs from {code} by more than {temp_tol}"
+
+
+# Pinte et al. 2009 benchmark (very optically thick disc, anisotropic scattering), following
+# the comparisons of the paper (Sect. 4): SEDs and images relative to the average of the
+# codes, temperatures, 11 pixel wide cuts in the images and polarisation maps. Results of
+# the codes distributed with the MCFOST utils. Long tests (local runs only).
+# Largest differences with MCFOST 4.1.16 over several runs (October 2026):
+# - SED per wavelength relative to the average of MCMax and MCFOST 2009 (which agree within
+#   2-7 %): 21 % up to 76 deg, from the Monte Carlo noise of the ray-traced scattered thermal
+#   emission at 2-4 um (the paper finds 20 %); closer to edge-on MCMax and MCFOST 2009 differ
+#   by up to 65 % near 1 um, only the median over wavelength is compared there;
+# - temperatures inside the disc: 7.6 % (tau = 1e3), 19 % (tau = 1e6, inner au, where
+#   MCMax and TORUS differ by a similar amount).
+# - tau = 1e6 images at 69.5 and 87.1 deg (paper Figs. 7 and 8), rt2 with -rt2_angles 45 and
+#   rt1 with 1.28e7 packets, cuts through the two disc surfaces and through the centre:
+#   flux 17 % per point with rt2 and up to 31 % with rt1 (Monte Carlo noise, lower surface at
+#   69.5 deg, where MCFOST 2009 and MCMax differ by 23 %), medians 9 % with rt2 and up to
+#   14 % with rt1 (same cut), polarisation degree 0.12 (rt1). Slightly
+#   looser than in the paper (10 %, 0.05) because the 2009 maps predate the 2026 fix of the
+#   polarisation in multiple scattering, which changes the dark lane and the polarisation.
+_pinte2009_cases = [
+    pytest.param("1e3", 0.15, "", marks=pytest.mark.slow),
+    pytest.param("1e6", 0.25, "-diff_approx", marks=pytest.mark.slow),
+]
+_pinte2009_inclinations = ["18.2", "31.8", "41.4", "49.5", "56.6", "63.3", "69.5", "75.5", "81.4", "87.1"]
+
+
+def _pinte2009_results():
+    utils = os.environ.get("MCFOST_UTILS", os.path.join("..", "utils"))
+    results = os.path.join(utils, "benchmarks", "Pinte2009")
+    if not os.path.isdir(results):
+        pytest.skip("Pinte 2009 results not found in the MCFOST utils (mcfost -update_utils)")
+    return results
+
+
+def _log_interp(x, xp, fp):
+    return np.exp(np.interp(np.log(x), np.log(xp), np.log(np.maximum(fp, 1e-300))))
+
+
+@pytest.mark.parametrize("tau, temp_tol, opt", _pinte2009_cases)
+def test_pinte2009_benchmark(tau, temp_tol, opt):
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    results = _pinte2009_results()
+
+    root_dir = "Pinte2009_tau="+tau
+    clean_results(root_dir)
+    # -diff_approx (tau = 1e6): temperature of the optically thick midplane, not reached by
+    # the packets, from the diffusion approximation (1 K otherwise)
+    run_mcfost("benchmarks/Pinte2009/Pinte2009_tau="+tau+".para", root_dir,
+               "-star_bb +disk_struct "+opt, timeout=3600)
+
+    # SEDs (lambda.F_lambda [W/m2] at 140 pc) relative to the average of MCMax and MCFOST 2009
+    sed_file = fits.open(root_dir+"/data_th/sed_rt.fits.gz")
+    sed = sed_file[0].data.astype(np.float64)
+    wl = sed_file[1].data.astype(np.float64)         # micron
+    for k, incl in enumerate(_pinte2009_inclinations):
+        n = round(np.degrees(np.arccos(0.95 - 0.1*k)))
+        refs = [np.loadtxt(results+"/"+f, comments="#") for f in
+                ["mcmax/tau="+tau+"_aniso/SED/SED"+incl+".dat",
+                 "mcfost/tau="+tau+"_aniso/SED/tau="+tau+"_aniso_inc{:03d}.dat".format(n)]]
+        average = np.mean([_log_interp(wl, ref[:,0], ref[:,1]) for ref in refs], axis=0)
+        mask = average > 1e-3 * average.max()
+        ratio = sed[0,0,k,mask] / average[mask]
+        print("i =", incl, "SED / average:", ratio.min(), ratio.max(), "median", np.median(ratio))
+        assert abs(np.median(ratio) - 1) < 0.12, f"SED differs from the reference codes at i = {incl} deg"
+        if float(incl) < 80:
+            assert np.all(abs(ratio - 1) < 0.25), f"SED differs from the reference codes at i = {incl} deg"
+
+    temperature = root_dir+"/data_th/Temperature_DA.fits.gz"
+    if not os.path.isfile(temperature):
+        temperature = root_dir+"/data_th/Temperature.fits.gz"
+    T = fits.getdata(temperature).astype(np.float64) # (z, r)
+    grid = fits.getdata(root_dir+"/data_disk/grid.fits.gz")
+    r = grid[0,0,0,:]
+
+    # midplane: radius [au], T [K]
+    for code, filename in [("MCMax", "mcmax/tau="+tau+"_aniso/T/midplane_temp_tau"+tau+".dat"),
+                           ("TORUS", "torus/tau="+tau+"_aniso/T/tau="+tau+"_aniso_radial.dat"),
+                           ("MCFOST 2009", "mcfost/tau="+tau+"_aniso/T/Radial_temp_tau="+tau+".txt")]:
+        ref = np.loadtxt(results+"/"+filename, comments="#")
+        ref = ref[(ref[:,0] >= r.min()) & (ref[:,0] <= r.max())] # some codes extend beyond the disc
+        ratio = np.interp(np.log(ref[:,0]), np.log(r), T[0,:]) / ref[:,1]
+        print(code, "midplane temperature ratio:", ratio.min(), ratio.max())
+        assert np.all(abs(ratio - 1) < temp_tol), f"midplane temperature differs from {code}"
+
+    # vertical cuts: z [au], T [K], at R = 0.2 and 200 au (z of the cells interpolated in log r)
+    for R, label in [(0.2, "0.2AU"), (200., "200AU")]:
+        i = np.searchsorted(r, R)
+        f = np.log(R/r[i-1]) / np.log(r[i]/r[i-1])
+        z = np.exp((1-f) * np.log(grid[1,0,:,i-1]) + f * np.log(grid[1,0,:,i]))
+        T_R = (1-f) * T[:,i-1] + f * T[:,i]
+        for code, filename in [("MCMax", "mcmax/tau="+tau+"_aniso/T/vertical_temp_"+label+"_tau"+tau+".dat"),
+                               ("MCFOST 2009", "mcfost/tau="+tau+"_aniso/T/Vertical_temp_R="+label+"_tau="+tau+".txt")]:
+            ref = np.loadtxt(results+"/"+filename, comments="#")
+            z_ref = abs(ref[:,0])
+            mask = (z_ref >= z.min()) & (z_ref <= z.max())
+            ratio = np.interp(np.log(z_ref[mask]), np.log(z), T_R) / ref[mask,1]
+            print(code, "temperature ratio at R =", R, "au:", ratio.min(), ratio.max())
+            assert np.all(abs(ratio - 1) < temp_tol), f"temperature at R = {R} au differs from {code}"
+
+    if tau == "1e6":
+        # both ray-tracing methods: rt2 with a finer angular sampling of the scattered radiation
+        # field (the default 15 directions smooth the forward scattering peak of the 1 um grains,
+        # making the near side of the disc next to the star 30-40 % too faint), and rt1
+        _check_pinte2009_images(root_dir, results, "-rt2 -rt2_angles 45", 0.12, 0.30)
+        # rt1 is noisier, in particular on the faint lower surface at 69.5 deg (median 0.87-0.98
+        # of the reference average from run to run): looser medians and points
+        _check_pinte2009_images(root_dir, results, "-rt1 -nphot_img 1.28e7", 0.20, 0.40)
+
+
+def _check_pinte2009_images(root_dir, results, opt, median_tol, flux_tol):
+    # 1 um images and linear polarisation maps of the tau = 1e6 model at 69.5 and 87.1 deg
+    # (paper Figs. 7 and 8): 11 pixel wide cuts through the upper and lower disc surfaces
+    # (brightest rows of the reference images at least 15 pixels from the star) and through
+    # the centre. Flux relative to the average of MCFOST 2009 and MCMax, polarisation degree
+    # relative to the average of MCFOST 2009, MCMax and Pinball. Stellar pixels excluded.
+    shutil.rmtree(root_dir+"/data_1.0", ignore_errors=True)
+    run_mcfost("benchmarks/Pinte2009/Pinte2009_tau=1e6.para", root_dir, "-star_bb -img 1.0 "+opt, timeout=3600)
+    image = fits.getdata(root_dir+"/data_1.0/RT.fits.gz").astype(np.float64) # (Stokes, az, incl, y, x)
+    c = image.shape[-1] // 2
+    star = (slice(c-3, c+4), slice(c-3, c+4))
+
+    for k, incl, n in [(6, "69.5", 70), (9, "87.1", 87)]:
+        I = image[0,0,k].copy()
+        P = np.sqrt(image[1,0,k]**2 + image[2,0,k]**2) / np.maximum(I, 1e-300)
+        I_ref = [fits.getdata(results+"/mcfost/tau=1e6_aniso/images/intensity_map_inc{:03d}.fits.gz".format(n)),
+                 fits.getdata(results+"/mcmax/tau=1e6_aniso/images/ImageF_i"+incl+"_l00001.00_fov00900.0.fits")]
+        P_ref = [fits.getdata(results+"/mcfost/tau=1e6_aniso/pola/linear_polarization_map_inc{:03d}.fits.gz".format(n)),
+                 fits.getdata(results+"/mcmax/tau=1e6_aniso/pola/ImageP_i"+incl+"_l00001.00_fov00900.0.fits"),
+                 fits.getdata(results+"/pinball/pola/pola_inc{:d}.fits".format(n))]
+        I_ref = [np.array(a, dtype=np.float64) for a in I_ref]
+        for a in [I] + I_ref:
+            a[star] = np.nan
+        I_avg = np.mean(I_ref, axis=0)
+        P_avg = np.mean([np.array(a, dtype=np.float64) for a in P_ref], axis=0)
+
+        column = np.nanmean(I_avg[:,c-5:c+6], axis=1)
+        upper = c + 15 + int(np.nanargmax(column[c+15:c+100]))
+        lower = c - 100 + int(np.nanargmax(column[c-100:c-15]))
+        for name, rows, cols, axis in [("upper surface", slice(upper-5, upper+6), slice(None), 0),
+                                       ("lower surface", slice(lower-5, lower+6), slice(None), 0),
+                                       ("vertical", slice(None), slice(c-5, c+6), 1)]:
+            flux = np.nanmean(I[rows,cols], axis=axis)
+            flux_ref = np.nanmean(I_avg[rows,cols], axis=axis)
+            mask = np.isfinite(flux_ref) & (flux_ref > 0.1 * np.nanmax(flux_ref)) # where the flux is significant
+            ratio = flux[mask] / flux_ref[mask]
+            dP = np.nanmean(P[rows,cols], axis=axis)[mask] - np.nanmean(P_avg[rows,cols], axis=axis)[mask]
+            print(opt, "i =", incl, name, "cut: flux / average", ratio.min(), ratio.max(), "median", np.median(ratio),
+                  "polarisation - average", dP.min(), dP.max())
+            assert abs(np.median(ratio) - 1) < median_tol, f"1 um image differs from the reference codes ({opt}, {name} cut, i = {incl} deg)"
+            assert np.all(abs(ratio - 1) < flux_tol), f"1 um image differs from the reference codes ({opt}, {name} cut, i = {incl} deg)"
+            assert np.all(abs(dP) < 0.15), f"polarisation degree differs from the reference codes ({opt}, {name} cut, i = {incl} deg)"
+
+
+# Pinte et al. 2009 benchmark, temperatures with isotropic scattering (compared with RADMC,
+# ProDiMo, TORUS and MCFOST 2009) and without scattering (RADICAL, ProDiMo, MCFOST 2009),
+# tau = 1e3. Largest differences with MCFOST 4.1.16 (October 2026): medians 3 %, points
+# 14 % (isotropic, ProDiMo at 200 au) and 18 % (no scattering, ProDiMo and RADICAL near
+# the inner and outer edges, where their grids are coarser).
+def _read_radmc_struct(filename):
+    # RADMC / RADICAL structure file: spherical grid (r [cm], theta from the pole [rad]) and
+    # temperature array (ir, itheta); returns the midplane temperature profile (r [au], T [K])
+    blocks = {}
+    key = None
+    for line in open(filename):
+        if line.startswith("#"):
+            key = line.strip("# \n")
+            blocks[key] = []
+        else:
+            blocks[key].extend(float(x) for x in line.split())
+    nr, nt = (int(x) for x in blocks["NR,NT"])
+    r = np.array(blocks["Spherical radius grid [cm] (middle of cell)"]) / 1.495978707e13
+    theta = np.array(blocks["Theta grid [rad, from pole] (middle of cell)"])
+    T = np.array(blocks["Temperature array (for ir=0,nr-1 do for it=0,nt-1 do ...)"]).reshape(nr, nt)
+    return r, T[:, np.argmin(abs(theta - np.pi/2))]
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("case, opt", [("iso", "-isotropic"), ("no_scatt", "-no_scattering")])
+def test_pinte2009_temperature(case, opt):
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    utils = os.environ.get("MCFOST_UTILS", os.path.join("..", "utils"))
+    results = os.path.join(utils, "benchmarks", "Pinte2009")
+    if not os.path.isdir(results):
+        pytest.skip("Pinte 2009 results not found in the MCFOST utils (mcfost -update_utils)")
+
+    root_dir = "Pinte2009_tau=1e3_"+case
+    clean_results(root_dir)
+    run_mcfost("benchmarks/Pinte2009/Pinte2009_tau=1e3.para", root_dir, "-star_bb +disk_struct "+opt, timeout=3600)
+    T = fits.getdata(root_dir+"/data_th/Temperature.fits.gz").astype(np.float64) # (z, r)
+    grid = fits.getdata(root_dir+"/data_disk/grid.fits.gz")
+    r = grid[0,0,0,:]
+
+    def load(filename, skip=0):
+        return np.loadtxt(results+"/"+filename, comments="#", skiprows=skip)
+
+    prodimo = "prodimo/tau=1e3_"+case+"/T/ProDiMo_ltau3_"
+    mcfost09 = "mcfost/tau=1e3_"+case+"/T/"
+    midplane = {"ProDiMo": load(prodimo+"z0.0.dat")[:,[0,2]], "MCFOST 2009": load(mcfost09+"Radial_temp_tau=1e3.txt")}
+    if case == "iso":
+        midplane["RADMC"] = np.transpose(_read_radmc_struct(results+"/radmc/tau=1e3_iso/T/struct_3E-8.out"))
+        midplane["TORUS"] = load("torus/tau=1e3_iso/T/tau=1e3_iso_radial.dat")
+    else:
+        midplane["RADICAL"] = np.transpose(_read_radmc_struct(results+"/radical/tau=1e3_no_scatt/T/struct_3E-8_noscat_radical.out"))
+    # vertical cuts (z [au], T [K]); ProDiMo files have 2 header lines without "#"
+    vertical = {(0.2, "ProDiMo"): load(prodimo+"r0.2.dat", 2)[:,[1,2]],
+                (200., "ProDiMo"): load(prodimo+"r200.dat", 2)[:,[1,2]],
+                (0.2, "MCFOST 2009"): load(mcfost09+"Vertical_temp_R=0.2AU_tau=1e3.txt"),
+                (200., "MCFOST 2009"): load(mcfost09+"Vertical_temp_R=200AU_tau=1e3.txt")}
+
+    for code, ref in midplane.items():
+        ref = ref[(ref[:,0] >= r.min()) & (ref[:,0] <= r.max())]
+        ratio = np.interp(np.log(ref[:,0]), np.log(r), T[0,:]) / ref[:,1]
+        print(code, "midplane temperature ratio:", ratio.min(), ratio.max(), "median", np.median(ratio))
+        assert abs(np.median(ratio) - 1) < 0.05, f"midplane temperature differs from {code}"
+        assert np.all(abs(ratio - 1) < 0.25), f"midplane temperature differs from {code}"
+
+    for (R, code), ref in vertical.items():
+        i = np.searchsorted(r, R)
+        f = np.log(R/r[i-1]) / np.log(r[i]/r[i-1])
+        z = np.exp((1-f) * np.log(grid[1,0,:,i-1]) + f * np.log(grid[1,0,:,i]))
+        T_R = (1-f) * T[:,i-1] + f * T[:,i]
+        z_ref = abs(ref[:,0])
+        mask = (z_ref >= z.min()) & (z_ref <= z.max())
+        ratio = np.interp(np.log(z_ref[mask]), np.log(z), T_R) / ref[mask,1]
+        print(code, "temperature ratio at R =", R, "au:", ratio.min(), ratio.max(), "median", np.median(ratio))
+        assert abs(np.median(ratio) - 1) < 0.05, f"temperature at R = {R} au differs from {code}"
+        assert np.all(abs(ratio - 1) < 0.25), f"temperature at R = {R} au differs from {code}"
 
 
 def test_sublimation_image():

@@ -34,7 +34,7 @@ module atom_transfer
                                    tab_RT_az,tab_RT_incl
    use stars, only               : intersect_stars, max_Tshock, min_Tshock, max_Thp, min_Thp, max_Facc, min_Facc
    use output, only : allocate_atom_maps, flux_total, write_total_flux, write_atomic_maps
-   use mcfost_env, only          : dp, time_tick, time_max
+   use mcfost_env, only          : dp, time_tick, time_max, data_dir_atom
    use molecular_emission, only  : ds
    use messages, only : error, warning
    use voigts, only : Voigt
@@ -80,7 +80,7 @@ module atom_transfer
       ! allocate(image(npix_x,npix_y,n_lambda,rt_n_incl,rt_n_az,3))
 
       !write the map to bin at the moment and dealloc
-      open(100, file=filename,form="unformatted",status='unknown',access="stream")
+      open(100, file=trim(data_dir_atom)//"/"//filename,form="unformatted",status='unknown',access="stream")
       write(100) shape(tau_surface_map)
       ! write(100) shape(image)
       write(100) vacuum2air(n_lambda,tab_lambda_nm)
@@ -111,7 +111,7 @@ module atom_transfer
 
       write(*,*) " ** writing convergence maps..."
       unit = 100
-      open(unit, file="dloc.b",form="unformatted",status='unknown',access="stream",iostat=status)
+      open(unit, file=trim(data_dir_atom)//"/dloc.b",form="unformatted",status='unknown',access="stream",iostat=status)
       write(unit,iostat=status) n_cells
       write(unit,iostat=status) lmap
       write(unit,iostat=status) map
@@ -1809,7 +1809,7 @@ module atom_transfer
          I_1d(:,:) = I_1d(:,:) + Itot(:,:,j)
       enddo
 
-      open(1,file="spectrum_1d.txt",status="unknown")
+      open(1,file=trim(data_dir_atom)//"/spectrum_1d.txt",status="unknown")
       write(1,*) Nimpact, N_lambda!, atmos_1d%s
       write(1,'(*(1ES17.8E3))') (p(j), j=1,Nimpact)
       write(1,'(*(1ES17.8E3))') (cos_theta(j), j=1,Nimpact)

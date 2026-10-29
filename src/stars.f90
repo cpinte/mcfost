@@ -676,7 +676,7 @@ subroutine ism_energy_distribution(ISM_model)
   else if (ISM_model==1) then ! ProdiMo
      do lambda=1, n_lambda
         wl = tab_lambda(lambda) * 1e-6
-        E_ISM(lambda) = (chi_ISM * 1.71 * Wdil * Blambda(wl,T_ISM_stars) + Blambda(wl,TCmb))
+        E_ISM(lambda) = (chi_ISM * 1.71 * Wdil * Blambda(wl,T_ISM_stars) + Blambda(wl,T_Cmb))
      enddo
   else if (ISM_model==2) then ! Bate & Keto
      ! Interstellar Radiation (ISR) field from Zucconi et al. (2001), following Black (1994)

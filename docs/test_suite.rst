@@ -25,3 +25,32 @@ The test suite is performed in 2 steps.
 Running the reference and test solution takes ~ 14 minutes each on a macbook pro (Intel i7 4 cores at 2.8Ghz)
 
  .. note:: Comparisons with version earlier than v3.0.34 will fail as some definitions regarging the orientation of the images, and the Stokes vectors were changed. Those changes were validated manually.
+
+Benchmarks
+----------
+
+The parameter files of the benchmark of `Pinte et al. 2009 <https://ui.adsabs.harvard.edu/abs/2009A&A...498..967P>`_
+(very optically thick disc, anisotropic scattering and polarisation, midplane optical depths from 10\ :sup:`3`
+to 10\ :sup:`6`) are in ``test_suite/benchmarks/Pinte2009``. The star of the benchmark is a blackbody: run them
+with the ``-star_bb`` option. See the README in that directory for the model and the comparisons.
+The description of the benchmark and the results of the seven codes of the paper are on the benchmark webpage,
+https://ipag.osug.fr/~pintec/benchmark/index.shtml (formerly at Exeter), and a copy is distributed with the
+MCFOST utils (``benchmarks/Pinte2009``).
+
+The parameter files of the benchmark of `Pascucci et al. 2004 <https://ui.adsabs.harvard.edu/abs/2004A&A...417..793P>`_
+(2D disc with isotropic scattering, visual optical depths from 0.1 to 100) are in
+``test_suite/benchmarks/Pascucci2004``, and the results of the five codes of the paper in the MCFOST utils
+(``benchmarks/Pascucci2004``). They also need the ``-star_bb`` option.
+
+The test suite compares the SEDs (above 1 micron) and midplane temperatures of the Pascucci et al. 2004
+models with the RADMC and RADICAL results: the optically thin cases (optical depths 0.1 and 1) run
+everywhere, including for every pull request; the optically thick ones (10 and 100, a few minutes) run only
+locally. The long tests also compare the Pinte et al. 2009 models with optical depths 10\ :sup:`3`
+and 10\ :sup:`6` (SEDs, midplane and vertical temperatures, and for 10\ :sup:`6` the 1 micron scattered light
+images and linear polarisation degree) with the MCMax, TORUS and MCFOST 2009 results, and the temperatures with
+isotropic scattering and without scattering with RADMC, ProDiMo, RADICAL, TORUS and MCFOST 2009.
+
+Long tests are marked ``@pytest.mark.slow`` (see ``test_suite/conftest.py``): they run locally and are
+skipped on CI (environment variable ``CI=true``). They add about 10 minutes to a local run. To skip them::
+
+     $ pytest -m "not slow"

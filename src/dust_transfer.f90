@@ -1903,9 +1903,12 @@ subroutine compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix, dx_map, dy_ma
   x_center = npix_x/2 + 1
   y_center = npix_y/2 + 1
 
-  ! Energy
+  ! Energy: lambda.F_lambda [W.m-2] = pi B_lambda (R/d)^2 lambda, with
+  ! E_stars = 4 pi R[AU]^2 / ((exp(hc/lambda kT)-1) lambda[m]^5) (stars.f90):
+  ! lambda.F_lambda = E_stars * lambda[m] * (h c^2 / 2) / d[AU]^2
+  ! (the constant was approximated by 1.35e-12 / AU_to_Rsun^2, i.e. 2 % too low)
   factor = E_stars(lambda) * tab_lambda(lambda) * 1.0e-6 &
-       / (distance*pc_to_AU*AU_to_Rsun)**2 * 1.35e-12
+       * 0.5_dp * hp * c_light**2 / (distance*pc_to_AU)**2
 
   ! Test if star is resolved
   n_ray_star(:) = max(n_ray_star_SED / n_stars,1)

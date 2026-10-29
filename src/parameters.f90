@@ -259,13 +259,15 @@ module parameters
 
   ! ISM radiation following ProDiMo's definitions
   real, parameter :: Wdil =  9.85357e-17
-  real, parameter :: TCmb = 2.73
   real, parameter :: T_ISM_stars = 20000.
   real :: chi_ISM = 1.0
 
   character(len=8) :: system_age
 
   logical :: lscatt_ray_tracing, lscatt_ray_tracing1, lscatt_ray_tracing2, loutput_mc
+  ! RT2 angular sampling: directions of the stored radiation field and of the diffuse scattered
+  ! emission (-rt2_angles), and of the first scattering of the stellar light (-rt2_star_angles)
+  integer :: rt2_n_angles = 15, rt2_n_angles_star = 1000
   ! ray-tracing 1: saves the diffuse radiation field
   ! ray-tracing 2: saves the specific intensity
 

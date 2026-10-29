@@ -9,7 +9,7 @@ module thermal_emission
   use utils
   use PAH
   use grid
-  use stars, only : star_spectrum, E_ISM, E_stars
+  use stars, only : E_ISM, E_stars
   use input
   use density
   use cylindrical_grid
@@ -90,8 +90,6 @@ end subroutine allocate_thermal_energy
 !***************************************************
 
 subroutine allocate_thermal_emission(Nc,p_Nc)
-
-  use radiation_field, only : allocate_radiation_field_step1
 
   integer, intent(in) :: Nc, p_Nc
 

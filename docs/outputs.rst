@@ -131,6 +131,25 @@ The 3rd and 4th HDUs contain the transition numbers and frequencies respectively
           The fits file also only contains the main HDU in that case.
 
 
+Outputs from Atomic Line calculations
+-------------------------------------
+
+An atomic line calculation (``-atom``) writes its results in one directory named after the atoms of the
+parameter file, e.g. ``data_H`` (or ``data_H_Ca`` for several atoms):
+
+-  A copy of the input parameter file, with the command line.
+
+-  ``<atom>.fits.gz``: level populations of each atom, and ``ne.fits.gz``: electron density.
+
+-  ``<atom>_line_*.fits.gz``: line maps (ray-traced images) and ``flux.fits.gz``: total flux.
+
+-  ``<atom>_colrate.fits.gz``, ``<atom>_radrate.fits.gz`` (``-output_rates``) and the other optional outputs.
+
+When the populations are read from a previous calculation (initial solution "from file"), or when the
+electron density of a previous calculation is reused, they are read from the directory of the previous
+run, which mcfost renames ``data_<atoms>_old`` at the start of the new run.
+
+
 Additional optional outputs
 ---------------------------
 
@@ -199,7 +218,7 @@ containing only a copy of the parameter file.
 Optical depth maps
 ^^^^^^^^^^^^^^^^^^
 
-Using the option ``-optical_depth_map`` or ``-od`` (in combination with ``-img``), mcfost will generate a fits file ``optical_depth_map.fits.gz`` of dimensions (n_rad, nz, n_az, 2) giving for the each cell the optical depth at the selected wavelentgh from the centre of the cell to r=0 and z=+infinity. When used in SED mode, the optical depth map will be computed at the wavelength closest to I band (e.g. 0.81 micron).
+Using the option ``-optical_depth_to_cell`` or ``-tau_to_cell`` (in combination with ``-img``), mcfost will generate a fits file ``optical_depth_to_cell.fits.gz`` in the data directory, of dimensions (n_rad, nz, n_az, 2) giving for the each cell the optical depth at the selected wavelentgh from the centre of the cell to r=0 and z=+infinity. When used in SED mode, the optical depth map will be computed at the wavelength closest to I band (e.g. 0.81 micron).
 
 Note that this option does not work yet when using a Voronoi mesh, the current implmentation only works for the rgular grids.
 
@@ -221,7 +240,7 @@ Option ``-origin`` or ``-o`` creates a fits file ``origin.fits.gz``, which fract
 Radiation field
 ^^^^^^^^^^^^^^^
 Option ``-output_J`` generates a fits file ``J.fits`` with the radiation field in each cell and at each wavelength in W/m2.
-Option ``-output_UV_field`` generates a fits file ``UV_field.fits`` with, for each cell,  the integrated radiation field between 912 and 200 angstroems (in Habing units).
+Option ``-output_UV_field`` generates a fits file ``UV_field.fits.gz`` with, for each cell, the radiation field integrated between 912 and 2050 angstroms, in Habing units (G\ :sub:`0`, 1.6e-3 erg cm\ :sup:`-2` s\ :sup:`-1`; the Draine field is 1.7 G\ :sub:`0`, van Dishoeck et al., arXiv:0806.0088). Up to version 4.1.16, the values were in Draine units despite the Habing label (i.e. 1.67 times lower) and integrated up to 2000 angstroms.
 
 Files for ProDiMo
 ^^^^^^^^^^^^^^^^^

@@ -5,7 +5,7 @@ module mcfost_env
   implicit none
 
   real, parameter :: mcfost_version = 4.1
-  character(8), parameter :: mcfost_release = "4.1.16"
+  character(8), parameter :: mcfost_release = "4.1.17"
   real, parameter :: required_utils_version = 4.1
 
   !character(len=128) :: web_server    = "https://ipag.osug.fr/public/pintec/"
@@ -32,6 +32,8 @@ module mcfost_env
   character(len=512) :: mcfost_utils, my_mcfost_utils, data_dir, root_dir, tmp_dir, basename_data_dir, seed_dir
   character(len=512) :: lambda_filename, band, model_pah, pah_grain, cmd_opt
   character(len=512), dimension(100) :: data_dir2, basename_data_dir2
+  ! atomic line transfer: data_<atoms> directory, and the one of the previous run for restarts
+  character(len=512) :: data_dir_atom = ".", basename_data_dir_atom = "", restart_dir_atom = "."
   character(len=512), dimension(:), allocatable :: search_dir, dust_dir, mol_dir, star_dir, lambda_dir, ML_dir
 
   integer :: time_begin, time_end, time_tick, time_max

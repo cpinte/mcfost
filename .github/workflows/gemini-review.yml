@@ -44,7 +44,7 @@ jobs:
           echo "context_lines=$context_lines" >> $GITHUB_OUTPUT
 
       - name: Run Gemini Reviewer
-        uses: sshnaidm/gemini-code-review-action@v2
+        uses: sshnaidm/gemini-code-review-action@ecc2434351ef76b0084b788a3d61ec7d3acf44f9 # v2
         with:
           gemini-key: ${{ secrets.GEMINI_API_KEY }}
           model: "gemini-3.6-flash"

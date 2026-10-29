@@ -14,8 +14,6 @@ module benchmarks
 
 subroutine init_Pascucci_benchmark()
 
-  !character(len=32) :: filename = "Pascucci_optSi.dat"
-
   write(*,*) "------------------------------------------------"
   write(*,*) "| Setting up the Pascucci et al 2004 benchmark |"
   write(*,*) "------------------------------------------------"
@@ -27,6 +25,7 @@ subroutine init_Pascucci_benchmark()
   dust_pop(1)%rho1g_avg = 3.6
 
   write(*,*) "! Forcing isotropic scattering                  |"
+  write(*,*) "! Cross-sections from Pascucci_optSi.dat         |"
   write(*,*) "-------------------------------------------------"
   lisotropic=.true.
 
@@ -36,48 +35,7 @@ end subroutine init_Pascucci_benchmark
 
 !*************************************************************
 
-!-- subroutine read_Pascucci_cross_sections(lambda, Cext, Csca)
-!-- ! Read cross-section table
-!-- ! Benchmark Pascucci et al. 2004
-!-- ! V band: line 15
-!--
-!--   use utils, only : in_dir
-!--
-!--   implicit none
-!--
-!--   integer, intent(in) :: lambda
-!--   real, intent(out) :: Cext, Csca
-!--
-!--   integer :: l, ios
-!--   real, dimension(61), save :: Cext_Pascucci, Csca_Pascucci
-!--
-!--   character(len=512) :: filename, dir
-!--
-!--   if (lambda == 1) then
-!--      filename = dust_pop(1)%indices(1)
-!--      dir = in_dir(filename, dust_dir,  status=ios)
-!--      if (ios /=0) call error("dust file cannot be found:"//trim(filename))
-!--      filename = trim(dir)//trim(filename) ;
-!--
-!--      open(unit=1,file=filename,status="old")
-!--      ! Skipping header
-!--      do l=1,11
-!--         read(1,*)
-!--      enddo
-!--
-!--      do l=1,n_lambda
-!--         read(1,*) tab_lambda(l), Csca_Pascucci(l), Cext_Pascucci(l)
-!--      enddo
-!--      close(unit=1)
-!--   endif
-!--
-!--   ! Convert to mum**2
-!--   Cext = Cext_Pascucci(lambda) * (m_to_mum)**2
-!--   Csca = Csca_Pascucci(lambda) * (m_to_mum)**2
-!--
-!--   return
-!--
-!-- end subroutine read_Pascucci_cross_sections
+
 
 !*************************************************************
 
@@ -165,9 +123,6 @@ subroutine readMolecule_benchmark2()
 
   implicit none
 
-  real(kind=dp), parameter :: ergToEv = 6.24145d11
-  real(kind=dp), parameter :: hCgs = 6.626205d-27
-
   character(len=80) :: junk
   integer :: i, iPart
 
@@ -203,7 +158,7 @@ subroutine readMolecule_benchmark2()
   read(1,*) Aul(1:nTrans_tot)
 
   do i = 1, nTrans_tot
-     transFreq(i) = ((Level_energy(iTransUpper(i)) - Level_energy(iTransLower(i)))/ergToEV)/hcgs
+     transFreq(i) = (Level_energy(iTransUpper(i)) - Level_energy(iTransLower(i))) * eV_to_J / hp ! eV -> Hz
 
      ! Transformation Aul -> Bul
      Bul(i) = Aul(i) * (c_light**2)/(2.d0*hp*(transfreq(i))**3)

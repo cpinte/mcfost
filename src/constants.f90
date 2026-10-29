@@ -15,31 +15,34 @@ module constants
 
   real(kind=dp), parameter :: sqrtpi=sqrt(pi)!1.77245385090551
   ! --- 1/(2sqrt(2)), needed for anisotropy of radiation ---
-  real(kind=dp), parameter ::  twosqrttwo = 0.35355339059327
+  real(kind=dp), parameter ::  twosqrttwo = 1.0_dp / (2.0_dp * sqrt(2.0_dp))
 
   ! SI constants
-  real(kind=dp), parameter :: hp = 6.626070040e-34_dp  ! Planck (J.s) CODATA 2014
-  real(kind=dp), parameter :: kb = 1.38064852e-23_dp   ! Boltzmann (J.K^-1) CODATA 2014
-  real(kind=dp), parameter :: c_light = 299792458._dp  ! speed of light (m.s^-1) CODATA 2014
+  ! Defining constants of the SI (2019 redefinition, exact): h, c, e, k, N_A
+  ! Other constants: CODATA 2018 (Tiesinga et al. 2021, Rev. Mod. Phys. 93, 025010,
+  ! https://physics.nist.gov/cuu/Constants/)
+  real(kind=dp), parameter :: hp = 6.62607015e-34_dp   ! Planck (J.s), SI 2019 exact
+  real(kind=dp), parameter :: kb = 1.380649e-23_dp     ! Boltzmann (J.K^-1), SI 2019 exact
+  real(kind=dp), parameter :: c_light = 299792458._dp  ! speed of light (m.s^-1), SI exact
   real, parameter :: thermal_const=c_light*hp/kb  ! pour Calculation of (h c)/(lambda k T)
-  real, parameter :: sigma = 5.670367e-8     ! Stefan (en W/(m^2.K^4)) CODATA 2014
-  real, parameter :: Ggrav = 6.67428e-11   ! (m^3.s^-2.kg^-1) e-8 en cgs, CODATA 2016, value recommended by IAU 2015 B3
-  real(kind=dp), parameter :: electron_charge = 1.6021766208e-19_dp  ! Coulombs CODATA 2014
-  real(kind=dp), parameter :: mel = 9.1093897d-31 !Electron mass [kg]
+  real, parameter :: sigma = 2.0_dp*pi**5*kb**4/(15.0_dp*hp**3*c_light**2) ! Stefan-Boltzmann (W.m^-2.K^-4) = 5.670374419e-8, exact
+  real(kind=dp), parameter :: Ggrav = 6.67430e-11_dp   ! (m^3.s^-2.kg^-1), CODATA 2018
+  real(kind=dp), parameter :: electron_charge = 1.602176634e-19_dp  ! Coulombs, SI 2019 exact
+  real(kind=dp), parameter :: mel = 9.1093837015e-31_dp ! Electron mass [kg], CODATA 2018
   real(kind=dp), parameter :: radconst = 4.*sigma/c_light       ! radiation constant
 
-  real(kind=dp), parameter :: Na = 6.022140857e23_dp   ! Nombre d'Avogadro CODATA 2014
-  real(kind=dp), parameter :: amu = 1.0_dp/Na          ! atomic mass unit [g]
-  real(kind=dp), parameter :: mH = 1.007825032231_dp * amu   ! H atom mass [g] CODATA 2014
+  real(kind=dp), parameter :: Na = 6.02214076e23_dp    ! Avogadro number, SI 2019 exact
+  real(kind=dp), parameter :: amu = 1.66053906660e-24_dp ! atomic mass unit [g], CODATA 2018 (1/N_A g within 4e-10 since 2019)
+  real(kind=dp), parameter :: mH = 1.007825032231_dp * amu   ! H atom mass [g], 1H atomic mass (AME 2020)
   real, parameter :: mu = 2.3                          ! [mH] 2.3 following Walker 2004
   real, parameter :: mu_mH = mu * mH                   ! mean molecular weight [g]
-  real, parameter :: T_Cmb = 2.7260                    ! K
+  real, parameter :: T_Cmb = 2.72548                   ! CMB temperature [K], Fixsen 2009, ApJ 707, 916
 
   real(kind=dp), parameter ::  e_ion_hmin = 0.754 * electron_charge !Ionization energy (affinity) Hmin in [J]
-  real(kind=dp), parameter ::  epsilon_0=8.854187817d-12  !Vacuum permittivity [F/m]
-  real(kind=dp), parameter ::  rBohr=5.29177349d-11  ! Bohr radius [m]
-  real(kind=dp), parameter ::  E_Rydberg=2.1798741d-18 ! Ion. pot. Hydrogen [J]
-  real(kind=dp), parameter ::  theta0 = 5.03974756d+3! log10(e) * eV/k [K^-1]
+  real(kind=dp), parameter ::  epsilon_0=8.8541878128d-12  !Vacuum permittivity [F/m], CODATA 2018
+  real(kind=dp), parameter ::  rBohr=5.29177210903d-11  ! Bohr radius [m], CODATA 2018
+  real(kind=dp), parameter ::  E_Rydberg=2.1798723611035d-18 ! Rydberg energy R_inf h c [J], CODATA 2018
+  real(kind=dp), parameter ::  theta0 = log10(exp(1.0_dp)) * electron_charge / kb ! log10(e) * eV/k [K^-1] = 5039.7752
   real(kind=dp), parameter ::  abarh = 7.42d-41 ! polarizabilty of Hydrogen in [Fm^2]
   real(kind=dp), parameter ::  pia0squarex2 = two_pi * rBohr**2 ! constant for collision Cross-sections
 
@@ -84,7 +87,7 @@ module constants
   real(kind=dp), parameter ::  m_to_nm =1.0d9
 
   real(kind=dp), parameter :: Rsun = 6.957e8_dp ! IAU 2015 B3 definition, https://arxiv.org/abs/1605.09788
-  real, parameter :: Teff_Sun = 5772.0 ! IAU 2015
+  real, parameter :: Teff_Sun = 5772.0 ! IAU 2015 B3 nominal solar effective temperature
   real(kind=dp), parameter :: Rsun_to_au = Rsun/au_to_m
   real(kind=dp), parameter :: au_to_Rsun = 1.0_dp/Rsun_to_au
 
@@ -98,9 +101,12 @@ module constants
   real(kind=dp), parameter :: erg_to_J = 1.0e-7_dp
   real, parameter :: jansky = 1.0e-26 ! W.m^-2.Hz-1 (F_nu en jansky)
   real, parameter :: Lsun = 3.828e26 ! [W] IAU 2015
+  ! FUV interstellar radiation fields integrated over 912-2050 Angstroms
+  ! (van Dishoeck, Jonkheid & van Hemert, arXiv:0806.0088, p. 7)
+  real(kind=dp), parameter :: Habing_field = 1.6e-6_dp  ! [W.m-2] Habing (1968), G0 = 1
+  real(kind=dp), parameter :: Draine_field = 2.67e-6_dp ! [W.m-2] Draine (1978), chi = 1 (= 1.7 G0)
   real(kind=dp), parameter ::  j_to_ev=1/ev_to_j!6.241506363094028e+18
-  real(kind=dp), parameter ::  j_to_cm1=5.040963080525957d+22
-  real, parameter :: Tsun = 5777 ! [K] effective tenperature of the sun
+  real(kind=dp), parameter ::  j_to_cm1 = 1.0_dp / (hp * c_light * m_to_cm) ! 5.034116567e22 (was 5.0409631e22, 0.14 % off)
 
   ! Masses
   real(kind=dp), parameter :: g_to_kg = 1.0e-3_dp
