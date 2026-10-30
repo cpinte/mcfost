@@ -239,7 +239,7 @@ endif
 gdir=gas
 VPATH = $(gdir)/
 
-SOURCES = mcfost_env.f90 parameters.f90 constants.f90 healpix_mod.f90 sha.f90 messages.f90 \
+SOURCES = mcfost_env.f90 parameters.f90 constants.f90 healpix_mod.f90 sha.f90 messages.f90 timing.f90 \
           operating_system.f90 random_numbers.f90 utils.f90 sort.f90 fits_utils.f90 \
           grains.f90 cylindrical_grid.f90 spherical_grid.f90 kdtree2.f90 \
           elements_type.f90 Voronoi.f90 grid.f90 wavelengths.f90 stars.f90 \

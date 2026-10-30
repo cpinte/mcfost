@@ -501,6 +501,19 @@ def test_mdot_option():
     assert "Mdot=" in stdout
 
 
+def test_timing_option():
+    # -timing: wall-clock time per phase, read by performance_suite/run_benchmark.sh
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    root_dir = "ref3.0_timing"
+    clean_results(root_dir)
+    stdout = run_mcfost("test_data/ref3.0/ref3.0.para", root_dir, "-no_SED -timing", timeout=300)
+    timing = {l.split()[1]: float(l.split()[2]) for l in stdout.splitlines() if l.startswith(" TIMING")}
+    # no dust_prop when the dust properties are read from a previous run (_dust_prop_th.tmp)
+    assert {"total", "init", "opacity", "mc_temperature", "temperature"} <= timing.keys()
+    assert timing["init"] <= timing["total"]
+
+
 # Pascucci et al. 2004 benchmark: SEDs and midplane temperatures compared with the
 # RADMC and RADICAL results of the paper (distributed with the MCFOST utils).
 # Optically thin cases run for every pull request, optically thick ones only locally (slow).

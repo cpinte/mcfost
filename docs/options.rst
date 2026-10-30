@@ -63,6 +63,8 @@ File organisation
 
 ``-prodimo_input_dir <dir>``: input directory for ProDiMo
 
+``-timing``: prints the wall-clock time of each phase of the run (``TIMING <phase> <seconds> <calls>`` lines, phases can be nested), used by the benchmark scripts in ``performance_suite``
+
 Options related to images
 -------------------------
 

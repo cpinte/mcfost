@@ -1,0 +1,6 @@
+ozstar.conf
+results/logs/
+# editor files
+\#*#
+.#*
+*~

@@ -11,6 +11,7 @@ module init_mcfost
   use input, only : Tfile, lect_lambda, read_phase_function, read_molecules_names
   use ProdiMo
   use utils
+  use timing, only : ltiming
   use read_fargo3d, only : read_fargo3d_parameters
   use read_athena, only : read_athena_parameters
   use read_1d_models, only : read_model_1d
@@ -1191,6 +1192,9 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         i_arg = i_arg + 1
         read(s,*) Tmax_PAH
+     case("-timing")
+        i_arg = i_arg + 1
+        ltiming = .true.
      case("-benchmark_SHG")
         i_arg = i_arg + 1
         lbenchmark_SHG=.true.
@@ -1996,6 +2000,7 @@ subroutine display_help()
   write(*,*) '        : -tmp_dir <dir>  : redults where previous cartial calculations are store (default: ".")'
   write(*,*) "        : -no_backup  : stops if directory data_XX already exists"
   write(*,*) "                        without attempting to backup existing directory"
+  write(*,*) "        : -timing : prints the wall-clock time of each phase of the run"
   write(*,*) "        : -prodimo_input_dir <dir> : input files for ProDiMo"
   write(*,*) " "
   write(*,*) " Options related to images"
