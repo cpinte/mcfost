@@ -1343,11 +1343,19 @@ subroutine run_sed_mc()
            endif
         enddo
 
-        if (lscatt_ray_tracing1) then
-           xI_scatt = 0.0_dp
-        else
-           I_spec = 0.0_dp ; I_spec_star = 0.0_dp
-        endif
+        ! Reset for the next wavelength, one thread per copy: these arrays have a copy
+        ! per thread (0.8 GB with 16 threads for the W5 benchmark) and a serial reset
+        ! took longer than the ray tracing itself
+        !$omp parallel do default(none) shared(lscatt_ray_tracing1,xI_scatt,I_spec,I_spec_star,nb_proc) &
+        !$omp private(id) schedule(static,1)
+        do id=1, nb_proc
+           if (lscatt_ray_tracing1) then
+              xI_scatt(:,:,:,:,:,id) = 0.0_dp
+           else
+              I_spec(:,:,:,:,id) = 0.0_dp ; I_spec_star(:,id) = 0.0_dp
+           endif
+        enddo
+        !$omp end parallel do
      endif
 
   enddo ! lambda

@@ -76,8 +76,8 @@ def main():
         base = times.get((args.baseline, w, p))
         cand = times.get((args.candidate, w, p))
         if not base or not cand:
-            print(f"{w:8} {p:16} {'-' if not base else statistics.median(base):>10} "
-                  f"{'-' if not cand else statistics.median(cand):>10}   (missing)")
+            fmt = lambda t: f"{statistics.median(t):10.3f}" if t else f"{'-':>10}"
+            print(f"{w:8} {p:16} {fmt(base)} {fmt(cand)}   (missing)")
             continue
         mb, mc = statistics.median(base), statistics.median(cand)
         # relative spread of the repeats: noise level of this phase
