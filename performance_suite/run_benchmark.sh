@@ -105,7 +105,7 @@ fi
         label=${b%%=*} ; bin=${b#*=}
         dir=$(cd "$(dirname "$bin")" && pwd)
         sha=$(git -C "$dir" rev-parse HEAD 2>/dev/null || echo unknown)
-        git -C "$dir" diff --quiet HEAD -- . 2>/dev/null || sha="$sha-dirty"
+        [ "$sha" != unknown ] && { git -C "$dir" diff --quiet HEAD -- . 2>/dev/null || sha="$sha-dirty" ; }
         echo "# binary: $label $dir/$(basename "$bin") $sha"
     done
     printf "label\tworkload\trepeat\tphase\tseconds\tcalls\n"

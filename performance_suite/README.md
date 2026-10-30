@@ -31,7 +31,7 @@ phase (`TIMING <phase> <seconds> <calls>`). Phases can be nested: `init` and
 | `mc_temperature` | Monte Carlo packets of the temperature step |
 | `temperature` | Equilibrium temperatures (LTE and nLTE) |
 | `temperature_nRE` | Stochastic heating: temperature probabilities and re-emission (`Temp_nRE`, `update_proba_abs_nRE`, `emission_nRE`) |
-| `step2_setup` | SED step: wavelength grid, dust properties, opacities and, per wavelength, scattering matrices, dark zone and emission probabilities before the packets |
+| `step2_setup` | Image or SED step before the packets: scattering matrices, dark zone and emission probabilities (per wavelength for SEDs), and for SEDs the wavelength grid, dust properties and opacities |
 | `mc_step2` | Monte Carlo packets of the image or SED step |
 | `source_fct` | Source functions of the ray tracing (including `calc_Jth`) |
 | `ray_tracing` | Ray tracing of the images and SEDs (`dust_map`) |

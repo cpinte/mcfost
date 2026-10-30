@@ -415,11 +415,11 @@ subroutine recompute_opacities(ltemperature_step)
   if (present(ltemperature_step)) letape_th = ltemperature_step
 
   write(*,'(a30, $)') "Computing opacities ..."
-  call timer_start(t_opacity)
   do lambda = 1, n_lambda
+     call timer_start(t_opacity)
      call opacity(lambda)
+     call timer_stop(t_opacity)
   enddo
-  call timer_stop(t_opacity)
   write(*,*) "Done"
 
   letape_th = letape_th_save
@@ -1038,6 +1038,7 @@ subroutine run_image_mc()
   lambda = 1
   p_lambda = 1
 
+  call timer_start(t_step2_setup)
   if (.not.l_p_lambda_is_lambda .and. lscatt_ray_tracing) then
      call calc_local_scattering_matrices(lambda)
   endif
@@ -1051,6 +1052,7 @@ subroutine run_image_mc()
   if (lweight_emission) call define_proba_weight_emission(lambda)
 
   call repartition_energie(lambda)
+  call timer_stop(t_step2_setup)
 
   write(*,*) "frac. energy emitted by star(s) : ", real(frac_E_stars(1))
   if (n_stars > 1) then
