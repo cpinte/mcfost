@@ -18,8 +18,9 @@ pytest test suite; it uses the models of `test_suite/test_data`.
 | `results/` | Results files, one per job |
 
 The times come from `mcfost -timing`, which prints the wall-clock time of each
-phase (`TIMING <phase> <seconds> <calls>`). Phases can be nested: `init`
-includes `dust_prop` and `opacity`, `total` includes everything.
+phase (`TIMING <phase> <seconds> <calls>`). Phases can be nested: `init` and
+`step2_setup` include `dust_prop` and `opacity`, `total` includes everything.
+`compare_benchmark.py` adds `other`: the part of `total` that no phase covers.
 
 | Phase | Content |
 |---|---|
@@ -30,6 +31,7 @@ includes `dust_prop` and `opacity`, `total` includes everything.
 | `mc_temperature` | Monte Carlo packets of the temperature step |
 | `temperature` | Equilibrium temperatures (LTE and nLTE) |
 | `temperature_nRE` | Stochastic heating: temperature probabilities and re-emission (`Temp_nRE`, `update_proba_abs_nRE`, `emission_nRE`) |
+| `step2_setup` | SED step: wavelength grid, dust properties, opacities and, per wavelength, scattering matrices, dark zone and emission probabilities before the packets |
 | `mc_step2` | Monte Carlo packets of the image or SED step |
 | `source_fct` | Source functions of the ray tracing (including `calc_Jth`) |
 | `ray_tracing` | Ray tracing of the images and SEDs (`dust_map`) |

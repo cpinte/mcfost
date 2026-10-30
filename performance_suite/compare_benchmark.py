@@ -17,8 +17,15 @@ import sys
 from collections import defaultdict
 
 
+# Phases that do not overlap (dust_prop and opacity are within init or
+# step2_setup): "other" = total - their sum, the time no timer covers
+TOP_LEVEL = ("setup", "init", "mc_temperature", "temperature", "temperature_nRE", "step2_setup",
+             "mc_step2", "source_fct", "ray_tracing", "output", "mol", "atom")
+
+
 def read_results(files):
     times = defaultdict(list)  # (label, workload, phase) -> [seconds]
+    runs = defaultdict(dict)   # (file, label, workload, repeat) -> {phase: seconds}
     meta = defaultdict(set)    # key -> values, to check the runs are comparable
     labels = []                # binaries in order of appearance
     for name in files:
@@ -35,6 +42,11 @@ def read_results(files):
                 if cols[0] == "label" or len(cols) < 6:
                     continue
                 times[(cols[0], cols[1], cols[3])].append(float(cols[4]))
+                runs[(name, cols[0], cols[1], cols[2])][cols[3]] = float(cols[4])
+    for (name, label, workload, repeat), phases in runs.items():
+        if len(phases) > 1 and "total" in phases:  # binaries with -timing only
+            times[(label, workload, "other")].append(
+                phases["total"] - sum(t for p, t in phases.items() if p in TOP_LEVEL))
     return times, meta, labels
 
 

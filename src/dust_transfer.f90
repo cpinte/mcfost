@@ -1177,6 +1177,7 @@ subroutine run_sed_mc()
   n_phot_lim = n_photons_lim
   nnfot1_start = 1
 
+  call timer_start(t_step2_setup)
   ! Setup step 2 for non-complete SED (separate wavelength grid)
   if (.not.lsed_complete) then
      call setup_scattering()
@@ -1218,9 +1219,11 @@ subroutine run_sed_mc()
 
      n_lambda_sed = n_lambda
   endif
+  call timer_stop(t_step2_setup)
 
   ! Loop over SED wavelengths
   do lambda = 1, n_lambda_sed
+     call timer_start(t_step2_setup)
      p_lambda = merge(lambda, 1, l_p_lambda_is_lambda)
 
      if (.not.l_p_lambda_is_lambda .and. lscatt_ray_tracing) then
@@ -1250,6 +1253,7 @@ subroutine run_sed_mc()
      write(*,*) "", real(tab_lambda(lambda)) ,"  ", real(frac_E_stars(lambda)), "  ", tau
 
      ! MC photon loop
+     call timer_stop(t_step2_setup)
      call timer_start(t_mc_step2)
      call mc_photon_loop(lambda, n_photons2, n_phot_lim, nnfot1_start, laffichage)
      call timer_stop(t_mc_step2)
