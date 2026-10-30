@@ -94,9 +94,10 @@ wall time of each workload, measured by the script.
 
 Comparison:
 
-    ./compare_benchmark.py results/<file>.tsv [--baseline main --candidate new]
+    ./compare_benchmark.py [results/<file>.tsv] [--baseline main --candidate new]
 
-The baseline and candidate default to the first two binaries of the file.
+Without a file, the latest one in `results/` is used. The baseline and candidate
+default to the first two binaries of the file.
 
 A phase is flagged `SLOWER` when the candidate median is slower by more than
 10 % (`--threshold`) and by more than the spread of the repeats; phases shorter

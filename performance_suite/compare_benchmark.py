@@ -7,11 +7,14 @@ the candidate is slower than the baseline by more than the threshold and by
 more than the spread of the repeats. Phases shorter than --min-seconds are
 reported but never flagged. Exit status 1 if any phase is flagged.
 
-Usage: compare_benchmark.py results.tsv [more.tsv ...] [--baseline <label>] [--candidate <label>]
-By default the baseline and candidate are the first two binaries of the files.
+Usage: compare_benchmark.py [results.tsv more.tsv ...] [--baseline <label>] [--candidate <label>]
+Without a file, the latest results file in results/ is used. By default the
+baseline and candidate are the first two binaries of the files.
 """
 
 import argparse
+import glob
+import os
 import statistics
 import sys
 from collections import defaultdict
@@ -52,12 +55,21 @@ def read_results(files):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("files", nargs="+")
+    parser.add_argument("files", nargs="*", help="results files (default: the latest in results/)")
     parser.add_argument("--baseline", help="label of the reference binary (default: first binary)")
     parser.add_argument("--candidate", help="label of the binary under test (default: second binary)")
     parser.add_argument("--threshold", type=float, default=0.10, help="relative slowdown flagged (default 0.10)")
     parser.add_argument("--min-seconds", type=float, default=0.5, help="phases shorter than this are not flagged")
     args = parser.parse_args()
+
+    if not args.files:
+        # names start with the UTC date and time of the run: the last one is the latest
+        files = sorted(glob.glob(os.path.join(os.path.dirname(os.path.abspath(__file__)), "results", "*.tsv")),
+                       key=os.path.basename)
+        if not files:
+            sys.exit("ERROR: no results file in results/")
+        args.files = files[-1:]
+        print(f"Using {os.path.relpath(args.files[0])}")
 
     times, meta, labels = read_results(args.files)
     if args.baseline is None or args.candidate is None:
