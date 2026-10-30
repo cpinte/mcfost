@@ -15,6 +15,7 @@ program BIGCRUNCH
   use dust_transfer
   use mol_transfer
   use atom_transfer, only : atom_line_transfer
+  use timing
   !use gas_transfer
 
   implicit none
@@ -25,8 +26,11 @@ program BIGCRUNCH
   ! Beginning of execution
   call system_clock(time_begin,count_rate=time_tick,count_max=time_max)
   call cpu_time(cpu_time_begin)
+  call timer_start(t_total)
 
+  call timer_start(t_setup)
   call initialisation_mcfost()
+  call timer_stop(t_setup)
 
   !*************************************************************************
   ! Here it comes ...
@@ -43,11 +47,15 @@ program BIGCRUNCH
   ! Molecular emission ...
   !to do merge with lgas_transfer
   if (lemission_mol) then
+     call timer_start(t_mol)
      call mol_line_transfer()
+     call timer_stop(t_mol)
   endif
 
   if (lemission_atom) then
+     call timer_start(t_atom)
      call atom_line_transfer
+     call timer_stop(t_atom)
   endif
 
   !both gas absorption and emission (atomic and molecular lines and continua)...
@@ -58,6 +66,8 @@ program BIGCRUNCH
 !   endif
 
   ! Execution time
+  call timer_stop(t_total)
+  call write_timing()
   call system_clock(time_end)
   if (time_end < time_begin) then
      time=(time_end + (1.0 * time_max)- time_begin)/real(time_tick)

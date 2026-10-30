@@ -1,0 +1,28 @@
+# Settings of submit_ozstar.sh and fetch_ozstar.sh. Copy to ozstar.conf (not
+# under version control) and edit. The *_SETUP strings are run on OzSTAR, so
+# $HOME etc. refer to the remote account.
+
+# ssh host (alias from ~/.ssh/config)
+OZSTAR_HOST=ozstar
+
+# Directory on OzSTAR, relative to the remote home: git clone, one build per
+# commit (build/<sha>), cached test data, results and job logs
+REMOTE_BASE=mcfost_benchmark
+
+# Commands run on the login node before compiling (modules, libraries of mcfost).
+# Can stay empty if your login profile already sets them (see README.md)
+BUILD_SETUP='module load gcc ; export SYSTEM=gfortran MCFOST_INSTALL=$HOME/mcfost_libs'
+BUILD_JOBS=8
+
+# Commands run in the job before mcfost, e.g. LD_LIBRARY_PATH to the compiler
+# run-time libraries if `ldd mcfost` shows them and modules are not available
+# on the compute nodes
+JOB_SETUP=''
+
+# MCFOST utils on OzSTAR
+REMOTE_MCFOST_UTILS='$HOME/mcfost/utils'
+
+# sbatch options added to the ones of benchmark.sbatch: account, partition,
+# node type (the same for every run that is compared). OzSTAR does not allow
+# --exclusive: --cpus-per-task equal to the cores of a node avoids sharing it
+SBATCH_OPTIONS="--account=<account> --cpus-per-task=16"

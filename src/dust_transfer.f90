@@ -22,6 +22,7 @@ module dust_transfer
   use stars
   use mem
   use utils
+  use timing
   use ProDiMo
   use init_mcfost
   use SPH2mcfost
@@ -167,12 +168,16 @@ subroutine init_dust_transfer()
 
      if (llimb_darkening) call read_limb_darkening_file(1)
 
+     call timer_start(t_dust_prop)
      call prop_grains(1)
+     call timer_stop(t_dust_prop)
      if (lscatt_ray_tracing) then
         call alloc_ray_tracing()
         call init_directions_ray_tracing()
      endif
+     call timer_start(t_opacity)
      call opacity(1)
+     call timer_stop(t_opacity)
      call integ_tau(1)
 
      if (loptical_depth_to_cell) call write_optical_depth_to_cell(1)
@@ -238,8 +243,14 @@ subroutine init_dust_transfer()
         endif
 
         do lambda=1,n_lambda
-           if (lcompute_dust_prop) call prop_grains(lambda)
+           if (lcompute_dust_prop) then
+              call timer_start(t_dust_prop)
+              call prop_grains(lambda)
+              call timer_stop(t_dust_prop)
+           endif
+           call timer_start(t_opacity)
            call opacity(lambda)!_eqdiff!_data  ! ~ takes 2 seconds  PB : takes a long time in RT as using method 2 for scattering
+           call timer_stop(t_opacity)
         enddo !n
         if (lcompute_dust_prop) call save_dust_prop(letape_th)
         write(*,*) "Done"
@@ -260,8 +271,12 @@ subroutine init_dust_transfer()
            if (lTemp) then
               do lambda=1,n_lambda
                  ! recalculation for opacity 2 :peut etre eviter mais implique + meme : garder tab_s11 en mem
+                 call timer_start(t_dust_prop)
                  call prop_grains(lambda)
+                 call timer_stop(t_dust_prop)
+                 call timer_start(t_opacity)
                  call opacity(lambda)
+                 call timer_stop(t_opacity)
               enddo
            endif
         endif ! ldust_sublimation
@@ -305,7 +320,9 @@ subroutine init_dust_transfer()
            call lect_temperature()
            call Temp_approx_diffusion_vertical()
            call diffusion_approx_nLTE_nRE()
+           call timer_start(t_output)
            call ecriture_temperature(2)
+           call timer_stop(t_output)
            return
         endif
 
@@ -399,7 +416,9 @@ subroutine recompute_opacities(ltemperature_step)
 
   write(*,'(a30, $)') "Computing opacities ..."
   do lambda = 1, n_lambda
+     call timer_start(t_opacity)
      call opacity(lambda)
+     call timer_stop(t_opacity)
   enddo
   write(*,*) "Done"
 
@@ -490,7 +509,9 @@ subroutine dust_transfer_sub()
   real, parameter :: hydrostatic_precision_max = 0.3
   real, parameter :: min_packets_for_noise_estimate = 10.0
 
+  call timer_start(t_init)
   call init_dust_transfer()
+  call timer_stop(t_init)
   if (lonly_diff_approx) return
 
   ! ── Thermal structure & Physics Iteration Loop ──
@@ -693,8 +714,12 @@ subroutine dust_transfer_sub()
 
         ! Save per-iteration state for restart and inspection
         if (lhydrostatic) then
+           call timer_start(t_output)
            call ecriture_temperature_hydro_iter(iter)
+           call timer_stop(t_output)
+           call timer_start(t_output)
            call ecriture_gas_density_hydro_iter(iter)
+           call timer_stop(t_output)
         endif
         if (ldust_sublimation .and. (.not.lmcfost_lib)) call write_sublimation_mask(iter)
 
@@ -706,8 +731,12 @@ subroutine dust_transfer_sub()
         if (lhydrostatic) call print_hydrostatic_scale_height()
         if (ldust_sublimation .and. (.not. lmcfost_lib)) call write_sublimation_mask(0)
         if (.not. lmcfost_lib) then
+           call timer_start(t_output)
            call ecriture_temperature(1)
+           call timer_stop(t_output)
+           call timer_start(t_output)
            call ecriture_sed(1)
+           call timer_stop(t_output)
         endif
         call reset_sed() ! for the next step
         if (lapprox_diffusion .and. l_is_dark_zone .and. &
@@ -904,9 +933,12 @@ subroutine run_thermal_mc(lwrite_output)
      n_photons2 = n_photons_eq_th
 
      ! Todo : we do no need to pass lambda here
+     call timer_start(t_mc_temperature)
      call mc_photon_loop(lambda, n_photons2, n_phot_lim, nnfot1_start, laffichage)
+     call timer_stop(t_mc_temperature)
 
      letape_th = .false. ! A priori, on a calcule la temperature
+     call timer_start(t_temperature)
      if (lRE_LTE) then
         call Temp_finale()
         if (lreemission_stats) call reemission_stats()
@@ -914,9 +946,12 @@ subroutine run_thermal_mc(lwrite_output)
      if (lRE_nLTE) then
         call Temp_finale_nLTE()
      endif
+     call timer_stop(t_temperature)
      if (lnRE) then
+        call timer_start(t_temperature_nRE)
         call Temp_nRE(flag_em_nRE)
         call update_proba_abs_nRE()
+        call timer_stop(t_temperature_nRE)
         if (n_iter > 10) then
            flag_em_nRE = .true.
            write(*,*) "WARNING: Reaching the maximum number of iterations"
@@ -924,7 +959,9 @@ subroutine run_thermal_mc(lwrite_output)
         endif
 
         if (.not.flag_em_nRE) then ! need to iterate
+           call timer_start(t_temperature_nRE)
            call emission_nRE()
+           call timer_stop(t_temperature_nRE)
            letape_th = .true.
            n_iter = n_iter + 1
            write(*,*) "Starting iteration", n_iter
@@ -935,8 +972,12 @@ subroutine run_thermal_mc(lwrite_output)
   enddo
 
   if ((.not. lmcfost_lib) .and. lwrite) then
+     call timer_start(t_output)
      call ecriture_temperature(1)
+     call timer_stop(t_output)
+     call timer_start(t_output)
      call ecriture_sed(1)
+     call timer_stop(t_output)
   endif
 
   if (lapprox_diffusion.and.l_is_dark_zone.and.&
@@ -997,6 +1038,7 @@ subroutine run_image_mc()
   lambda = 1
   p_lambda = 1
 
+  call timer_start(t_step2_setup)
   if (.not.l_p_lambda_is_lambda .and. lscatt_ray_tracing) then
      call calc_local_scattering_matrices(lambda)
   endif
@@ -1010,6 +1052,7 @@ subroutine run_image_mc()
   if (lweight_emission) call define_proba_weight_emission(lambda)
 
   call repartition_energie(lambda)
+  call timer_stop(t_step2_setup)
 
   write(*,*) "frac. energy emitted by star(s) : ", real(frac_E_stars(1))
   if (n_stars > 1) then
@@ -1025,10 +1068,16 @@ subroutine run_image_mc()
   ! MC photon loop
 
   ! todo : lambda and p_lambda are always 1 here : it does not look like we need to pass lambda as input here
+  call timer_start(t_mc_step2)
   call mc_photon_loop(lambda, n_photons2, n_phot_lim, nnfot1_start, laffichage)
+  call timer_stop(t_mc_step2)
 
   ! Stokes FITS output from MC packets
-  if (loutput_mc) call write_stokes_fits()
+  if (loutput_mc) then
+     call timer_start(t_output)
+     call write_stokes_fits()
+     call timer_stop(t_output)
+  endif
 
   ! Ray-tracing map
   if (lscatt_ray_tracing) then
@@ -1046,12 +1095,16 @@ subroutine run_image_mc()
         if (lscatt_ray_tracing1) then
            do iaz=1, RT_n_az
               call system_clock(time_1)
+              call timer_start(t_source_fct)
               call init_dust_source_fct1(lambda,ibin,iaz)
+              call timer_stop(t_source_fct)
               call system_clock(time_2)
               time_source_fct = time_source_fct + (time_2 - time_1)
 
               time_1 = time_2
+              call timer_start(t_ray_tracing)
               call dust_map(lambda,ibin,iaz)
+              call timer_stop(t_ray_tracing)
               if (ltau_surface) call compute_tau_surface_map(lambda,tau_surface, ibin,iaz)
               if (ltau_map) call compute_tau_map(lambda, ibin, iaz)
               call system_clock(time_2)
@@ -1060,12 +1113,16 @@ subroutine run_image_mc()
         else
            iaz=1
            call system_clock(time_1)
+           call timer_start(t_source_fct)
            call init_dust_source_fct2(lambda,p_lambda,ibin)
+           call timer_stop(t_source_fct)
            call system_clock(time_2)
            time_source_fct = time_source_fct + (time_2 - time_1)
 
            time_1 = time_2
+           call timer_start(t_ray_tracing)
            call dust_map(lambda,ibin,iaz)
+           call timer_stop(t_ray_tracing)
            if (ltau_surface) call compute_tau_surface_map(lambda,tau_surface, ibin,iaz)
            if (ltau_map) call compute_tau_map(lambda, ibin, iaz)
            call system_clock(time_2)
@@ -1082,7 +1139,9 @@ subroutine run_image_mc()
         endif
      enddo
 
+     call timer_start(t_output)
      call ecriture_map_ray_tracing()
+     call timer_stop(t_output)
      if (ltau_surface) call write_tau_surface(0) ! 0 for continuum
      if (ltau_map) call write_tau_map(0)
      write(*,*) "Source fct time", time_source_fct/real(time_tick), "s"
@@ -1120,6 +1179,7 @@ subroutine run_sed_mc()
   n_phot_lim = n_photons_lim
   nnfot1_start = 1
 
+  call timer_start(t_step2_setup)
   ! Setup step 2 for non-complete SED (separate wavelength grid)
   if (.not.lsed_complete) then
      call setup_scattering()
@@ -1141,8 +1201,14 @@ subroutine run_sed_mc()
         write(*,'(a46, $)') "Reading dust properties from previous run ..."
      endif
      do lambda=1,n_lambda2
-        if (lcompute_dust_prop) call prop_grains(lambda)
+        if (lcompute_dust_prop) then
+           call timer_start(t_dust_prop)
+           call prop_grains(lambda)
+           call timer_stop(t_dust_prop)
+        endif
+        call timer_start(t_opacity)
         call opacity(lambda)
+        call timer_stop(t_opacity)
      enddo
      if (lcompute_dust_prop) call save_dust_prop(letape_th)
      write(*,*) "Done"
@@ -1155,9 +1221,11 @@ subroutine run_sed_mc()
 
      n_lambda_sed = n_lambda
   endif
+  call timer_stop(t_step2_setup)
 
   ! Loop over SED wavelengths
   do lambda = 1, n_lambda_sed
+     call timer_start(t_step2_setup)
      p_lambda = merge(lambda, 1, l_p_lambda_is_lambda)
 
      if (.not.l_p_lambda_is_lambda .and. lscatt_ray_tracing) then
@@ -1187,7 +1255,10 @@ subroutine run_sed_mc()
      write(*,*) "", real(tab_lambda(lambda)) ,"  ", real(frac_E_stars(lambda)), "  ", tau
 
      ! MC photon loop
+     call timer_stop(t_step2_setup)
+     call timer_start(t_mc_step2)
      call mc_photon_loop(lambda, n_photons2, n_phot_lim, nnfot1_start, laffichage)
+     call timer_stop(t_mc_step2)
 
      ! Interstellar radiation field
      if ((.not.letape_th).and.(lProDiMo.or.lML)) then
@@ -1243,42 +1314,62 @@ subroutine run_sed_mc()
            if (lscatt_ray_tracing1) then
               do iaz=1, RT_n_az
                  call system_clock(time_1)
+                 call timer_start(t_source_fct)
                  call init_dust_source_fct1(lambda,ibin,iaz)
+                 call timer_stop(t_source_fct)
                  call system_clock(time_2)
                  time_source_fct = time_source_fct + (time_2 - time_1)
 
                  time_1 = time_2
+                 call timer_start(t_ray_tracing)
                  call dust_map(lambda,ibin,iaz)
+                 call timer_stop(t_ray_tracing)
                  call system_clock(time_2)
                  time_RT = time_RT + (time_2 - time_1)
               enddo
            else
               iaz=1
               call system_clock(time_1)
+              call timer_start(t_source_fct)
               call init_dust_source_fct2(lambda,p_lambda,ibin)
+              call timer_stop(t_source_fct)
               call system_clock(time_2)
               time_source_fct = time_source_fct + (time_2 - time_1)
 
               time_1 = time_2
+              call timer_start(t_ray_tracing)
               call dust_map(lambda,ibin,iaz)
+              call timer_stop(t_ray_tracing)
               call system_clock(time_2)
               time_RT = time_RT + (time_2 - time_1)
            endif
         enddo
 
-        if (lscatt_ray_tracing1) then
-           xI_scatt = 0.0_dp
-        else
-           I_spec = 0.0_dp ; I_spec_star = 0.0_dp
-        endif
+        ! Reset for the next wavelength, one thread per copy: these arrays have a copy
+        ! per thread (0.8 GB with 16 threads for the W5 benchmark) and a serial reset
+        ! took longer than the ray tracing itself
+        !$omp parallel do default(none) shared(lscatt_ray_tracing1,xI_scatt,I_spec,I_spec_star,nb_proc) &
+        !$omp private(id) schedule(static,1)
+        do id=1, nb_proc
+           if (lscatt_ray_tracing1) then
+              xI_scatt(:,:,:,:,:,id) = 0.0_dp
+           else
+              I_spec(:,:,:,:,id) = 0.0_dp ; I_spec_star(:,id) = 0.0_dp
+           endif
+        enddo
+        !$omp end parallel do
      endif
 
   enddo ! lambda
 
   ! Write outputs after completing all wavelengths
+  call timer_start(t_output)
   call ecriture_sed(2)
+  call timer_stop(t_output)
   if (lscatt_ray_tracing) then
+     call timer_start(t_output)
      call ecriture_sed_ray_tracing()
+     call timer_stop(t_output)
      write(*,*) "Source fct time", time_source_fct/real(time_tick), "s"
      write(*,*) "RT time        ", time_RT/real(time_tick), "s"
   endif
