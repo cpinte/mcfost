@@ -220,7 +220,7 @@ subroutine misselt_load(file, pop)
   integer, intent(in) :: pop
 
   ! nh : n header ; ns : n_skip
-  integer, parameter :: nh1 = 7, nh2 = 2, ns=1
+  integer, parameter :: nh1 = 7, ns=1
 
   character(len=5) :: sbuffer
 
@@ -239,7 +239,8 @@ subroutine misselt_load(file, pop)
   dust_pop(pop)%component_rho1g(1) = material_density
   dust_pop(pop)%rho1g_avg = material_density
 
-  do l=1, nh2
+  ! one line per atom type, then a blank line
+  do l=1, ibuffer+1
      read(1,*)
   enddo
 

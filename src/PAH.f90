@@ -38,6 +38,35 @@ end function specific_heat
 
 !**********************************************************************
 
+function enthalpy(T, igrain)
+  ! Enthalpy U(T) = int_0^T C(T') dT' [J], for temperatures T in increasing order.
+  ! C(T) is integrated in log steps between successive temperatures,
+  ! and taken as C ~ T^3 (Debye) below T(1)
+
+  integer, intent(in) :: igrain ! grain size index
+  real(kind=dp), dimension(:), intent(in) :: T
+  real(kind=dp), dimension(size(T)) :: enthalpy
+
+  integer, parameter :: n_sub = 20
+  real(kind=dp), dimension(n_sub+1) :: T_sub, C_sub
+  integer :: i, j
+
+  C_sub(1:1) = specific_heat(T(1:1), igrain)
+  enthalpy(1) = 0.25_dp * C_sub(1) * T(1)
+  do i=2, size(T)
+     do j=0, n_sub
+        T_sub(j+1) = T(i-1) * (T(i)/T(i-1))**(real(j,kind=dp)/n_sub)
+     enddo
+     C_sub = specific_heat(T_sub, igrain)
+     enthalpy(i) = enthalpy(i-1) + sum(0.5_dp * (C_sub(2:) + C_sub(:n_sub)) * (T_sub(2:) - T_sub(:n_sub)))
+  enddo
+
+  return
+
+end function enthalpy
+
+!**********************************************************************
+
 function astrosil_specific_heat(T, igrain)
   ! C. Pinte
   ! 26/01/07
@@ -218,7 +247,7 @@ end subroutine test_PAH_specific_heat
 !******************************************************
 
 function Misselt_specific_heat(T,igrain)
-  ! return the specific heat capacity in [erg/K]
+  ! return the specific heat capacity in [J/K]
 
   integer, intent(in) :: igrain ! grain size index
   real(kind=dp), dimension(:), intent(in) :: T
@@ -230,8 +259,8 @@ function Misselt_specific_heat(T,igrain)
 
   ! todo : interpoler a l'avance dans read_file_specific_heat
   do k=1,size(T)
-     Misselt_specific_heat(k) = interp(file_sh(:,pop), file_sh_T(:,pop), T(k)) * M_grain(igrain)  / 1.e7  * 0.5  ! todo : c'est des Joules l'unite non ?
-     ! todo 2 : factor 0.5 ??? donne un meilleur accord mais je ne capte pas pourquoi
+     ! file in erg/g/K, M_grain in g
+     Misselt_specific_heat(k) = interp(file_sh(:,pop), file_sh_T(:,pop), T(k)) * M_grain(igrain) * 1.e-7
   enddo
 
   return
@@ -241,7 +270,7 @@ end function Misselt_specific_heat
 !**********************************************************************
 
 function DustEM_specific_heat(T,igrain)
-  ! return the specific heat capacity in [erg/K]
+  ! return the specific heat capacity in [J/K]
 
   integer, intent(in) :: igrain ! grain size index
   real(kind=dp), dimension(:), intent(in) :: T
@@ -253,7 +282,8 @@ function DustEM_specific_heat(T,igrain)
 
   ! todo : interpoler a l'avance dans read_file_specific_heat
   do k=1,size(T)
-     DustEM_specific_heat(k) = interp(file_sh(:,pop), file_sh_T(:,pop), T(k)) * M_grain(igrain)
+     ! file_sh in erg/K/g (read_DustEM_specific_heat), M_grain in g
+     DustEM_specific_heat(k) = interp(file_sh(:,pop), file_sh_T(:,pop), T(k)) * M_grain(igrain) * 1.e-7
   enddo
 
   return

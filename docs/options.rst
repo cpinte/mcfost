@@ -132,6 +132,12 @@ sublimation temperature of the optical indices files (see :ref:`sublimation-laws
 
 ``-Tmax_PAH <T>``: changes the maximum temperature allowed for PAH (default: 2500)
 
+``-nT <n>``: number of temperature bins (default: 100)
+
+``-benchmark_SHG``: stochastic heating benchmark of Camps et al. 2015: the non-equilibrium grains are heated by an imposed radiation field instead of the Monte Carlo one (the star diluted at the distance of each cell), and are not re-emitted (driver in ``test_suite/benchmarks/Camps2015``)
+
+``-Mathis_field <U>``: with ``-benchmark_SHG``, the imposed field is the Mathis et al. 1983 interstellar radiation field scaled by U
+
 ``-ISM_heating``: includes heating by ISM radiation
 
 ``-chi_ISM <chi>``: changes the chi of ISM radiation (default: 1)

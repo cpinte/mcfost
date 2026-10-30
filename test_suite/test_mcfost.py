@@ -586,6 +586,37 @@ def test_pascucci_benchmark(tau, ref_dir, sed_tol, lambda_min, temp_tol):
             f"midplane temperature differs from {code} by more than {temp_tol}"
 
 
+# Camps et al. 2015 benchmark of the stochastic heating of dust grains (silicate, graphite
+# and PAH mixture exposed to 17 imposed radiation fields, mcfost -benchmark_SHG): emissivities
+# compared with DustEM from 3 to 1000 um (the codes of the paper agree within about 10 %),
+# and energy balance of each grain size. Driver in benchmarks/Camps2015, data in the utils.
+# Largest differences (31/10/2026): emissivity / DustEM 0.88-1.05 (median 0.98-1.02; the
+# other codes of the paper / DustEM: 0.48-1.42), emitted / absorbed power 0.97-1.00 per
+# grain size. Local runs only.
+@pytest.mark.slow
+def test_camps2015_SHG_benchmark():
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    import sys
+    sys.path.insert(0, "benchmarks/Camps2015")
+    import shg_benchmark as shg
+    try:
+        shg.download()
+    except OSError as e:
+        pytest.skip(f"benchmark data not available ({e})")
+
+    workdir = os.path.abspath("Camps2015_SHG")
+    shutil.rmtree(workdir, ignore_errors=True)
+    failed = shg.run(os.path.abspath(_mcfost_bin), workdir, list(shg.GRAINS), shg.FIELDS)
+    assert not failed, f"mcfost failed for {failed}"
+
+    for (field, grain), ratios in shg.compare(workdir, list(shg.GRAINS), shg.FIELDS).items():
+        balance, dustem = ratios["E_em/E_abs"], ratios["DustEM"]
+        assert np.all(abs(balance - 1) < 0.06), f"{field} {grain}: energy not conserved"
+        assert abs(np.median(dustem) - 1) < 0.03, f"{field} {grain}: emissivity differs from DustEM"
+        assert np.all(abs(dustem - 1) < 0.15), f"{field} {grain}: emissivity differs from DustEM"
+
+
 # Pinte et al. 2009 benchmark (very optically thick disc, anisotropic scattering), following
 # the comparisons of the paper (Sect. 4): SEDs and images relative to the average of the
 # codes, temperatures, 11 pixel wide cuts in the images and polarisation maps. Results of

@@ -950,7 +950,12 @@ subroutine run_thermal_mc(lwrite_output)
      if (lnRE) then
         call timer_start(t_temperature_nRE)
         call Temp_nRE(flag_em_nRE)
-        call update_proba_abs_nRE()
+        if (lbenchmark_SHG) then
+           ! imposed radiation field: nothing to re-emit, no iteration
+           flag_em_nRE = .true.
+        else
+           call update_proba_abs_nRE()
+        endif
         call timer_stop(t_temperature_nRE)
         if (n_iter > 10) then
            flag_em_nRE = .true.

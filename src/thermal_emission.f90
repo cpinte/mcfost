@@ -1032,10 +1032,11 @@ subroutine Temp_nRE(lconverged)
   real(kind=dp), dimension(0:n_T) :: T_lim, U_lim
 
   real(kind=dp), dimension(n_lambda) :: C_abs_norm_o_dnu, tab_nu
+  real(kind=dp), dimension(0:n_lambda) :: nu_edge
 
-  real(kind=dp), dimension(:,:), allocatable :: kJnu, lambda_Jlambda
+  real(kind=dp), dimension(:,:), allocatable :: kJnu, lambda_Jlambda, kJnu_o_nu, N_above
 
-  real(kind=dp) :: delta_T, kJnu_interp, t_cool, t_abs, mean_abs_E, kTu, mean_abs_nu, cst_t_cool, Int_k_lambda_Jlambda
+  real(kind=dp) :: delta_T, N_lo, N_hi, t_cool, t_abs, mean_abs_E, kTu, mean_abs_nu, cst_t_cool, Int_k_lambda_Jlambda
 
   integer :: l, T, T1, T2, lambda, alloc_status, id, T_int, icell, p_l
 
@@ -1046,7 +1047,7 @@ subroutine Temp_nRE(lconverged)
 
   real :: E_max
   real(kind=dp) :: Temp1, Temp2, frac, log_E_abs, maxP
-  real(kind=dp) :: somme1, somme2, wl, wl_mum, delta_wl, Temp, cst_wl ! for test
+  real(kind=dp) :: wl, wl_mum, J_lambda
   integer :: Tpeak
 
   write(*,*) "Calculating temperature probabilities of non equilibrium grains ..."
@@ -1056,23 +1057,27 @@ subroutine Temp_nRE(lconverged)
   if (alloc_status > 0) call error('Allocation error A')
   A=0.0 ; B=0.0 ;
 
-  allocate(kJnu(n_lambda,nb_proc), lambda_Jlambda(n_lambda,nb_proc), stat=alloc_status)
+  allocate(kJnu(n_lambda,nb_proc), lambda_Jlambda(n_lambda,nb_proc), kJnu_o_nu(n_lambda,nb_proc), &
+       N_above(0:n_lambda,nb_proc), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error kJnu')
-  kJnu = 0.0 ;  lambda_Jlambda=0.0
+  kJnu = 0.0 ;  lambda_Jlambda=0.0 ; kJnu_o_nu = 0.0 ; N_above = 0.0
 
   delta_T=exp((1.0_dp/(real(n_T,kind=dp)))*log(T_max/T_min))
   T_lim(0) = T_min
   T_lim(1:n_T) = tab_Temp(:)*sqrt(delta_T)
 
   tab_nu = c_light/(tab_lambda*1.0e-6)
+  ! frequency edges of the wavelength bins (decreasing)
+  nu_edge(0) = c_light/(tab_lambda_inf(1)*1.0e-6)
+  nu_edge(1:n_lambda) = c_light/(tab_lambda_sup(:)*1.0e-6)
 
   ! l est l'indice de taille de grains
   do l=grain_nRE_start, grain_nRE_end
      ! bin centers [Hz]
-     nu_bin(:) = specific_heat(real(tab_Temp,kind=dp),l) * tab_Temp(:)/hp ! evaluate specific heat & enthalpy at bin centers
+     nu_bin(:) = enthalpy(real(tab_Temp,kind=dp),l)/hp ! enthalpy at bin centers
 
      ! bin widths [Hz]
-     U_lim(:) = specific_heat(T_lim(:),l)*T_lim(:) ! enthalpy of bin boundaries [erg]
+     U_lim(:) = enthalpy(T_lim(:),l) ! enthalpy of bin boundaries [J]
      delta_nu_bin(:) = (U_lim(1:n_T)-U_lim(0:n_T-1))/hp  ! bin width [Hz]
 
      ! compute transition matrix  A   [Hz]
@@ -1094,12 +1099,14 @@ subroutine Temp_nRE(lconverged)
      enddo
 
      ! Pour cooling time
+     ! t_abs and t_cool are both computed with C_abs_norm (C_abs x 1e4 AU_to_cm in m2):
+     ! the common factor cancels in their comparison
      E_max = real(maxval(U_lim))
      en_lim = spanl(1.0e-10*E_max,E_max, n_cooling_time+1)
      do T=1,n_cooling_time
         en(T) = 0.5 * (en_lim(T+1) + en_lim(T))
         delta_en(T) = en_lim(T+1) - en_lim(T)
-        Cabs(T) = interp(real(C_abs_norm(l,:),kind=dp),real(tab_lambda,kind=dp),en(T)/hp)
+        Cabs(T) = interp(real(C_abs_norm(l,:),kind=dp),real(tab_lambda,kind=dp),hp*c_light/en(T) * 1.0e6_dp) ! lambda [mum]
      enddo
 
      cst_t_cool =(real(hp,kind=dp)**3 * real(c_light,kind=dp)**2) / (8*pi)
@@ -1109,13 +1116,13 @@ subroutine Temp_nRE(lconverged)
      !$omp parallel &
      !$omp default(none) &
      !$omp private(Int_k_lambda_Jlambda, lambda, wl, wl_mum, T, T2) &
-     !$omp private(kJnu_interp,id,t_cool,t_abs,mean_abs_E,mean_abs_nu,kTu) &
-     !$omp private(frac,T1,Temp1,Temp2,T_int,log_E_abs,icell,p_l) &
+     !$omp private(N_lo,N_hi,id,t_cool,t_abs,mean_abs_E,mean_abs_nu,kTu) &
+     !$omp private(frac,T1,Temp1,Temp2,T_int,log_E_abs,icell,p_l,J_lambda) &
      !$omp shared(l,kJnu, lambda_Jlambda, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium) &
-     !$omp shared(n_cells, C_abs_norm_o_dnu, xJ_abs, J0, L_packet_th, volume, n_T, disk_zone,star) &
-     !$omp shared(tab_nu, n_lambda, tab_delta_lambda, tab_lambda,en,delta_en,Cabs) &
+     !$omp shared(n_cells, C_abs_norm_o_dnu, xJ_abs, J0, L_packet_th, volume, n_T, star) &
+     !$omp shared(tab_nu, nu_edge, n_lambda, tab_delta_lambda, tab_lambda,en,delta_en,Cabs,kJnu_o_nu,N_above,U_lim) &
      !$omp shared(delta_nu_bin,Proba_Tdust, A,B,X,nu_bin,tab_Temp,T_min,T_max,lbenchmark_SHG,lMathis_field,Mathis_field) &
-     !$omp shared(Tdust_1grain_nRE,log_E_em_1grain_nRE,cst_t_cool,C_abs_norm,l_RE,r_grid,n_grains) &
+     !$omp shared(Tdust_1grain_nRE,log_E_em_1grain_nRE,cst_t_cool,C_abs_norm,l_RE,r_grid,z_grid,n_grains) &
      !$omp shared(dust_density_o_n_grains,l_dark_zone,Tdust,lchange_nRE,lvariable_dust,grain)
 
      id = 1 ! pour code sequentiel
@@ -1141,55 +1148,53 @@ subroutine Temp_nRE(lconverged)
               Int_k_lambda_Jlambda = Int_k_lambda_Jlambda*L_packet_th * (1.0/volume(icell))
               kJnu(:,id) = kJnu(:,id)*L_packet_th * (1.0/volume(icell))
 
-              if (lbenchmark_SHG) then ! Adding TRUST radiation field
+              if (lbenchmark_SHG) then
+                 ! Imposed radiation field of the SHG benchmark (Camps et al. 2015) instead of the MC
+                 ! field: lambda_Jlambda is 4pi J_lambda Delta_lambda [W.m-2], as the MC estimate
+                 ! above and the emission E_em_1grain_nRE (cst_E includes 4pi)
                  Int_k_lambda_Jlambda = 0.0
-                 if (lMathis_field) then
-                    id = 1
-                    do lambda=1, n_lambda
-                       wl_mum =  tab_lambda(lambda)
-                       wl = tab_lambda(lambda) * 1e-6
-
+                 do lambda=1, n_lambda
+                    wl_mum = tab_lambda(lambda)
+                    wl = wl_mum * 1e-6
+                    if (lMathis_field) then
+                       ! Mathis et al. (1983) ISRF, Eq. 11 of Camps et al. 2015 [W.m-3.sr-1] x U
                        if (wl_mum < 0.0912) then
-                          lambda_Jlambda(lambda,id) = 0.0_dp
+                          J_lambda = 0.0_dp
                        else if (wl_mum < 0.110) then
-                          lambda_Jlambda(lambda,id) = 3069 * wl_mum**3.4172
+                          J_lambda = 3069 * wl_mum**3.4172
                        else if (wl_mum <  0.134) then
-                          lambda_Jlambda(lambda,id) = 1.627
+                          J_lambda = 1.627
                        else if (wl_mum <  0.250) then
-                          lambda_Jlambda(lambda,id) = 0.0566 * wl_mum**(-1.6678)
+                          J_lambda = 0.0566 * wl_mum**(-1.6678)
                        else
-                          lambda_Jlambda(lambda,id) = 1e-14 * Blambda_dp(wl,7500.) &
-                               + 1e-13 * Blambda_dp(wl,4000.) &
+                          J_lambda = 1e-14 * Blambda_dp(wl,7500.) + 1e-13 * Blambda_dp(wl,4000.) &
                                + 4e-13 * Blambda_dp(wl,3000.)
                        endif
-                       lambda_Jlambda(lambda,id) = lambda_Jlambda(lambda,id)* wl * Mathis_field * 1.3e-2
+                       J_lambda = J_lambda * Mathis_field
+                    else
+                       ! star diluted at the distance of the cell: W = (R_star/2r)^2
+                       J_lambda = star(1)%r**2 / (4.0_dp * (r_grid(icell)**2 + z_grid(icell)**2)) * Blambda_dp(wl,star(1)%T)
+                    endif
+                    lambda_Jlambda(lambda,id) = four_pi * J_lambda * tab_delta_lambda(lambda) * 1e-6
 
-                       Int_k_lambda_Jlambda = Int_k_lambda_Jlambda + C_abs_norm(l,lambda) * lambda_Jlambda(lambda,id)
-                       kJnu(lambda,id) =   C_abs_norm_o_dnu(lambda)  * lambda_Jlambda(lambda,id)
-                    enddo ! lambda
-                 else ! BB field
-                    do lambda=1, n_lambda
-                       wl = tab_lambda(lambda)*1e-6
-                       lambda_Jlambda(lambda,id) = (Blambda_dp(wl,star(1)%T))*wl / disk_zone(1)%Rin**2 * 7.e-8 !* 7.25965e-08
-
-                       Int_k_lambda_Jlambda = Int_k_lambda_Jlambda + C_abs_norm(l,lambda) * lambda_Jlambda(lambda,id)
-                       kJnu(lambda,id) =   C_abs_norm_o_dnu(lambda)  * lambda_Jlambda(lambda,id)
-                    enddo ! lambda
-                 endif ! lMathis
-              endif ! End adding TRUST radiation field
+                    Int_k_lambda_Jlambda = Int_k_lambda_Jlambda + C_abs_norm(l,lambda) * lambda_Jlambda(lambda,id)
+                    kJnu(lambda,id) =   C_abs_norm_o_dnu(lambda)  * lambda_Jlambda(lambda,id)
+                 enddo ! lambda
+              endif ! lbenchmark_SHG
 
               ! decide whether we really need to use this model, instead of calculating the equilibrium temperature
 
-              ! time interval for photon absorption
+              ! time interval for photon absorption: lambda_Jlambda = 4pi J_lambda Delta_lambda,
+              ! absorption rate = sum C_abs 4pi J_lambda Delta_lambda / (hc/lambda)
               t_abs = sum(C_abs_norm(l,:)*lambda_Jlambda(:,id)*tab_lambda(:)) * 1.0e-6/c_light
               if (t_abs > tiny_dp) then
-                 t_abs = hp/(4.*pi*t_abs)
+                 t_abs = hp/t_abs
               else
                  t_abs = huge_real
               endif
 
               ! mean absorbed photon energy
-              mean_abs_E = t_abs * 4*pi * Int_k_lambda_Jlambda ! D01 eq 46
+              mean_abs_E = t_abs * Int_k_lambda_Jlambda ! D01 eq 46
               mean_abs_nu = mean_abs_E/hp
 
               ! Fast energy to temperature inversion
@@ -1212,7 +1217,7 @@ subroutine Temp_nRE(lconverged)
                     endif
                  enddo integ
                  if (t_cool > tiny_dp) then
-                    t_cool = cst_t_cool*mean_abs_E/t_cool * 1.0e-4
+                    t_cool = cst_t_cool*mean_abs_E/t_cool
                  else
                     t_cool = huge_real
                  endif
@@ -1266,15 +1271,26 @@ subroutine Temp_nRE(lconverged)
               if (t_cool < t_abs) then !  calcul proba temperature
                  l_RE(l,icell) = .false.
                  ! heating terms : select lower triangle
-                 ! Afi with with f > i
-                 do T=1,n_T
-                    do T2=1,T-1
-                       ! Much more stable in linear interpolation than log !!!
-                       ! It does anything in log for low flux cases
-                       !KJ_abs_interp = exp(interp(log(kJnu(:,id)), log(tab_nu), log(nu_bin(T) - nu_bin(T2))))
-                       !A(T,T2,id) = 0.5 * KJ_abs_interp * delta_nu_bin(T)/ (nu_bin(T) - nu_bin(T2))
-                       kJnu_interp = interp(kJnu(:,id), tab_nu, nu_bin(T) - nu_bin(T2))
-                       A(T,T2,id) = kJnu_interp * delta_nu_bin(T)/ (nu_bin(T) - nu_bin(T2))
+                 ! Afi with with f > i: photons with an energy between the edges of bin f minus U_i,
+                 ! integral of kJnu/nu dnu (number of photons), from the field averaged over each
+                 ! wavelength bin, so that the heating rates add up to the absorbed power on any
+                 ! wavelength grid. The top bin receives all the photons that would heat the grain
+                 ! above it (Draine & Li 2001)
+                 kJnu_o_nu(:,id) = kJnu(:,id) / tab_nu(:)
+                 N_above(0,id) = 0.0_dp
+                 do lambda=1, n_lambda
+                    N_above(lambda,id) = N_above(lambda-1,id) + kJnu_o_nu(lambda,id) * (nu_edge(lambda-1) - nu_edge(lambda))
+                 enddo
+                 do T2=1,n_T-1
+                    N_lo = n_photons_above(U_lim(T2)/hp - nu_bin(T2), nu_edge, N_above(:,id), kJnu_o_nu(:,id))
+                    do T=T2+1,n_T
+                       if (T < n_T) then
+                          N_hi = n_photons_above(U_lim(T)/hp - nu_bin(T2), nu_edge, N_above(:,id), kJnu_o_nu(:,id))
+                       else
+                          N_hi = 0.0_dp
+                       endif
+                       A(T,T2,id) = N_lo - N_hi
+                       N_lo = N_hi
                     end do
                  end do
 
@@ -1316,7 +1332,6 @@ subroutine Temp_nRE(lconverged)
                  !enddo
 
                  !! Normalisation
-                 X(1,id) = X(2,id)
                  X(:,id)=X(:,id)/sum(X(:,id))
 
                  do T=1, n_T ! boucle car double to single array assignment bug with ifort
@@ -1340,7 +1355,7 @@ subroutine Temp_nRE(lconverged)
      !$omp end parallel
   enddo !l
 
-  deallocate(A, B, X)
+  deallocate(A, B, X, kJnu, lambda_Jlambda, kJnu_o_nu, N_above)
 
   write(*,*) "Done"
 
@@ -1390,49 +1405,45 @@ subroutine Temp_nRE(lconverged)
      enddo !l
   enddo !icell
 
-
-  if (lbenchmark_SHG) then ! renormalisation des proba, probleme en transfert complet ...
-     do l=grain_nRE_start,grain_nRE_end ! TEST for 1 grain size
-        do icell=1, n_cells
-           somme1=0.0
-           somme2=0.0
-           !temp=Tdust_1grain(i,j,l) ! Tab_Temp(100)
-           do lambda=1, n_lambda
-              somme1 = somme1 + C_abs_norm(l,lambda)  * lambda_Jlambda(lambda,1)
-              wl = tab_lambda(lambda)*1.0e-6
-              delta_wl = tab_delta_lambda(lambda)*1.0e-6
-              if (l_RE(l,icell)) then
-                 Temp = Tdust_1grain_nRE(l,icell)
-                 cst_wl=thermal_const/(Temp*wl)
-                 if (cst_wl < 500.) then
-                    somme2 = somme2 + C_abs_norm(l,lambda)* 1.0/((wl**5)*(exp(cst_wl)-1.0)) * delta_wl
-                 endif
-              else
-                 do T=1, n_T
-                    Temp = tab_Temp(T)
-                    cst_wl=thermal_const/(Temp*wl)
-                    if (cst_wl < 500.) then
-                       somme2 = somme2 + C_abs_norm(l,lambda)* 1.0/((wl**5)*(exp(cst_wl)-1.0)) * delta_wl * &
-                            Proba_Tdust(T,l,icell)
-                    endif !cst_wl
-                 enddo
-              endif
-           enddo ! lambda
-
-           somme2=somme2*2.0*hp*c_light**2
-           !write(*,*) i,j,l,l_RE(i,j,l), Tdust_1grain_nRE(i,j,l), real(somme1), real(somme2), real(somme1/somme2)
-           if (somme2 > tiny_dp) then
-              Proba_Tdust(:,l,icell)  = Proba_Tdust(:,l,icell) * real(somme1/somme2)
-           endif
-        enddo !icell
-     enddo ! l
-  endif ! lbenchmark_SHG
-
 !  lconverged = .true. ! TMP
 
   return
 
 end subroutine Temp_nRE
+
+!********************************************************************
+
+pure function n_photons_above(nu, nu_edge, N_above, density)
+  ! Integral above nu of a density that is constant in each frequency bin:
+  ! nu_edge(0:n) decreasing bin edges, N_above(k) integral above nu_edge(k)
+
+  real(kind=dp), intent(in) :: nu
+  real(kind=dp), dimension(0:), intent(in) :: nu_edge, N_above
+  real(kind=dp), dimension(:), intent(in) :: density
+  real(kind=dp) :: n_photons_above
+
+  integer :: n, k, kmin, kmax
+
+  n = size(density)
+  if (nu >= nu_edge(0)) then
+     n_photons_above = 0.0_dp
+  else if (nu <= nu_edge(n)) then
+     n_photons_above = N_above(n)
+  else
+     ! nu_edge(kmax) <= nu < nu_edge(kmin)
+     kmin = 0 ; kmax = n
+     do while (kmax - kmin > 1)
+        k = (kmin + kmax) / 2
+        if (nu_edge(k) > nu) then
+           kmin = k
+        else
+           kmax = k
+        endif
+     enddo
+     n_photons_above = N_above(kmin) + density(kmax) * (nu_edge(kmin) - nu)
+  endif
+
+end function n_photons_above
 
 !********************************************************************
 
