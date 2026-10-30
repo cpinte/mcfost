@@ -123,8 +123,13 @@ run() { # label binary workload repeat directory para options
     local label=$1 bin=$2 w=$3 r=$4 dir=$5 para=$6 ; shift 6
     local timing="" t0 t1
     declare_timing "$bin" && timing=-timing
+    # each run in its own directory: mcfost caches the dust properties and the
+    # Voronoi tessellation in temporary files of the working directory, which
+    # would otherwise be reused by the next binary
+    mkdir -p "$dir"
+    for f in "$work"/*.lambda; do [ -f "$f" ] && cp "$f" "$dir/" ; done
     t0=$(now)
-    (cd "$work" && "$bin" "$para" -root_dir "$dir" $timing "$@" > "$dir.log" 2>&1) || \
+    (cd "$dir" && "$bin" "$work/$para" -root_dir "$dir" $timing "$@" > "$dir.log" 2>&1) || \
         { echo "ERROR: $label $w failed, see $dir.log" ; tail -20 "$dir.log" ; exit 1 ; }
     t1=$(now)
     [ -z "$timing" ] && awk -v t0="$t0" -v t1="$t1" 'BEGIN {printf " TIMING total %.3f 1\n", t1-t0}' >> "$dir.log"
@@ -134,6 +139,11 @@ run() { # label binary workload repeat directory para options
     fi
     grep "^ TIMING" "$dir.log" | awk -v l="$label" -v w="$w" -v r="$r" \
         '{printf "%s\t%s\t%s\t%s\t%s\t%s\n", l, w, r, $2, $3, $4}' >> "$results"
+    # mcfost output of the first repeat, kept next to the results
+    if [ "$r" -eq 1 ]; then
+        mkdir -p "${results%.tsv}_logs"
+        cp "$dir.log" "${results%.tsv}_logs/${label}_$w.log"
+    fi
     echo "$label $w repeat $r: $(awk '$2=="total" {print $3}' "$dir.log") s"
 }
 

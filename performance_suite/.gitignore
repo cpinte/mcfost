@@ -1,5 +1,6 @@
 ozstar.conf
 results/logs/
+results/*_logs/
 # editor files
 \#*#
 .#*

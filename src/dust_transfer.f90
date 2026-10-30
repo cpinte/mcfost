@@ -320,7 +320,9 @@ subroutine init_dust_transfer()
            call lect_temperature()
            call Temp_approx_diffusion_vertical()
            call diffusion_approx_nLTE_nRE()
+           call timer_start(t_output)
            call ecriture_temperature(2)
+           call timer_stop(t_output)
            return
         endif
 
@@ -712,8 +714,12 @@ subroutine dust_transfer_sub()
 
         ! Save per-iteration state for restart and inspection
         if (lhydrostatic) then
+           call timer_start(t_output)
            call ecriture_temperature_hydro_iter(iter)
+           call timer_stop(t_output)
+           call timer_start(t_output)
            call ecriture_gas_density_hydro_iter(iter)
+           call timer_stop(t_output)
         endif
         if (ldust_sublimation .and. (.not.lmcfost_lib)) call write_sublimation_mask(iter)
 
@@ -725,8 +731,12 @@ subroutine dust_transfer_sub()
         if (lhydrostatic) call print_hydrostatic_scale_height()
         if (ldust_sublimation .and. (.not. lmcfost_lib)) call write_sublimation_mask(0)
         if (.not. lmcfost_lib) then
+           call timer_start(t_output)
            call ecriture_temperature(1)
+           call timer_stop(t_output)
+           call timer_start(t_output)
            call ecriture_sed(1)
+           call timer_stop(t_output)
         endif
         call reset_sed() ! for the next step
         if (lapprox_diffusion .and. l_is_dark_zone .and. &
@@ -962,8 +972,12 @@ subroutine run_thermal_mc(lwrite_output)
   enddo
 
   if ((.not. lmcfost_lib) .and. lwrite) then
+     call timer_start(t_output)
      call ecriture_temperature(1)
+     call timer_stop(t_output)
+     call timer_start(t_output)
      call ecriture_sed(1)
+     call timer_stop(t_output)
   endif
 
   if (lapprox_diffusion.and.l_is_dark_zone.and.&
@@ -1057,7 +1071,11 @@ subroutine run_image_mc()
   call timer_stop(t_mc_step2)
 
   ! Stokes FITS output from MC packets
-  if (loutput_mc) call write_stokes_fits()
+  if (loutput_mc) then
+     call timer_start(t_output)
+     call write_stokes_fits()
+     call timer_stop(t_output)
+  endif
 
   ! Ray-tracing map
   if (lscatt_ray_tracing) then
@@ -1119,7 +1137,9 @@ subroutine run_image_mc()
         endif
      enddo
 
+     call timer_start(t_output)
      call ecriture_map_ray_tracing()
+     call timer_stop(t_output)
      if (ltau_surface) call write_tau_surface(0) ! 0 for continuum
      if (ltau_map) call write_tau_map(0)
      write(*,*) "Source fct time", time_source_fct/real(time_tick), "s"
@@ -1329,9 +1349,13 @@ subroutine run_sed_mc()
   enddo ! lambda
 
   ! Write outputs after completing all wavelengths
+  call timer_start(t_output)
   call ecriture_sed(2)
+  call timer_stop(t_output)
   if (lscatt_ray_tracing) then
+     call timer_start(t_output)
      call ecriture_sed_ray_tracing()
+     call timer_stop(t_output)
      write(*,*) "Source fct time", time_source_fct/real(time_tick), "s"
      write(*,*) "RT time        ", time_RT/real(time_tick), "s"
   endif

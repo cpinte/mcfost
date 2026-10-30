@@ -28,7 +28,9 @@ program BIGCRUNCH
   call cpu_time(cpu_time_begin)
   call timer_start(t_total)
 
+  call timer_start(t_setup)
   call initialisation_mcfost()
+  call timer_stop(t_setup)
 
   !*************************************************************************
   ! Here it comes ...

@@ -23,6 +23,7 @@ includes `dust_prop` and `opacity`, `total` includes everything.
 
 | Phase | Content |
 |---|---|
+| `setup` | Reading the parameters, data directories (before `init`) |
 | `init` | Grid, density, dust properties and opacities of the first step |
 | `dust_prop` | Grain properties (Mie, DHS, ...) |
 | `opacity` | Opacities per cell |
@@ -32,6 +33,7 @@ includes `dust_prop` and `opacity`, `total` includes everything.
 | `mc_step2` | Monte Carlo packets of the image or SED step |
 | `source_fct` | Source functions of the ray tracing (including `calc_Jth`) |
 | `ray_tracing` | Ray tracing of the images and SEDs (`dust_map`) |
+| `output` | Writing the temperature, SED and image files of the dust transfer |
 | `mol`, `atom` | Molecular and atomic line transfer |
 
 ## Workloads
@@ -110,3 +112,6 @@ phase is flagged.
   `--cpus-per-task` equal to the number of cores of a node. Threads pinned
   (`OMP_PROC_BIND=close`, `OMP_PLACES=cores`).
 - Timings of a binary built from a modified tree are marked `-dirty` in the results.
+- Each run has its own working directory, so that cached dust properties or
+  Voronoi tessellations are never reused by another binary. The mcfost output of
+  the first repeat is kept in `results/<file>_logs/` (not under version control).
