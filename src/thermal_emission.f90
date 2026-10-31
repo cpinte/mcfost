@@ -17,7 +17,8 @@ module thermal_emission
   implicit none
   save
 
-  public :: prob_E_cell, E_totale, nbre_reemission, frac_E_stars, frac_E_disk, L_packet_th, E_abs_nRE, correct_E_emission, &
+  public :: prob_E_cell, E_totale, nbre_reemission, frac_E_stars, frac_E_disk, L_packet_th, E_abs_nRE, E_abs_nRE_id, &
+       correct_E_emission, &
        DensE, DensE_m1, Dcoeff
 
   public :: allocate_temperature, deallocate_temperature_calculation, realloc_emitting_fractions, &
@@ -60,6 +61,7 @@ module thermal_emission
   real(kind=dp), dimension(:,:), allocatable :: nbre_reemission ! n_cells, id
 
   real(kind=dp) :: L_packet_th, E_abs_nRE
+  real(kind=dp), dimension(:), allocatable :: E_abs_nRE_id ! energy absorbed by nRE grains, per thread
 
   ! Emission bias towards the disk surface
   real(kind=dp), dimension(:), allocatable :: weight_proba_emission, correct_E_emission
@@ -192,6 +194,10 @@ subroutine allocate_thermal_emission(Nc,p_Nc)
      if (alloc_status > 0) call error('Allocation error xT_ech_1grain_nRE')
      xT_ech_1grain_nRE = 2
 
+     allocate(E_abs_nRE_id(nb_proc),stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error E_abs_nRE_id')
+     E_abs_nRE_id = 0.0_dp ; E_abs_nRE = 0.0_dp
+
      allocate(kdB_dT_1grain_nRE_CDF(n_lambda,grain_nRE_start:grain_nRE_end,n_T),stat=alloc_status)
      if (alloc_status > 0) call error('Allocation error kdB_dT_1grain_nRE_CDF')
      kdB_dT_1grain_nRE_CDF=0.0
@@ -244,7 +250,7 @@ subroutine deallocate_temperature_calculation()
   if (lreemission_stats) deallocate(nbre_reemission)
   if (lnRE) then
      deallocate(kdB_dT_1grain_nRE_CDF,E_em_1grain_nRE,log_E_em_1grain_nRE,xT_ech_1grain_nRE,nu_bin_nRE,U_lim_nRE)
-     deallocate(Tdust_1grain_nRE_old,Emissivite_nRE_old,Tpeak_old)
+     deallocate(Tdust_1grain_nRE_old,Emissivite_nRE_old,Tpeak_old,E_abs_nRE_id)
      if (lRE_nlTE) deallocate(Tdust_1grain_old)
   endif
   call deallocate_radiation_field()
@@ -812,7 +818,8 @@ subroutine im_reemission_NLTE(id,icell,p_icell,rand1,rand2,lambda)
      heating_method = 2 ! nLTE
      k = select_absorbing_grain(lambda0,icell, rand1, heating_method)
   else
-     kmin=grain_RE_nLTE_start
+     ! kabs_nLTE_CDF(grain_RE_nLTE_start-1) = 0: first grain k with CDF(k) >= rand1
+     kmin=grain_RE_nLTE_start-1
      kmax=grain_RE_nLTE_end
      k=(kmin+kmax)/2
 
@@ -827,17 +834,17 @@ subroutine im_reemission_NLTE(id,icell,p_icell,rand1,rand2,lambda)
      k=kmax
   endif
 
-  ! Mean intensity
-  ! total_sum sur differents processeurs
+  ! Mean intensity: estimate of this thread x nb_proc, as for LTE grains (Temp_LTE), instead
+  ! of summing the other threads at each event; the temperature also follows this thread
   J_abs=0.0
   do ilambda=1, n_lambda
-     J_abs =  J_abs + C_abs_norm(k,ilambda)  * (sum(xJ_abs(icell,ilambda,:)) + J0(icell,ilambda))
+     J_abs =  J_abs + C_abs_norm(k,ilambda)  * (xJ_abs(icell,ilambda,id) * nb_proc + J0(icell,ilambda))
   enddo ! lambda
   ! WARNING: must divide by dust_density_o_n_grains as it is not taken into account in E_em_1grain
   log_E_abs=log(J_abs*L_packet_th/volume(icell) )
 
   ! Sampled temperature just above the cell temperature
-  T_int=maxval(xT_ech_1grain(k,icell,:))
+  T_int=xT_ech_1grain(k,icell,id)
 
   ! Eventually increment the temperature zone
   do while((log_E_em_1grain(k,T_int) < log_E_abs).and.(T_int < n_T))
@@ -990,8 +997,9 @@ subroutine Temp_finale_nLTE()
               if (log_E_abs <  log_E_em_1grain(k,1)) then
                  Tdust_1grain(k,icell) = T_min
               else
-                 ! Sampled temperature just above the cell temperature
-                 T_int=maxval(xT_ech_1grain(k,icell,:))
+                 ! Sampled temperature just above the cell temperature: lowest over the threads,
+                 ! each thread follows its own estimate of the field (as Temp_LTE with id = 0)
+                 T_int=max(minval(xT_ech_1grain(k,icell,:)),2)
 
                  ! Eventually increment the temperature zone
                  do while((log_E_em_1grain(k,T_int) < log_E_abs).and.(T_int < n_T))
@@ -1161,7 +1169,8 @@ subroutine Temp_nRE(lconverged)
      do icell=n_cells, 1, -1
         !$ id = omp_get_thread_num() + 1
         if (l_dark_zone(icell)) then
-           l_RE(:,icell) = .true.
+           lchange_nRE(l,icell) = .not.l_RE(l,icell)
+           l_RE(l,icell) = .true.
         else
            if (dust_density_o_n_grains(p_l,icell) > tiny_dp) then
               ! Champ de radiation
@@ -1298,6 +1307,8 @@ subroutine Temp_nRE(lconverged)
               !t_cool = 0.0
 
               if (t_cool < t_abs) then !  calcul proba temperature
+                 ! status change if the grain was at equilibrium at the previous iteration
+                 lchange_nRE(l,icell) = l_RE(l,icell)
                  l_RE(l,icell) = .false.
                  ! heating terms : select lower triangle
                  ! Afi with with f > i: photons with an energy between the edges of bin f minus U_i,
@@ -1498,17 +1509,17 @@ subroutine im_reemission_qRE(id,icell,p_icell,rand1,rand2,lambda)
 
   k = select_absorbing_grain(lambda0,icell, rand1, heating_method)
 
-  ! Mean intensity
-  ! total_sum sur differents processeurs
+  ! Mean intensity: estimate of this thread x nb_proc, as for LTE grains (Temp_LTE), instead
+  ! of summing the other threads at each event; the temperature also follows this thread
   J_abs=0.0
   do ilambda=1, n_lambda
-     J_abs =  J_abs + C_abs_norm(k,ilambda)  * (sum(xJ_abs(icell,ilambda,:)) + J0(icell,lambda))
+     J_abs =  J_abs + C_abs_norm(k,ilambda)  * (xJ_abs(icell,ilambda,id) * nb_proc + J0(icell,ilambda))
   enddo ! ilambda
   ! WARNING: must divide by dust_density_o_n_grains as it is not taken into account in E_em_1grain
   log_E_abs=log(J_abs*L_packet_th/volume(icell))
 
   ! Sampled temperature just above the cell temperature
-  T_int=maxval(xT_ech_1grain_nRE(k,icell,:))
+  T_int=xT_ech_1grain_nRE(k,icell,id)
 
   ! Eventually increment the temperature zone
   do while((log_E_em_1grain_nRE(k,T_int) < log_E_abs).and.(T_int < n_T))
@@ -1587,14 +1598,18 @@ subroutine update_proba_abs_nRE()
         lall_grains_eq = .true.
         do l=grain_nRE_start,grain_nRE_end
            p_l = merge(l,grain(l)%zone,lvariable_dust)
-           if (lchange_nRE(l,icell)) then ! 1 grain changed status at this iteration
-              delta_kappa_abs_qRE =  C_abs_norm(l,lambda) * dust_density_o_n_grains(p_l,icell) * n_grains(l)
-           else
-              if (.not.l_RE(l,icell)) lall_grains_eq = .false. ! there are grains remaining not at equilibrium
+           if (lchange_nRE(l,icell)) then ! grain changed status at this iteration: added to (qRE) or
+              ! removed from (back to nRE) the grains with immediate re-emission
+              if (l_RE(l,icell)) then
+                 delta_kappa_abs_qRE = delta_kappa_abs_qRE + C_abs_norm(l,lambda) * dust_density_o_n_grains(p_l,icell) * n_grains(l)
+              else
+                 delta_kappa_abs_qRE = delta_kappa_abs_qRE - C_abs_norm(l,lambda) * dust_density_o_n_grains(p_l,icell) * n_grains(l)
+              endif
            endif
+           if (.not.l_RE(l,icell)) lall_grains_eq = .false. ! there are grains remaining not at equilibrium
         enddo !l
 
-        if (delta_kappa_abs_qRE > tiny_dp) then ! at least 1 grain changed status, updating the various probabilites
+        if (abs(delta_kappa_abs_qRE) > tiny_dp) then ! at least 1 grain changed status, updating the various probabilites
            kappa_abs_RE_old = kappa_abs_RE(icell,lambda)
            kappa_abs_RE_new = kappa_abs_RE_old + delta_kappa_abs_qRE
            kappa_abs_RE(icell,lambda) = kappa_abs_RE_new
@@ -1607,8 +1622,8 @@ subroutine update_proba_abs_nRE()
               write(*,*) "Exiting"
               call exit(1)
            else
-              correct = kappa_abs_RE_new / kappa_abs_RE_old ! > 1
-              correct_m1 = 1.0_dp/correct ! < 1
+              correct = kappa_abs_RE_new / kappa_abs_RE_old ! > 1 if grains reached qRE, < 1 if they left it
+              correct_m1 = 1.0_dp/correct
 
               ! Proba d'abs sur un grain en equilibre (pour reemission immediate)
               if (lall_grains_eq) then
@@ -1652,6 +1667,7 @@ subroutine emission_nRE()
   ! differential proba as a function of proba emission precedente
 
   !E_abs_nRE est en nbre de paquets !!!
+  E_abs_nRE = sum(E_abs_nRE_id)
   frac_E_abs_nRE = E_abs_nRE / n_photons_total
   write(*,*) "Non equilibrium grains have absorbed", real(frac_E_abs_nRE), "of emitted energy"
   write(*,*) "Re-emitting this amount of energy"
@@ -1669,7 +1685,7 @@ subroutine emission_nRE()
   E_paquet = fn /  n_photons_eq_th
 
   ! For next iteration
-  E_abs_nRE = 0.0
+  E_abs_nRE = 0.0 ; E_abs_nRE_id = 0.0_dp
 
   ! Spatial energy distribution
   cst_wl_max = log(huge_real)-1.0e-4
@@ -2232,7 +2248,7 @@ subroutine reset_thermal_state()
      xT_ech_1grain_nRE = 2
      l_RE = .false.
      lchange_nRE = .false.
-     E_abs_nRE = 0.0_dp
+     E_abs_nRE = 0.0_dp ; E_abs_nRE_id = 0.0_dp
   endif
 
   return
