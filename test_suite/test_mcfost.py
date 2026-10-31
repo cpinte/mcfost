@@ -1211,9 +1211,13 @@ def test_sublimation_power_law():
 
 def nre_absorbed_fractions(stdout):
     # fraction of the energy absorbed by non-equilibrium grains, first nRE pass of each
-    # temperature calculation
-    values = [float(l.split()[-4]) for l in stdout.splitlines() if "Non equilibrium grains have absorbed" in l]
-    return values[0::2]
+    # temperature calculation (the number of nRE passes per calculation varies)
+    values = []
+    for block in stdout.split("Computing temperature structure")[1:]:
+        lines = [l for l in block.splitlines() if "Non equilibrium grains have absorbed" in l]
+        if lines:
+            values.append(float(lines[0].split()[-4]))
+    return values
 
 
 def check_hydrostatic_temperature_stable(root_dir, tolerance=0.05):
