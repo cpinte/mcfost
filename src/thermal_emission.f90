@@ -39,6 +39,8 @@ module thermal_emission
   real(kind=dp), dimension(:,:), allocatable :: log_Qcool_minus_extra_heating ! 0:n_T, n_cells
   real(kind=dp), dimension(:,:), allocatable :: log_E_em_1grain  !n_grains,0:n_T
   real(kind=dp), dimension(:,:), allocatable :: E_em_1grain_nRE, log_E_em_1grain_nRE !n_grains,0:n_T
+  ! enthalpy of non equilibrium grains, at the temperature bin centers [Hz] and edges [J]
+  real(kind=dp), dimension(:,:), allocatable :: nu_bin_nRE, U_lim_nRE ! n_T and 0:n_T, n_grains
 
   ! Cumulative probability in lambda of dust emissivity
   ! with temperature correction (dp/dT)
@@ -170,6 +172,11 @@ subroutine allocate_thermal_emission(Nc,p_Nc)
      E_em_1grain_nRE=0.0
      log_E_em_1grain_nRE=0.0
 
+     allocate(nu_bin_nRE(n_T,grain_nRE_start:grain_nRE_end), U_lim_nRE(0:n_T,grain_nRE_start:grain_nRE_end), &
+          stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error nu_bin_nRE')
+     nu_bin_nRE = 0.0_dp ; U_lim_nRE = 0.0_dp
+
      allocate(Tdust_1grain_nRE_old(grain_nRE_start:grain_nRE_end,Nc), stat=alloc_status)
      if (alloc_status > 0) call error('Allocation error Tdust_1grain_nRE_old')
      Tdust_1grain_nRE_old =0.0
@@ -236,7 +243,7 @@ subroutine deallocate_temperature_calculation()
   if (lRE_nLTE) deallocate(kabs_nLTE_CDF, kdB_dT_1grain_nLTE_CDF, log_E_em_1grain,xT_ech_1grain)
   if (lreemission_stats) deallocate(nbre_reemission)
   if (lnRE) then
-     deallocate(kdB_dT_1grain_nRE_CDF,E_em_1grain_nRE,log_E_em_1grain_nRE,xT_ech_1grain_nRE)
+     deallocate(kdB_dT_1grain_nRE_CDF,E_em_1grain_nRE,log_E_em_1grain_nRE,xT_ech_1grain_nRE,nu_bin_nRE,U_lim_nRE)
      deallocate(Tdust_1grain_nRE_old,Emissivite_nRE_old,Tpeak_old)
      if (lRE_nlTE) deallocate(Tdust_1grain_old)
   endif
@@ -417,6 +424,7 @@ subroutine init_reemission(lheating,dudt)
   real(kind=dp) ::  temp, cst_E, delta_wl
   real(kind=dp), dimension(0:n_lambda) :: integ3
   real(kind=dp), dimension(n_lambda,n_T) :: B, dB_dT
+  real(kind=dp), dimension(0:n_T) :: T_lim
 
   real(kind=dp) :: Qcool, extra_heating, u_o_dt, Qcool_minus_extra_heating, Qcool0
 
@@ -635,6 +643,17 @@ subroutine init_reemission(lheating,dudt)
         if (dust_pop(pop)%is_DustEM_opacity_file)  call read_DustEM_specific_heat(pop)
      endif
   enddo
+
+  if (lnRE) then
+     ! Enthalpy of the temperature bins (after reading the heat capacity files), used by
+     ! Temp_nRE at each iteration
+     T_lim(0) = T_min
+     T_lim(1:n_T) = tab_Temp(:) * sqrt(exp((1.0_dp/(real(n_T,kind=dp)))*log(T_max/T_min)))
+     do k=grain_nRE_start,grain_nRE_end
+        nu_bin_nRE(:,k) = enthalpy(real(tab_Temp,kind=dp),k)/hp ! enthalpy at bin centers [Hz]
+        U_lim_nRE(:,k) = enthalpy(T_lim(:),k) ! enthalpy of bin boundaries [J]
+     enddo
+  endif
 
   write(*,*) "Done"
   return
@@ -1029,16 +1048,18 @@ subroutine Temp_nRE(lconverged)
   real(kind=dp), dimension(:,:,:), allocatable :: A, B
   real(kind=dp), dimension(:,:), allocatable :: X
   real(kind=dp), dimension(n_T) :: nu_bin, delta_nu_bin
-  real(kind=dp), dimension(0:n_T) :: T_lim, U_lim
+  real(kind=dp), dimension(0:n_T) :: U_lim
 
   real(kind=dp), dimension(n_lambda) :: C_abs_norm_o_dnu, tab_nu
   real(kind=dp), dimension(0:n_lambda) :: nu_edge
 
   real(kind=dp), dimension(:,:), allocatable :: kJnu, lambda_Jlambda, kJnu_o_nu, N_above
+  integer, dimension(:,:), allocatable :: k_edge
+  real(kind=dp), dimension(:,:), allocatable :: dnu_edge
 
   real(kind=dp) :: delta_T, N_lo, N_hi, t_cool, t_abs, mean_abs_E, kTu, mean_abs_nu, cst_t_cool, Int_k_lambda_Jlambda
 
-  integer :: l, T, T1, T2, lambda, alloc_status, id, T_int, icell, p_l
+  integer :: l, T, T1, T2, lambda, alloc_status, id, T_int, icell, p_l, k
 
   integer, parameter :: n_cooling_time = 100
 
@@ -1062,9 +1083,9 @@ subroutine Temp_nRE(lconverged)
   if (alloc_status > 0) call error('Allocation error kJnu')
   kJnu = 0.0 ;  lambda_Jlambda=0.0 ; kJnu_o_nu = 0.0 ; N_above = 0.0
 
-  delta_T=exp((1.0_dp/(real(n_T,kind=dp)))*log(T_max/T_min))
-  T_lim(0) = T_min
-  T_lim(1:n_T) = tab_Temp(:)*sqrt(delta_T)
+  allocate(k_edge(n_T,n_T), dnu_edge(n_T,n_T), stat=alloc_status)
+  if (alloc_status > 0) call error('Allocation error k_edge')
+  k_edge = 0 ; dnu_edge = 0.0_dp
 
   tab_nu = c_light/(tab_lambda*1.0e-6)
   ! frequency edges of the wavelength bins (decreasing)
@@ -1074,10 +1095,10 @@ subroutine Temp_nRE(lconverged)
   ! l est l'indice de taille de grains
   do l=grain_nRE_start, grain_nRE_end
      ! bin centers [Hz]
-     nu_bin(:) = enthalpy(real(tab_Temp,kind=dp),l)/hp ! enthalpy at bin centers
+     nu_bin(:) = nu_bin_nRE(:,l) ! enthalpy at bin centers [Hz]
 
      ! bin widths [Hz]
-     U_lim(:) = enthalpy(T_lim(:),l) ! enthalpy of bin boundaries [J]
+     U_lim(:) = U_lim_nRE(:,l) ! enthalpy of bin boundaries [J]
      delta_nu_bin(:) = (U_lim(1:n_T)-U_lim(0:n_T-1))/hp  ! bin width [Hz]
 
      ! compute transition matrix  A   [Hz]
@@ -1111,16 +1132,24 @@ subroutine Temp_nRE(lconverged)
 
      cst_t_cool =(real(hp,kind=dp)**3 * real(c_light,kind=dp)**2) / (8*pi)
 
+     ! Heating terms: the photon frequencies U_lim(T)/h - nu_bin(T2) at the edges of the
+     ! transitions T2 -> T depend only on the grain: their wavelength bins are found once here
+     do T2=1,n_T-1
+        do T=T2,n_T-1
+           call photon_edge(U_lim(T)/hp - nu_bin(T2), nu_edge, k_edge(T,T2), dnu_edge(T,T2))
+        enddo
+     enddo
+
      ! Loop over cells
 
      !$omp parallel &
      !$omp default(none) &
      !$omp private(Int_k_lambda_Jlambda, lambda, wl, wl_mum, T, T2) &
-     !$omp private(N_lo,N_hi,id,t_cool,t_abs,mean_abs_E,mean_abs_nu,kTu) &
+     !$omp private(N_lo,N_hi,id,t_cool,t_abs,mean_abs_E,mean_abs_nu,kTu,k) &
      !$omp private(frac,T1,Temp1,Temp2,T_int,log_E_abs,icell,p_l,J_lambda) &
      !$omp shared(l,kJnu, lambda_Jlambda, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium) &
      !$omp shared(n_cells, C_abs_norm_o_dnu, xJ_abs, J0, L_packet_th, volume, n_T, star) &
-     !$omp shared(tab_nu, nu_edge, n_lambda, tab_delta_lambda, tab_lambda,en,delta_en,Cabs,kJnu_o_nu,N_above,U_lim) &
+     !$omp shared(tab_nu, nu_edge, n_lambda, tab_delta_lambda, tab_lambda,en,delta_en,Cabs,kJnu_o_nu,N_above,k_edge,dnu_edge) &
      !$omp shared(delta_nu_bin,Proba_Tdust, A,B,X,nu_bin,tab_Temp,T_min,T_max,lbenchmark_SHG,lMathis_field,Mathis_field) &
      !$omp shared(Tdust_1grain_nRE,log_E_em_1grain_nRE,cst_t_cool,C_abs_norm,l_RE,r_grid,z_grid,n_grains) &
      !$omp shared(dust_density_o_n_grains,l_dark_zone,Tdust,lchange_nRE,lvariable_dust,grain)
@@ -1282,16 +1311,15 @@ subroutine Temp_nRE(lconverged)
                     N_above(lambda,id) = N_above(lambda-1,id) + kJnu_o_nu(lambda,id) * (nu_edge(lambda-1) - nu_edge(lambda))
                  enddo
                  do T2=1,n_T-1
-                    N_lo = n_photons_above(U_lim(T2)/hp - nu_bin(T2), nu_edge, N_above(:,id), kJnu_o_nu(:,id))
-                    do T=T2+1,n_T
-                       if (T < n_T) then
-                          N_hi = n_photons_above(U_lim(T)/hp - nu_bin(T2), nu_edge, N_above(:,id), kJnu_o_nu(:,id))
-                       else
-                          N_hi = 0.0_dp
-                       endif
+                    k = k_edge(T2,T2)
+                    N_lo = N_above(k,id) + kJnu_o_nu(k+1,id) * dnu_edge(T2,T2)
+                    do T=T2+1,n_T-1
+                       k = k_edge(T,T2)
+                       N_hi = N_above(k,id) + kJnu_o_nu(k+1,id) * dnu_edge(T,T2)
                        A(T,T2,id) = N_lo - N_hi
                        N_lo = N_hi
                     end do
+                    A(n_T,T2,id) = N_lo
                  end do
 
                  !! diagonal terms
@@ -1301,12 +1329,12 @@ subroutine Temp_nRE(lconverged)
 
                  !! compute probabilities P(T) using iterative formulation of GD89
 
-                 !! compute B array
-                 B(:,:,id) = 0.
-                 B(n_T,1:n_T-1,id) = A(n_T,1:n_T-1,id)
+                 !! compute B array, stored transposed (B(T2,T): heating rate from T2 to T or above,
+                 !! contiguous in T2 for the P recursion). Every element used is set for each cell
+                 B(1:n_T-1,n_T,id) = A(n_T,1:n_T-1,id)
                  do T=n_T-1,1,-1
                     do T2=1,T-1
-                       B(T,T2,id) = A(T,T2,id) + B(T+1,T2,id)
+                       B(T2,T,id) = A(T,T2,id) + B(T2,T+1,id)
                     enddo
                  enddo
 
@@ -1315,7 +1343,7 @@ subroutine Temp_nRE(lconverged)
                  do T=2, n_T
                     if (X(T-1,id) <  1.e-300_dp) X(T-1,id) = 1.e-300_dp
                     if (X(T-1,id) >  1.e250_dp) X(1:T-1,id) = X(1:T-1,id) * 1.0e-50_dp ! allows to stabilize in case of rounding errors
-                    X(T,id) =  sum(B(T,1:T-1,id)*X(1:T-1,id)) / max(A(T-1, T,id),tiny_dp)
+                    X(T,id) =  sum(B(1:T-1,T,id)*X(1:T-1,id)) / max(A(T-1, T,id),tiny_dp)
                     if (A(T-1, T,id) < tiny_dp) then
                        write(*,*) l, T, id, "normalization error"
                        call exit(1)
@@ -1355,7 +1383,7 @@ subroutine Temp_nRE(lconverged)
      !$omp end parallel
   enddo !l
 
-  deallocate(A, B, X, kJnu, lambda_Jlambda, kJnu_o_nu, N_above)
+  deallocate(A, B, X, kJnu, lambda_Jlambda, kJnu_o_nu, N_above, k_edge, dnu_edge)
 
   write(*,*) "Done"
 
@@ -1413,37 +1441,39 @@ end subroutine Temp_nRE
 
 !********************************************************************
 
-pure function n_photons_above(nu, nu_edge, N_above, density)
-  ! Integral above nu of a density that is constant in each frequency bin:
-  ! nu_edge(0:n) decreasing bin edges, N_above(k) integral above nu_edge(k)
+pure subroutine photon_edge(nu, nu_edge, k, dnu)
+  ! Position of frequency nu in bins of decreasing edges nu_edge(0:n), such that the
+  ! integral above nu of a density constant in each bin (N_above(k) the integral above
+  ! nu_edge(k)) is N_above(k) + density(k+1) * dnu, with 0 <= k < n and dnu >= 0:
+  ! k = 0, dnu = 0 above nu_edge(0); k = n-1, dnu = full last bin below nu_edge(n)
 
   real(kind=dp), intent(in) :: nu
-  real(kind=dp), dimension(0:), intent(in) :: nu_edge, N_above
-  real(kind=dp), dimension(:), intent(in) :: density
-  real(kind=dp) :: n_photons_above
+  real(kind=dp), dimension(0:), intent(in) :: nu_edge
+  integer, intent(out) :: k
+  real(kind=dp), intent(out) :: dnu
 
-  integer :: n, k, kmin, kmax
+  integer :: n, kmid, kmax
 
-  n = size(density)
+  n = size(nu_edge) - 1
   if (nu >= nu_edge(0)) then
-     n_photons_above = 0.0_dp
+     k = 0 ; dnu = 0.0_dp
   else if (nu <= nu_edge(n)) then
-     n_photons_above = N_above(n)
+     k = n-1 ; dnu = nu_edge(n-1) - nu_edge(n)
   else
-     ! nu_edge(kmax) <= nu < nu_edge(kmin)
-     kmin = 0 ; kmax = n
-     do while (kmax - kmin > 1)
-        k = (kmin + kmax) / 2
-        if (nu_edge(k) > nu) then
-           kmin = k
+     ! nu_edge(kmax) <= nu < nu_edge(k)
+     k = 0 ; kmax = n
+     do while (kmax - k > 1)
+        kmid = (k + kmax) / 2
+        if (nu_edge(kmid) > nu) then
+           k = kmid
         else
-           kmax = k
+           kmax = kmid
         endif
      enddo
-     n_photons_above = N_above(kmin) + density(kmax) * (nu_edge(kmin) - nu)
+     dnu = nu_edge(k) - nu
   endif
 
-end function n_photons_above
+end subroutine photon_edge
 
 !********************************************************************
 
