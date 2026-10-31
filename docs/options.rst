@@ -130,7 +130,7 @@ sublimation temperature of the optical indices files (see :ref:`sublimation-laws
 
 ``-force_PAH_out_equilibrium``: mainly for testing purposes
 
-``-Tmax_PAH <T>``: changes the maximum temperature allowed for PAH (default: 2500)
+``-Tmax_PAH <T>``: changes the maximum temperature allowed for PAH (default: 3000), also the maximum of the temperature grid of the non-equilibrium grains
 
 ``-nT <n>``: number of temperature bins (default: 100)
 

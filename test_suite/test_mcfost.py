@@ -18,7 +18,7 @@ model_list = [
 
 # If running on CI, only run some of the tests
 #if ON_CI:
-#    model_list = ["ref3.0","ref3.0_multi","debris","discF_00500"]
+#    model_list = ["ref3.0","ref4.1_multi","debris","discF_00500"]
 
 #model_list = ["ref3.0"]#,"debris","discF_00500"]
 
@@ -103,7 +103,7 @@ def test_SED(model_name):
     SED = fits.getdata(test_dir+"/"+SED_name)[0,:,:,:]
     SED_ref = fits.getdata("test_data/"+SED_name)[0,:,:,:]
 
-    if model_name == "ref3.0_multi":
+    if model_name == "ref4.1_multi":
         threshold=0.12
     else:
         threshold=0.1
@@ -202,7 +202,7 @@ def test_image(model_name, wl):
     if (model_name == "ref3.0") and (wl == "100"): # weird difference on linux, ifort, openmp=no, release=no
         threshold=0.11
 
-    if (model_name == "ref3.0_multi") and (wl == "1.0"): # weird difference on linux, ifort, openmp=yes, release=no
+    if (model_name == "ref4.1_multi") and (wl == "1.0"): # weird difference on linux, ifort, openmp=yes, release=no
         threshold=0.11
 
     if (model_name == "ref4.1_nLTE") and (wl == "100"):
@@ -253,8 +253,8 @@ def test_pola(model_name, wl):
             # This requires too much memory on CI
             pytest.skip("Skipping images on phantom dump on CI")
 
-    if (model_name == "ref3.0_multi"):
-        pytest.skip("Skipping pola for ref3.0_multi for now")
+    if (model_name == "ref4.1_multi"):
+        pytest.skip("Skipping pola for ref4.1_multi for now")
 
     # Read the results
     image_name = model_name+"/data_"+wl+"/RT.fits.gz"
@@ -295,8 +295,8 @@ def test_contrib(model_name, wl):
             # This requires too much memory on CI
             pytest.skip("Skipping images on phantom dump on CI")
 
-    if (model_name == "ref3.0_multi") and (wl == "1.0"):
-        pytest.skip("Skipping contrib at 1.0 for ref3.0_multi for now")
+    if (model_name == "ref4.1_multi") and (wl == "1.0"):
+        pytest.skip("Skipping contrib at 1.0 for ref4.1_multi for now")
 
     # Read the results
     image_name = model_name+"/data_"+wl+"/RT.fits.gz"
@@ -312,7 +312,7 @@ def test_contrib(model_name, wl):
     print("Maximum contrib difference", (abs(image-image_ref)/(image_ref+1e-30)).max())
     print("Mean contrib difference   ", (abs(image-image_ref)/(image_ref+1e-30)).mean())
 
-    if model_name == "ref3.0_multi":
+    if model_name == "ref4.1_multi":
         mask_threshold=1e-19
     elif (model_name == "ref4.1_PAH"):
         mask_threshold=1e-22
@@ -982,7 +982,7 @@ def test_sublimation_front():
 
 
 def test_sublimation_multi_population():
-    # Two zones and three populations (ref3.0_multi in LTE): silicates sublimate in
+    # Two zones and three populations (ref4.1_multi in LTE): silicates sublimate in
     # the inner zone, the ice-coated grains of the outer zone beyond the snow line, and
     # PAHs never sublimate. Each population sublimates independently (variable dust).
     # Only the innermost zone is extended to the sublimation radius (no overlapping
@@ -991,11 +991,11 @@ def test_sublimation_multi_population():
     # T_sub = 100 K is placed in the run directory, which is searched first.
     if not compute_models:
         pytest.skip("Only run when computing models")
-    root_dir = "ref3.0_multi_sublimation"
+    root_dir = "ref4.1_multi_sublimation"
     clean_results(root_dir)
     os.makedirs(root_dir, exist_ok=True)
     para = root_dir+"/multi.para"
-    make_para("test_data/ref3.0_multi/ref3.0_multi.para", para,
+    make_para("test_data/ref4.1_multi/ref4.1_multi.para", para,
               {"sublimate dust": set_first_value("T"),
                "Heating method": set_first_value("1"),
                "nbr_photons_eq_th": set_first_value("1.28e5"),
@@ -1095,15 +1095,15 @@ def test_sublimation_sed_only():
 
 def test_sublimation_per_grain_size():
     # nLTE grains have one temperature per grain size: the small (hotter) ice-coated
-    # grains of ref3.0_multi sublimate over a larger region than the large ones, and
+    # grains of ref4.1_multi sublimate over a larger region than the large ones, and
     # some cells are only partially sublimated. PAHs (nRE) never sublimate.
     if not compute_models:
         pytest.skip("Only run when computing models")
-    root_dir = "ref3.0_multi_sublimation_nlte"
+    root_dir = "ref4.1_multi_sublimation_nlte"
     clean_results(root_dir)
     os.makedirs(root_dir, exist_ok=True)
     para = root_dir+"/multi_nlte.para"
-    make_para("test_data/ref3.0_multi/ref3.0_multi.para", para,
+    make_para("test_data/ref4.1_multi/ref4.1_multi.para", para,
               {"sublimate dust": set_first_value("T"),
                "nbr_photons_eq_th": set_first_value("1.28e5"),
                "Rin, edge, Rout": lambda line: set_first_value("0.03")(line) if line.split()[0] == "1." else line})

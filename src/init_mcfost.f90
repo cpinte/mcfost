@@ -1199,9 +1199,6 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         lbenchmark_SHG=.true.
      case("-Mathis_field")
-        if (.not.lbenchmark_SHG) then
-           call error("Mathis field can only be used with the SHG benchmark")
-        endif
         i_arg = i_arg + 1
         lMathis_field=.true.
         call get_command_argument(i_arg,s)
@@ -1561,6 +1558,9 @@ subroutine initialisation_mcfost()
         call error("unknown option: "//trim(s), msg2="Use 'mcfost -h' to get list of available options")
      end select
   enddo ! while
+
+  ! checked after parsing, the options can be given in any order
+  if (lMathis_field .and. .not.lbenchmark_SHG) call error("-Mathis_field can only be used with -benchmark_SHG")
 
   ! Reading the parameter file
   if (lProDiMo2mcfost) then
@@ -2045,7 +2045,7 @@ subroutine display_help()
   write(*,*) "        : -weight_emission  : weight emission towards disk surface"
   write(*,*) "        : -force_PAH_equilibrium : mainly for testing purposes"
   write(*,*) "        : -force_PAH_out_equilibrium : mainly for testing purposes"
-  write(*,*) "        : -Tmax_PAH <T> : changes the maximum temperature allowed for PAH (default: 2500)"
+  write(*,*) "        : -Tmax_PAH <T> : changes the maximum temperature allowed for PAH (default: 3000)"
   write(*,*) "        : -ISM_heating : includes heating by ISM radiation"
   write(*,*) "        : -chi_ISM <chi> : changes the chi of ISM radiation (default: 1)"
   write(*,*) "        : -no_internal_energy : ignoring internal energy in Phantom dumps"
