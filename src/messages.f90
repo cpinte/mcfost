@@ -13,9 +13,10 @@ contains
     character(len=*), intent(in)           :: msg
     character(len=*), intent(in), optional :: msg2, msg3
 
-    write(*,*) "WARNING: "//trim(msg)
-    if (present(msg2)) write(*,*) trim(msg2)
-    if (present(msg3)) write(*,*) trim(msg3)
+    ! explicit format: list-directed output is wrapped at 80 columns by ifort
+    write(*,'(1x,a)') "WARNING: "//trim(msg)
+    if (present(msg2)) write(*,'(1x,a)') trim(msg2)
+    if (present(msg3)) write(*,'(1x,a)') trim(msg3)
 
     return
 
@@ -29,9 +30,10 @@ contains
     character(len=*), intent(in), optional :: msg2, msg3
     integer, intent(out), optional         :: ierr
 
-    write(*,*) "ERROR: "//trim(msg)
-    if (present(msg2)) write(*,*) trim(msg2)
-    if (present(msg3)) write(*,*) trim(msg3)
+    ! explicit format: list-directed output is wrapped at 80 columns by ifort
+    write(*,'(1x,a)') "ERROR: "//trim(msg)
+    if (present(msg2)) write(*,'(1x,a)') trim(msg2)
+    if (present(msg3)) write(*,'(1x,a)') trim(msg3)
 
     if (present(ierr)) then
        ierr = 1
