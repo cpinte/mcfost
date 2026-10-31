@@ -2231,6 +2231,11 @@ subroutine reset_temperature()
      xKJ_abs(:,:) = 0.0_dp
   endif
   if (lRE_nLTE .or. lnRE) xJ_abs(:,:,:) = 0.0_dp
+  ! energy absorbed by nRE grains: only reset by emission_nRE when re-emitted, the last
+  ! (converged) pass and the SED step would otherwise carry over to the next calculation
+  if (lnRE) then
+     E_abs_nRE = 0.0_dp ; E_abs_nRE_id = 0.0_dp
+  endif
   xT_ech = 2
   Tdust = 1.0
 
