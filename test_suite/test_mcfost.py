@@ -18,7 +18,7 @@ model_list = [
 
 # If running on CI, only run some of the tests
 #if ON_CI:
-#    model_list = ["ref3.0","ref3.0_multi","debris","discF_00500"]
+#    model_list = ["ref3.0","ref4.1_multi","debris","discF_00500"]
 
 #model_list = ["ref3.0"]#,"debris","discF_00500"]
 
@@ -103,7 +103,7 @@ def test_SED(model_name):
     SED = fits.getdata(test_dir+"/"+SED_name)[0,:,:,:]
     SED_ref = fits.getdata("test_data/"+SED_name)[0,:,:,:]
 
-    if model_name == "ref3.0_multi":
+    if model_name == "ref4.1_multi":
         threshold=0.12
     else:
         threshold=0.1
@@ -202,7 +202,7 @@ def test_image(model_name, wl):
     if (model_name == "ref3.0") and (wl == "100"): # weird difference on linux, ifort, openmp=no, release=no
         threshold=0.11
 
-    if (model_name == "ref3.0_multi") and (wl == "1.0"): # weird difference on linux, ifort, openmp=yes, release=no
+    if (model_name == "ref4.1_multi") and (wl == "1.0"): # weird difference on linux, ifort, openmp=yes, release=no
         threshold=0.11
 
     if (model_name == "ref4.1_nLTE") and (wl == "100"):
@@ -253,8 +253,8 @@ def test_pola(model_name, wl):
             # This requires too much memory on CI
             pytest.skip("Skipping images on phantom dump on CI")
 
-    if (model_name == "ref3.0_multi"):
-        pytest.skip("Skipping pola for ref3.0_multi for now")
+    if (model_name == "ref4.1_multi"):
+        pytest.skip("Skipping pola for ref4.1_multi for now")
 
     # Read the results
     image_name = model_name+"/data_"+wl+"/RT.fits.gz"
@@ -295,8 +295,8 @@ def test_contrib(model_name, wl):
             # This requires too much memory on CI
             pytest.skip("Skipping images on phantom dump on CI")
 
-    if (model_name == "ref3.0_multi") and (wl == "1.0"):
-        pytest.skip("Skipping contrib at 1.0 for ref3.0_multi for now")
+    if (model_name == "ref4.1_multi") and (wl == "1.0"):
+        pytest.skip("Skipping contrib at 1.0 for ref4.1_multi for now")
 
     # Read the results
     image_name = model_name+"/data_"+wl+"/RT.fits.gz"
@@ -312,7 +312,7 @@ def test_contrib(model_name, wl):
     print("Maximum contrib difference", (abs(image-image_ref)/(image_ref+1e-30)).max())
     print("Mean contrib difference   ", (abs(image-image_ref)/(image_ref+1e-30)).mean())
 
-    if model_name == "ref3.0_multi":
+    if model_name == "ref4.1_multi":
         mask_threshold=1e-19
     elif (model_name == "ref4.1_PAH"):
         mask_threshold=1e-22
@@ -514,6 +514,48 @@ def test_timing_option():
     assert timing["init"] <= timing["total"]
 
 
+@pytest.mark.parametrize("case, opt, message", [
+    ("nT", "-nT 50", "another temperature grid"),
+    ("Tmax", "-Tmax_PAH 2500", "another temperature grid (-Tmax_PAH)"),
+    ("grains", "", "does not match the grid or the grains"),
+])
+def test_temperature_file_mismatch(case, opt, message):
+    # An image run reads the temperatures of a previous run: a Temperature_nRE file
+    # computed with another temperature grid (-nT, -Tmax_PAH) or another number of
+    # grain sizes must be refused (D1: it was read into arrays of another size)
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    root_dir = "ref4.1_PAH_Tfile_"+case
+    clean_results(root_dir)
+    os.makedirs(root_dir+"/data_th")
+    for f in ["Temperature.fits.gz", "Temperature_nRE.fits.gz"]:
+        shutil.copy("test_data/ref4.1_PAH/data_th/"+f, root_dir+"/data_th")
+    para = root_dir+"/PAH.para"
+    edits = {}
+    if case == "grains": # 2 PAH sizes instead of 1
+        edits = {"amin, amax": lambda line: "  3.5e-4  1e-3 3.5 2 amin, amax [mum], aexp, n_grains\n"
+                 if line.split()[0] == "5e-4" else line}
+    make_para("test_data/ref4.1_PAH/ref4.1_PAH.para", para, edits)
+    result = subprocess.run((os.path.abspath(_mcfost_bin)+" "+para+" -root_dir "+root_dir+" -img 10 "+opt).split(),
+                            capture_output=True, text=True, timeout=120)
+    assert result.returncode != 0
+    assert message in result.stdout, result.stdout[-2000:]
+
+
+def test_mathis_field_option():
+    # -Mathis_field requires -benchmark_SHG, given before or after it
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    root_dir = "ref4.1_PAH_Mathis_field"
+    clean_results(root_dir)
+    run_mcfost("test_data/ref4.1_PAH/ref4.1_PAH.para", root_dir,
+               "-Mathis_field 1 -benchmark_SHG -disk_struct", timeout=120)
+    result = subprocess.run((os.path.abspath(_mcfost_bin)+" test_data/ref4.1_PAH/ref4.1_PAH.para -root_dir "
+                             +root_dir+" -Mathis_field 1 -disk_struct").split(), capture_output=True, text=True, timeout=120)
+    assert result.returncode != 0
+    assert "-Mathis_field can only be used with -benchmark_SHG" in result.stdout
+
+
 # Pascucci et al. 2004 benchmark: SEDs and midplane temperatures compared with the
 # RADMC and RADICAL results of the paper (distributed with the MCFOST utils).
 # Optically thin cases run for every pull request, optically thick ones only locally (slow).
@@ -584,6 +626,37 @@ def test_pascucci_benchmark(tau, ref_dir, sed_tol, lambda_min, temp_tol):
         print(code, "midplane temperature ratio:", ratio.min(), ratio.max())
         assert np.all(abs(ratio - 1) < temp_tol), \
             f"midplane temperature differs from {code} by more than {temp_tol}"
+
+
+# Camps et al. 2015 benchmark of the stochastic heating of dust grains (silicate, graphite
+# and PAH mixture exposed to 17 imposed radiation fields, mcfost -benchmark_SHG): emissivities
+# compared with DustEM from 3 to 1000 um (the codes of the paper agree within about 10 %),
+# and energy balance of each grain size. Driver in benchmarks/Camps2015, data in the utils.
+# Largest differences (31/10/2026): emissivity / DustEM 0.88-1.05 (median 0.98-1.02; the
+# other codes of the paper / DustEM: 0.48-1.42), emitted / absorbed power 0.97-1.00 per
+# grain size. Local runs only.
+@pytest.mark.slow
+def test_camps2015_SHG_benchmark():
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    import sys
+    sys.path.insert(0, "benchmarks/Camps2015")
+    import shg_benchmark as shg
+    try:
+        shg.download()
+    except OSError as e:
+        pytest.skip(f"benchmark data not available ({e})")
+
+    workdir = os.path.abspath("Camps2015_SHG")
+    shutil.rmtree(workdir, ignore_errors=True)
+    failed = shg.run(os.path.abspath(_mcfost_bin), workdir, list(shg.GRAINS), shg.FIELDS)
+    assert not failed, f"mcfost failed for {failed}"
+
+    for (field, grain), ratios in shg.compare(workdir, list(shg.GRAINS), shg.FIELDS).items():
+        balance, dustem = ratios["E_em/E_abs"], ratios["DustEM"]
+        assert np.all(abs(balance - 1) < 0.06), f"{field} {grain}: energy not conserved"
+        assert abs(np.median(dustem) - 1) < 0.03, f"{field} {grain}: emissivity differs from DustEM"
+        assert np.all(abs(dustem - 1) < 0.15), f"{field} {grain}: emissivity differs from DustEM"
 
 
 # Pinte et al. 2009 benchmark (very optically thick disc, anisotropic scattering), following
@@ -951,7 +1024,7 @@ def test_sublimation_front():
 
 
 def test_sublimation_multi_population():
-    # Two zones and three populations (ref3.0_multi in LTE): silicates sublimate in
+    # Two zones and three populations (ref4.1_multi in LTE): silicates sublimate in
     # the inner zone, the ice-coated grains of the outer zone beyond the snow line, and
     # PAHs never sublimate. Each population sublimates independently (variable dust).
     # Only the innermost zone is extended to the sublimation radius (no overlapping
@@ -960,11 +1033,11 @@ def test_sublimation_multi_population():
     # T_sub = 100 K is placed in the run directory, which is searched first.
     if not compute_models:
         pytest.skip("Only run when computing models")
-    root_dir = "ref3.0_multi_sublimation"
+    root_dir = "ref4.1_multi_sublimation"
     clean_results(root_dir)
     os.makedirs(root_dir, exist_ok=True)
     para = root_dir+"/multi.para"
-    make_para("test_data/ref3.0_multi/ref3.0_multi.para", para,
+    make_para("test_data/ref4.1_multi/ref4.1_multi.para", para,
               {"sublimate dust": set_first_value("T"),
                "Heating method": set_first_value("1"),
                "nbr_photons_eq_th": set_first_value("1.28e5"),
@@ -1064,15 +1137,15 @@ def test_sublimation_sed_only():
 
 def test_sublimation_per_grain_size():
     # nLTE grains have one temperature per grain size: the small (hotter) ice-coated
-    # grains of ref3.0_multi sublimate over a larger region than the large ones, and
+    # grains of ref4.1_multi sublimate over a larger region than the large ones, and
     # some cells are only partially sublimated. PAHs (nRE) never sublimate.
     if not compute_models:
         pytest.skip("Only run when computing models")
-    root_dir = "ref3.0_multi_sublimation_nlte"
+    root_dir = "ref4.1_multi_sublimation_nlte"
     clean_results(root_dir)
     os.makedirs(root_dir, exist_ok=True)
     para = root_dir+"/multi_nlte.para"
-    make_para("test_data/ref3.0_multi/ref3.0_multi.para", para,
+    make_para("test_data/ref4.1_multi/ref4.1_multi.para", para,
               {"sublimate dust": set_first_value("T"),
                "nbr_photons_eq_th": set_first_value("1.28e5"),
                "Rin, edge, Rout": lambda line: set_first_value("0.03")(line) if line.split()[0] == "1." else line})
@@ -1138,9 +1211,13 @@ def test_sublimation_power_law():
 
 def nre_absorbed_fractions(stdout):
     # fraction of the energy absorbed by non-equilibrium grains, first nRE pass of each
-    # temperature calculation
-    values = [float(l.split()[-4]) for l in stdout.splitlines() if "Non equilibrium grains have absorbed" in l]
-    return values[0::2]
+    # temperature calculation (the number of nRE passes per calculation varies)
+    values = []
+    for block in stdout.split("Computing temperature structure")[1:]:
+        lines = [l for l in block.splitlines() if "Non equilibrium grains have absorbed" in l]
+        if lines:
+            values.append(float(lines[0].split()[-4]))
+    return values
 
 
 def check_hydrostatic_temperature_stable(root_dir, tolerance=0.05):

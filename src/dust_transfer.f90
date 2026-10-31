@@ -807,12 +807,10 @@ subroutine mc_photon_loop(lambda_in, n_photons2, n_phot_lim, nnfot1_start, laffi
   !$omp private(x,y,z,u,v,w,Stokes,flag_star,flag_ISM,flag_scatt,capt,nnfot1) &
   !$omp shared(lambda_in, n_photons2, nnfot1_start,n_photons_loop,capt_sup,n_phot_lim,lscatt_ray_tracing1) &
   !$omp shared(n_phot_envoyes,nb_proc,l_p_lambda_is_lambda) &
-  !$omp shared(stream,laffichage,lmono,lmono0,lProDiMo,lML,letape_th,tab_lambda,n_photons_lambda, n_photons1_cumul,ibar) &
-  !$omp reduction(+:E_abs_nRE)
+  !$omp shared(stream,laffichage,lmono,lmono0,lProDiMo,lML,letape_th,tab_lambda,n_photons_lambda, n_photons1_cumul,ibar)
   n_photons2_local = n_photons2
   if (letape_th) then
      p_nnfot2 => nnfot2
-     E_abs_nRE = 0.0
   else
      if (lmono0) then
         p_nnfot2 => nnfot2
@@ -950,7 +948,12 @@ subroutine run_thermal_mc(lwrite_output)
      if (lnRE) then
         call timer_start(t_temperature_nRE)
         call Temp_nRE(flag_em_nRE)
-        call update_proba_abs_nRE()
+        if (lbenchmark_SHG) then
+           ! imposed radiation field: nothing to re-emit, no iteration
+           flag_em_nRE = .true.
+        else
+           call update_proba_abs_nRE()
+        endif
         call timer_stop(t_temperature_nRE)
         if (n_iter > 10) then
            flag_em_nRE = .true.
@@ -1090,6 +1093,11 @@ subroutine run_image_mc()
      else
         write (*,'(" Time = ", F5.2, "s")')  time
      endif
+
+     ! thermal emissivity, independent of the inclination
+     call timer_start(t_source_fct)
+     call calc_Jth(lambda)
+     call timer_stop(t_source_fct)
 
      do ibin=1,RT_n_incl
         if (lscatt_ray_tracing1) then
@@ -1310,6 +1318,11 @@ subroutine run_sed_mc()
 
      ! SED ray-tracing
      if (lscatt_ray_tracing) then
+        ! thermal emissivity, independent of the inclination
+        call timer_start(t_source_fct)
+        call calc_Jth(lambda)
+        call timer_stop(t_source_fct)
+
         do ibin=1,RT_n_incl
            if (lscatt_ray_tracing1) then
               do iaz=1, RT_n_az
@@ -1694,7 +1707,7 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
 
         if ((.not.lmono).and.lnRE) then
            ! energy fraction absorbed by non-equilibrium grains
-           E_abs_nRE = E_abs_nRE + Stokes(1) * (1.0_dp - proba_abs_RE(icell,lambda))
+           E_abs_nRE_id(id) = E_abs_nRE_id(id) + Stokes(1) * (1.0_dp - proba_abs_RE(icell,lambda))
            ! Multiply by probability of absorption by grain in radiative equilibrium
            Stokes = Stokes * proba_abs_RE(icell,lambda)
 

@@ -201,8 +201,11 @@ subroutine lect_Temperature()
   integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,nbuffer,npixels, hdutype
   character(len=1024) :: filename
   real :: nullval
-  integer, dimension(5) :: naxes
+  integer :: inullval
+  integer, dimension(10) :: naxes ! ftgknj reads up to 10 NAXISn keywords
   logical :: anynull, there_is_dust
+  integer, dimension(:,:), allocatable :: is_eq
+  real, dimension(:), allocatable :: file_tab_Temp
 
   !future: lgas_transfer. Dust could not always be present in the gas RT.
   if (lemission_atom) then
@@ -272,9 +275,11 @@ subroutine lect_Temperature()
         endif ! l3D
      endif ! lVoronoi
 
+     call check_temperature_hdu(filename, 1, status, naxes(1), naxes(1), npixels, size(Tdust))
      nbuffer=npixels
      ! read_image
      call ftgpve(unit,group,firstpix,nbuffer,nullval,Tdust,anynull,status)
+     if (status /= 0) call error("cannot read "//trim(filename))
 
      call ftclos(unit, status)
      call ftfiou(unit, status)
@@ -320,9 +325,11 @@ subroutine lect_Temperature()
         endif
      endif
 
+     call check_temperature_hdu(filename, 1, status, naxes(1), n_grains_RE_nLTE, npixels, size(Tdust_1grain))
      nbuffer=npixels
      ! read_image
      call ftgpve(unit,group,firstpix,nbuffer,nullval,Tdust_1grain,anynull,status)
+     if (status /= 0) call error("cannot read "//trim(filename))
 
      call ftclos(unit, status)
      call ftfiou(unit, status)
@@ -337,7 +344,7 @@ subroutine lect_Temperature()
 
      filename = temperature_filename(Tfile_nRE)
      write(*,*) "Reading temperature file : "//trim(filename)
-     !call init_tab_Temp()
+     call init_tab_Temp() ! temperature grid of this run, compared with the grid of the file (HDU 3)
 
      readwrite=0
      call ftopen(unit,filename,readwrite,blocksize,status)
@@ -368,9 +375,11 @@ subroutine lect_Temperature()
            npixels=naxes(1)*naxes(2)*naxes(3)
         endif
      endif
+     call check_temperature_hdu(filename, 1, status, naxes(1), n_grains_nRE, npixels, size(Tdust_1grain_nRE))
      nbuffer=npixels
      ! read_image
      call ftgpve(unit,group,firstpix,nbuffer,nullval,Tdust_1grain_nRE,anynull,status)
+     if (status /= 0) call error("cannot read HDU 1 of "//trim(filename))
 
      ! HDU 2 : is_eq
      call ftmahd(unit,2,hdutype,status)
@@ -394,9 +403,33 @@ subroutine lect_Temperature()
            npixels=naxes(1)*naxes(2)*naxes(3)
         endif
      endif
+     call check_temperature_hdu(filename, 2, status, naxes(1), n_grains_nRE, npixels, size(l_RE))
      nbuffer=npixels
-     ! read_image
-     call ftgpvj(unit,group,firstpix,nbuffer,nullval,l_RE,anynull,status)
+     ! read_image: 1 if the grain is at equilibrium, 0 otherwise
+     allocate(is_eq(size(l_RE,1),size(l_RE,2)))
+     inullval = -999
+     call ftgpvj(unit,group,firstpix,nbuffer,inullval,is_eq,anynull,status)
+     if (status /= 0) call error("cannot read HDU 2 of "//trim(filename))
+     l_RE = (is_eq == 1)
+     deallocate(is_eq)
+
+     ! HDU 3 : temperature grid, must be the grid of this run
+     call ftmahd(unit,3,hdutype,status)
+     call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
+     if ((status /= 0).or.(nfound /= 1)) call error("cannot read HDU 3 of "//trim(filename))
+     if (naxes(1) /= n_T) then
+        write(*,*) "Number of temperature bins: ", naxes(1), " in the file, ", n_T, " required (-nT)"
+        call error(trim(filename)//" was computed with another temperature grid")
+     endif
+     allocate(file_tab_Temp(n_T))
+     call ftgpve(unit,group,firstpix,n_T,nullval,file_tab_Temp,anynull,status)
+     if (status /= 0) call error("cannot read HDU 3 of "//trim(filename))
+     if (maxval(abs(file_tab_Temp - tab_Temp)) > 1.0e-5 * maxval(tab_Temp)) then
+        write(*,*) "Temperature range: ", file_tab_Temp(1), file_tab_Temp(n_T), " in the file, ", &
+             tab_Temp(1), tab_Temp(n_T), " required"
+        call error(trim(filename)//" was computed with another temperature grid (-Tmax_PAH)")
+     endif
+     deallocate(file_tab_Temp)
 
      ! HDU 4 : proba temperature
      call ftmahd(unit,4,hdutype,status)
@@ -421,9 +454,12 @@ subroutine lect_Temperature()
            npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
         endif
      endif
+     if (naxes(2) /= n_grains_nRE) call error(trim(filename)//" HDU 4: wrong number of grains")
+     call check_temperature_hdu(filename, 4, status, naxes(1), n_T, npixels, size(Proba_Tdust))
      nbuffer=npixels
      ! read_image
      call ftgpve(unit,group,firstpix,nbuffer,nullval,Proba_Tdust,anynull,status)
+     if (status /= 0) call error("cannot read HDU 4 of "//trim(filename))
 
      call ftclos(unit, status)
      call ftfiou(unit, status)
@@ -432,6 +468,27 @@ subroutine lect_Temperature()
   return
 
 end subroutine lect_Temperature
+
+!********************************************************************
+
+subroutine check_temperature_hdu(filename, hdu, status, n_first, n_first_expected, npixels, n_expected)
+  ! Checks a temperature file before reading an HDU into an array of n_expected elements:
+  ! a file from another grid or grain distribution would overflow or misfill the array
+
+  character(len=*), intent(in) :: filename
+  integer, intent(in) :: hdu, status, n_first, n_first_expected, npixels, n_expected
+
+  if (status /= 0) then
+     write(*,*) "cfitsio status", status, "in HDU", hdu
+     call error("cannot read the header of "//trim(filename))
+  endif
+  if ((n_first /= n_first_expected).or.(npixels /= n_expected)) then
+     write(*,*) "HDU", hdu, ": first axis", n_first, ", size", npixels
+     write(*,*) "required: first axis", n_first_expected, ", size", n_expected
+     call error(trim(filename)//" does not match the grid or the grains of this model")
+  endif
+
+end subroutine check_temperature_hdu
 
 !********************************************************************
 

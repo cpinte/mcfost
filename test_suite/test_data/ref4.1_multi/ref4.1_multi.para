@@ -1,4 +1,4 @@
-3.0                      mcfost version
+4.1                      mcfost version
 
 #Number of photon packages
   1.28e6                  nbr_photons_eq_th  : T computation
@@ -12,7 +12,7 @@
   T T			  separation of different contributions?, stokes parameters?
 
 #Grid geometry and size
-  1			  1 = cylindrical, 2 = spherical, 3 = Voronoi tesselation (this is in beta, please ask Christophe)
+  1			  1 = cylindrical, 2 = spherical (a Voronoi mesh is selected automatically with -phantom)
   100 70 1 20             n_rad (log distribution), nz (or n_theta), n_az, n_rad_in
 
 #Maps
@@ -23,10 +23,9 @@
   -90.			  disk PA
 
 #Scattering method
-  0	                  0=auto, 1=grain prop, 2=cell prop
-  1	                  1=Mie, 2=hg (2 implies the loss of polarizarion)
+  1	                  1=exact phase function, 2=hg function with same g (2 implies the loss of polarizarion)
 
-#Symetries
+#Symmetries
   T	                  image symmetry
   T	                  central symmetry
   T	                  axial symmetry (important only if N_phi > 1)
@@ -77,17 +76,26 @@
   5e-4  5e-4 3.5 1 	  amin, amax [mum], aexp, n_grains (log distribution)
 
 #Molecular RT settings
-  T T T 15.	          lpop, laccurate_pop, LTE, profile width (km.s^-1)
-  0.2 			  v_turb (delta)
-  1			  nmol
-  co@xpol.dat 6           molecular data filename, level_max
-  1.0 20     	  	  vmax (km.s^-1), n_speed
+  T T T                   lpop, laccurate_pop, LTE
+  0.2 km/s		  Turbulence velocity, unit km/s or cs
+  1			  Number of molecules
+  co@xpol.dat 6           molecular data filename, level max up to which NLTE populations are calculated
   T 1.e-6 abundance.fits.gz   cst molecule abundance ?, abundance, abundance file
   T  3                       ray tracing ?,  number of lines in ray-tracing
   1 2 3	 		  transition numbers
+  -1.0 1.0 41     	  vmin and vmax [km/s], number of velocity bins betwen vmin and vmax
+
+#Atoms settings / share some informations with molecules
+ 1		number of atoms
+ H_6.atom	all levels treated in details at the moment
+ F		non-LTE ?
+ 0		initial solution, 0 LTE, 1 from file
+ 1000 101	vmax (km/s), n_points for ray-traced images and total flux
+ T 1		images (T) or total flux (F) ? Number of lines for images
+ 3 2		upper level -> lower level (Atomic model dependent)
 
 #Star properties
   1 Number of stars
-  4000.0	2.0	1.0	0.0	0.0	0.0  T Temp, radius (solar radius),M (solar mass),x,y,z (AU), is a blackbody?
+  4000.0	2.0	1.0	0.0	0.0	0.0  T Temp, radius (solar radius),M (solar mass),x,y,z (AU), automatic spectrum?
   lte4000-3.5.NextGen.fits.gz
   0.1	2.2  fUV, slope_fUV
