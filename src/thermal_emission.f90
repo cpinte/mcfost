@@ -126,7 +126,7 @@ subroutine allocate_thermal_emission(Nc,p_Nc)
      nbre_reemission = 0.0
   endif
 
-  mem_size = (1.0 * p_Nc) * n_T * n_lambda * 4. / 1024.**3
+  mem_size = (1.0 * p_Nc) * n_T * n_lambda * 8. / 1024.**3 ! double precision
   if (mem_size < max_mem) then
      low_mem_th_emission = .false.
      if (mem_size > 1) write(*,*) "Trying to allocate", mem_size, "GB for temperature calculation"
@@ -142,7 +142,7 @@ subroutine allocate_thermal_emission(Nc,p_Nc)
   endif
 
   if (lRE_nLTE) then
-     mem_size = (1.0 * (grain_RE_nLTE_end-grain_RE_nLTE_start+2)) * p_Nc * n_lambda * 4. / 1024.**3
+     mem_size = (1.0 * (grain_RE_nLTE_end-grain_RE_nLTE_start+2)) * p_Nc * n_lambda * 8. / 1024.**3 ! double precision
      if (mem_size < max_mem) then
         low_mem_th_emission_nLTE = .false.
         if (mem_size > 1) write(*,*) "Trying to allocate", mem_size, "GB for scattering probability"
@@ -529,8 +529,8 @@ subroutine init_reemission(lheating,dudt)
   if (low_mem_th_emission) then
      do T=1, n_T
         do k=grain_RE_LTE_start,grain_RE_LTE_end
-           integ3(1) = 0.0
-           do lambda=2, n_lambda
+           integ3(0) = 0.0
+           do lambda=1, n_lambda ! from the first wavelength bin, as kdB_dT_CDF (B13)
               ! No need for constant - nor volume (normalization to 1), nor density
               integ3(lambda) = integ3(lambda-1) + C_abs_norm(k,lambda) * dB_dT(lambda,T)
            enddo !l
@@ -579,8 +579,8 @@ subroutine init_reemission(lheating,dudt)
         enddo ! k
 
         do k=grain_RE_nLTE_start,grain_RE_nLTE_end
-           integ3(1) = 0.0
-           do lambda=2, n_lambda
+           integ3(0) = 0.0
+           do lambda=1, n_lambda ! from the first wavelength bin, as kdB_dT_CDF (B13)
               ! No need for constant - nor volume (normalization to 1), nor density
               integ3(lambda) = integ3(lambda-1) + C_abs_norm(k,lambda) * dB_dT(lambda,T)
            enddo !l
@@ -616,8 +616,8 @@ subroutine init_reemission(lheating,dudt)
         enddo
 
         do k=grain_nRE_start,grain_nRE_end
-           integ3(1) = 0.0
-           do lambda=2, n_lambda
+           integ3(0) = 0.0
+           do lambda=1, n_lambda ! from the first wavelength bin, as kdB_dT_CDF (B13)
               ! No need for constant - nor volume (normalization to 1), nor density
               integ3(lambda) = integ3(lambda-1) + C_abs_norm(k,lambda) * dB_dT(lambda,T)
            enddo !l

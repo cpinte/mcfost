@@ -514,6 +514,48 @@ def test_timing_option():
     assert timing["init"] <= timing["total"]
 
 
+@pytest.mark.parametrize("case, opt, message", [
+    ("nT", "-nT 50", "another temperature grid"),
+    ("Tmax", "-Tmax_PAH 2500", "another temperature grid (-Tmax_PAH)"),
+    ("grains", "", "does not match the grid or the grains"),
+])
+def test_temperature_file_mismatch(case, opt, message):
+    # An image run reads the temperatures of a previous run: a Temperature_nRE file
+    # computed with another temperature grid (-nT, -Tmax_PAH) or another number of
+    # grain sizes must be refused (D1: it was read into arrays of another size)
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    root_dir = "ref4.1_PAH_Tfile_"+case
+    clean_results(root_dir)
+    os.makedirs(root_dir+"/data_th")
+    for f in ["Temperature.fits.gz", "Temperature_nRE.fits.gz"]:
+        shutil.copy("test_data/ref4.1_PAH/data_th/"+f, root_dir+"/data_th")
+    para = root_dir+"/PAH.para"
+    edits = {}
+    if case == "grains": # 2 PAH sizes instead of 1
+        edits = {"amin, amax": lambda line: "  3.5e-4  1e-3 3.5 2 amin, amax [mum], aexp, n_grains\n"
+                 if line.split()[0] == "5e-4" else line}
+    make_para("test_data/ref4.1_PAH/ref4.1_PAH.para", para, edits)
+    result = subprocess.run((os.path.abspath(_mcfost_bin)+" "+para+" -root_dir "+root_dir+" -img 10 "+opt).split(),
+                            capture_output=True, text=True, timeout=120)
+    assert result.returncode != 0
+    assert message in result.stdout, result.stdout[-2000:]
+
+
+def test_mathis_field_option():
+    # -Mathis_field requires -benchmark_SHG, given before or after it
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    root_dir = "ref4.1_PAH_Mathis_field"
+    clean_results(root_dir)
+    run_mcfost("test_data/ref4.1_PAH/ref4.1_PAH.para", root_dir,
+               "-Mathis_field 1 -benchmark_SHG -disk_struct", timeout=120)
+    result = subprocess.run((os.path.abspath(_mcfost_bin)+" test_data/ref4.1_PAH/ref4.1_PAH.para -root_dir "
+                             +root_dir+" -Mathis_field 1 -disk_struct").split(), capture_output=True, text=True, timeout=120)
+    assert result.returncode != 0
+    assert "-Mathis_field can only be used with -benchmark_SHG" in result.stdout
+
+
 # Pascucci et al. 2004 benchmark: SEDs and midplane temperatures compared with the
 # RADMC and RADICAL results of the paper (distributed with the MCFOST utils).
 # Optically thin cases run for every pull request, optically thick ones only locally (slow).
