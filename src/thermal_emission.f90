@@ -1846,6 +1846,7 @@ subroutine repartition_energie(lambda)
   real(kind=dp) :: Temp, wl, cst_wl, E_star, surface, E_emise, cst_wl_max
   real(kind=dp) :: delta_T
   real(kind=dp), dimension(:), allocatable :: E_cell, E_cell_corrected
+  real(kind=dp), dimension(n_T) :: den_T ! Planck denominator on the temperature grid (0: no emission)
 
   if (lvariable_dust) then
      p_icell => icell
@@ -1918,6 +1919,21 @@ subroutine repartition_energie(lambda)
         enddo
      endif
 
+     do T=1,n_T
+        temp=tab_Temp(T)
+        cst_wl=thermal_const/(Temp*wl)
+        if (cst_wl < cst_wl_max) then
+           den_T(T) = (wl**5)*(exp(cst_wl)-1.0)
+        else
+           den_T(T) = 0.0_dp
+        endif
+     enddo
+
+     !$omp parallel do &
+     !$omp default(none) &
+     !$omp shared(n_cells,l_dark_zone,grain_nRE_start,grain_nRE_end,grain,lvariable_dust,l_RE,Tdust_1grain_nRE) &
+     !$omp shared(wl,cst_wl_max,C_abs_norm,lambda,dust_density_o_n_grains,n_grains,volume,n_T,den_T,Proba_Tdust,E_cell) &
+     !$omp private(icell,E_emise,k,p_k,T,Temp,cst_wl) schedule(dynamic,100)
      do icell=1,n_cells
         E_emise = 0.0
         if (.not.l_dark_zone(icell)) then
@@ -1933,11 +1949,9 @@ subroutine repartition_energie(lambda)
                  endif !cst_wl
               else ! the grain has a probability of T
                  do T=1,n_T
-                    temp=tab_Temp(T)
-                    cst_wl=thermal_const/(Temp*wl)
-                    if (cst_wl < cst_wl_max) then
+                    if (den_T(T) > 0.0_dp) then
                        E_emise = E_emise + 4.0*C_abs_norm(k,lambda)*dust_density_o_n_grains(p_k,icell)*n_grains(k)* &
-                            volume(icell)/((wl**5)*(exp(cst_wl)-1.0)) * Proba_Tdust(T,k,icell)
+                            volume(icell)/den_T(T) * Proba_Tdust(T,k,icell)
                     endif !cst_wl
                  enddo !T
               endif ! l_RE
@@ -1945,6 +1959,7 @@ subroutine repartition_energie(lambda)
         endif
         E_cell(icell) =  E_cell(icell) + E_emise
      enddo !icell
+     !$omp end parallel do
 
   endif
 

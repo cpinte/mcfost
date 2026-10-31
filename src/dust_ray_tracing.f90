@@ -595,8 +595,7 @@ subroutine init_dust_source_fct1(lambda,ibin,iaz)
 
   eps_dust1(:,:,:,:) = 0.0_dp
 
-  ! Direct thermal emission contribution
-  call calc_Jth(lambda)
+  ! Direct thermal emission contribution: J_th computed by calc_Jth, once per wavelength
   !unpolarized_Stokes = 0. ;   unpolarized_Stokes(1) = 1.
 
   ! TODO : the size of eps_dust1 is the limiting factor for compute time
@@ -690,8 +689,7 @@ subroutine init_dust_source_fct2(lambda,p_lambda,ibin)
   ! Scattered light contribution (including multiply scattered and thermally scattered)
   call calc_Isca_rt2(lambda, p_lambda, ibin)  ! ~ 0.7s over 2.4s
 
-  ! Direct thermal emission contribution
-  call calc_Jth(lambda)   !---> 0.05s over 2.4s
+  ! Direct thermal emission contribution: J_th computed by calc_Jth, once per wavelength
 
   ! Source function, indices: pola, iscatt, dir, i, j
   !$omp parallel &
@@ -755,14 +753,16 @@ end subroutine init_dust_source_fct2
 !***********************************************************
 
 subroutine calc_Jth(lambda)
-  ! Computes the thermal emissivity
+  ! Computes the thermal emissivity, at wavelength lambda: it does not depend on the
+  ! inclination, called once per wavelength before the ray-tracing
   ! C. Pinte
   ! 25/09/08
 
   integer, intent(in) :: lambda
 
   real(kind=dp) ::  Temp, cst_wl, wl, coeff_exp, cst_E
-  integer, target :: l, l0
+  real(kind=dp), dimension(n_T) :: B_wl ! Planck function x wl on the temperature grid of nRE grains
+  integer :: l
   integer :: T, icell, p_icell
   integer :: p_l ! Removed pointer to avoid issues with changing indices
 
@@ -771,10 +771,11 @@ subroutine calc_Jth(lambda)
 
   J_th(:) = 0.0
 
+  cst_E=2.0*hp*c_light**2
+
   ! Specific intensity of thermal emission
   if ((l_em_disk_image).or.(lsed)) then
      if (lRE_LTE) then
-        cst_E=2.0*hp*c_light**2
         !$omp parallel &
         !$omp default(none) &
         !$omp shared(n_cells,Tdust,wl,lambda,kappa_abs_LTE,kappa_factor,cst_E,J_th) &
@@ -800,7 +801,11 @@ subroutine calc_Jth(lambda)
      ! p_l is now set inside the loops below to handle zone-based indexing when lvariable_dust is false
 
      if (lRE_nLTE) then
-        cst_E=2.0*hp*c_light**2
+        !$omp parallel do &
+        !$omp default(none) &
+        !$omp shared(n_cells,Tdust_1grain,wl,lambda,C_abs_norm,dust_density_o_n_grains,n_grains,cst_E,J_th) &
+        !$omp shared(lvariable_dust,grain,grain_RE_nLTE_start,grain_RE_nLTE_end) &
+        !$omp private(icell,l,p_l,Temp,cst_wl,coeff_exp)
         do icell=1,n_cells
            do l=grain_RE_nLTE_start,grain_RE_nLTE_end
                p_l = merge(l, grain(l)%zone, lvariable_dust)
@@ -813,13 +818,30 @@ subroutine calc_Jth(lambda)
                endif
             enddo ! l
         enddo ! icell
+        !$omp end parallel do
      endif !lRE_nLTE
 
      if (lnRE) then
+        do T=1,n_T
+           Temp=tab_Temp(T)
+           if (Temp*wl > 3.e-4) then
+              cst_wl=thermal_const/(Temp*wl)
+              coeff_exp=exp(cst_wl)
+              B_wl(T) = cst_E/((wl**5)*(coeff_exp-1.0)) * wl
+           else
+              B_wl(T) = 0.0_dp
+           endif
+        enddo
+
+        !$omp parallel do &
+        !$omp default(none) &
+        !$omp shared(n_cells,Tdust_1grain_nRE,wl,lambda,C_abs_norm,dust_density_o_n_grains,n_grains,cst_E,J_th) &
+        !$omp shared(lvariable_dust,grain,grain_nRE_start,grain_nRE_end,l_RE,n_T,B_wl,Proba_Tdust) &
+        !$omp private(icell,l,p_l,T,Temp,cst_wl,coeff_exp) schedule(dynamic,100)
         do icell=1,n_cells
            do l=grain_nRE_start,grain_nRE_end
+              p_l = merge(l, grain(l)%zone, lvariable_dust)
               if (l_RE(l,icell)) then ! the grain has a temperature
-                  p_l = merge(l, grain(l)%zone, lvariable_dust)
                   Temp=Tdust_1grain_nRE(l,icell) ! WARNING : TODO : this does not work in 3D
                   if (Temp*wl > 3.e-4) then
                      cst_wl=thermal_const/(Temp*wl)
@@ -827,19 +849,17 @@ subroutine calc_Jth(lambda)
                      J_th(icell) = J_th(icell) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
                           C_abs_norm(l,lambda) * dust_density_o_n_grains(p_l,icell) * n_grains(l)
                   endif !cst_wl
-              else ! the grain has a temperature probability distribution ---> todo: we can compute BB outside of loop
+              else ! the grain has a temperature probability distribution
                  do T=1,n_T
-                    temp=tab_Temp(T)
-                    if (Temp*wl > 3.e-4) then
-                       cst_wl=thermal_const/(Temp*wl)
-                       coeff_exp=exp(cst_wl)
-                       J_th(icell) = J_th(icell) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
+                    if (B_wl(T) > 0.0_dp) then
+                       J_th(icell) = J_th(icell) + B_wl(T) * &
                             C_abs_norm(l,lambda) * dust_density_o_n_grains(p_l,icell) * n_grains(l) * Proba_Tdust(T,l,icell)
-                    endif !cst_wl
+                    endif
                  enddo ! T
               endif ! l_RE
            enddo ! l
         enddo ! icell
+        !$omp end parallel do
 
      endif !lnRE
 

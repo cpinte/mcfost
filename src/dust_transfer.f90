@@ -1094,6 +1094,11 @@ subroutine run_image_mc()
         write (*,'(" Time = ", F5.2, "s")')  time
      endif
 
+     ! thermal emissivity, independent of the inclination
+     call timer_start(t_source_fct)
+     call calc_Jth(lambda)
+     call timer_stop(t_source_fct)
+
      do ibin=1,RT_n_incl
         if (lscatt_ray_tracing1) then
            do iaz=1, RT_n_az
@@ -1313,6 +1318,11 @@ subroutine run_sed_mc()
 
      ! SED ray-tracing
      if (lscatt_ray_tracing) then
+        ! thermal emissivity, independent of the inclination
+        call timer_start(t_source_fct)
+        call calc_Jth(lambda)
+        call timer_stop(t_source_fct)
+
         do ibin=1,RT_n_incl
            if (lscatt_ray_tracing1) then
               do iaz=1, RT_n_az
