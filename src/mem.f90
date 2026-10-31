@@ -115,7 +115,7 @@ end subroutine alloc_dust_prop
 
 !*****************************************************************
 
-subroutine alloc_dynamique(n_cells_max)
+subroutine alloc_dynamique(n_cells_max, n_stars_max)
   ! Dynamically allocates arrays based on the organisation
   ! of the calculations and the presence of stratification ...
   ! Allows memory footprint optimisation
@@ -131,6 +131,7 @@ subroutine alloc_dynamique(n_cells_max)
   use output, only : allocate_origin
 
   integer, intent(in), optional :: n_cells_max
+  integer, intent(in), optional :: n_stars_max ! stellar arrays allocated for more stars than n_stars
 
   integer ::  alloc_status, Nc, p_Nc
   real :: mem_size
@@ -172,7 +173,7 @@ subroutine alloc_dynamique(n_cells_max)
   ! **************************************************
   ! Arrays related to wavelength-dependent properties
   ! **************************************************
-  call allocate_stellar_spectra(n_lambda)
+  call allocate_stellar_spectra(n_lambda, n_stars_max)
 
   call allocate_thermal_energy(Nc)
 

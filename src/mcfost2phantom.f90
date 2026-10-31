@@ -2,10 +2,16 @@ module mcfost2phantom
 
   implicit none
 
+  ! The arrays sized by the number of cells and of stars are allocated once, on the first
+  ! call to run_mcfost_phantom, for the maximum number of particles (max_particles, given
+  ! to init_mcfost_phantom, phantom's maxp) and of sinks (size of xyzmh_ptmass).
+  integer, save, private :: n_particles_max = 0 ! 0: not given, the first call's number is used
+  integer, save, private :: n_cells_alloc = 0   ! 0: not allocated yet
+
 contains
 
   subroutine init_mcfost_phantom(mcfost_para_filename, ndusttypes, use_SPH_limits_file, SPH_limits_file, SPH_limits, ierr, &
-       keep_particles, fix_star, turn_on_Lacc, turn_on_dust_subl, use_ISM_heating)
+       keep_particles, fix_star, turn_on_Lacc, turn_on_dust_subl, use_ISM_heating, max_particles)
 
     use parameters
     use init_mcfost, only : set_default_variables, get_mcfost_utils_dir
@@ -27,6 +33,7 @@ contains
     integer, intent(out) :: ierr
     real, intent(in), optional :: keep_particles
     logical, intent(in), optional :: fix_star, turn_on_Lacc, turn_on_dust_subl, use_ISM_heating
+    integer, intent(in), optional :: max_particles ! maximum number of particles (phantom's maxp)
     integer :: lambda
 
     write(*,*)
@@ -62,6 +69,10 @@ contains
           write(*,*) "WARNING: turning on accretion luminosity"
        endif
     endif
+
+    n_particles_max = 0
+    if (present(max_particles)) n_particles_max = max_particles
+    n_cells_alloc = 0
 
     lISM_heating = .false.
     if (present(use_ISM_heating)) then
@@ -219,11 +230,9 @@ contains
     real(kind=dp) :: x,y,z, u,v,w, mass_per_H
     real :: rand, time, cpu_time_begin, cpu_time_end
     integer :: n_SPH, icell, n_photons2, ibar, id, n_photons1_cumul, i_SPH, i, lambda_threshold
-    integer :: itime, ieos, alloc_status
+    integer :: itime, ieos, alloc_status, n_sinks_max
     logical :: lpacket_alive, lintersect, laffichage, flag_star, flag_scatt, flag_ISM, ldust_moments
     integer :: lambda
-
-    logical, save :: lfirst_time = .true.
 
     integer, dimension(:), allocatable :: mask ! not allocated as we do not mask particle in live RT hydro
 
@@ -261,18 +270,28 @@ contains
     call setup_grid()
     call setup_scattering()
 
-    ! We allocate the total number of SPH cells as the number of Voronoi cells mays vary
-    if (lfirst_time) then
-       if (use_apr) then
-          call alloc_dynamique(n_cells_max = n_SPH*8 + n_stars) ! this is the value currently used
-       else                                                       ! in Phantom (config.F90)
-          call alloc_dynamique(n_cells_max = n_SPH + n_stars)
+    ! Arrays sized by the number of cells and of stars: allocated once, for the maximum
+    ! numbers of particles and of sinks
+    n_sinks_max = max(size(xyzmh_ptmass,2), n_stars)
+    if (n_cells_alloc == 0) then
+       if (n_particles_max > 0) then
+          n_cells_alloc = n_particles_max + n_sinks_max
+       else
+          n_cells_alloc = n_cells + n_sinks_max
+          write(*,*) "WARNING: max_particles not given to init_mcfost_phantom,"
+          write(*,*) "allocating for", n_cells_alloc, "cells (number of particles of this call)"
        endif
+       call alloc_dynamique(n_cells_max = n_cells_alloc, n_stars_max = n_sinks_max)
        alloc_status = 0
-       allocate(xN_abs(n_SPH + n_stars,1,nb_proc),  stat=alloc_status)
+       allocate(xN_abs(n_cells_alloc,1,nb_proc),  stat=alloc_status)
        if (alloc_status /= 0) call error("Allocation error xN_abs")
-       lfirst_time = .false.
     endif
+    if (n_cells > n_cells_alloc) then
+       write(*,*) "Number of cells =", n_cells, ", allocated for", n_cells_alloc
+       call error("mcfost2phantom: more particles than allocated by mcfost", &
+            msg2="give the maximum number of particles to init_mcfost_phantom (max_particles)")
+    endif
+    xN_abs = 0.0 ! number of packets per cell for this call
     call no_dark_zone()
     lapprox_diffusion=.false.
 
@@ -340,6 +359,9 @@ contains
     call set_ghost_particle_temperature(n_SPH, is_ghost, Tphantom)
 
     ! Resetting memory state for next call
+    do i=1, nb_proc
+       if (free_sprng(stream(i)) < 0) call error("cannot free the random number stream")
+    enddo
     call reset_mcfost_phantom()
 
     ! Verifications et codes d'erreur

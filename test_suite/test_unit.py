@@ -24,6 +24,17 @@ def build_unit_tests():
 
 @pytest.mark.parametrize("name", unit_tests)
 def test_unit(build_unit_tests, name):
-    result = subprocess.run([os.path.join(_unit_dir, name)], capture_output=True, text=True)
+    # run from test_suite/: test_mcfost2phantom reads unit/mcfost2phantom.para
+    result = subprocess.run([os.path.join(_unit_dir, name)], capture_output=True, text=True, cwd=_test_dir)
     print(result.stdout)
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_mcfost2phantom_overflow(build_unit_tests):
+    # library called without max_particles, then with more particles than on the first
+    # call: mcfost must stop with an error instead of writing out of its arrays
+    result = subprocess.run([os.path.join(_unit_dir, "test_mcfost2phantom"), "overflow"],
+                            capture_output=True, text=True, cwd=_test_dir)
+    print(result.stdout)
+    assert result.returncode != 0, result.stdout
+    assert "more particles than allocated by mcfost" in result.stdout

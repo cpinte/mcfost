@@ -918,6 +918,10 @@ subroutine run_thermal_mc(lwrite_output)
   n_phot_lim = 1.0e30 ! packets are not killed
   nnfot1_start = 1
   n_phot_sed2 = 0.0_dp
+  ! energy of the packets: 1 at the start of a temperature calculation (modified by
+  ! emission_nRE between the nRE iterations). Not set by the library path otherwise
+  ! (mcfost2phantom), where the packets carried no energy
+  E_paquet = 1.0_dp
 
   lambda = 1
 
