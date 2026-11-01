@@ -1110,7 +1110,8 @@ contains
          abs(chi_got - (k_abs_want + k_sca_want)) < 1.0e-5_dp * (k_abs_want + k_sca_want))
     lisotropic = .false.
 
-    ! lphase_function_file override: s11(theta) = 1 + 3*g_target*cos(theta) -> <cos(theta)> = g_target
+    ! lphase_function_file: the file (monochromatic, for images) does not change g, the dust
+    ! model g (0.999999 above) is kept: chi_trans ~ kappa_abs, not k_abs + (1 - g_target) * k_sca
     lphase_function_file = .true.
     g_target = 0.25_dp
     allocate(s11_file(0:nang_scatt))
@@ -1123,10 +1124,10 @@ contains
     enddo
     call init_reemission(.false.)
     call eval_MRW_opacities_at_T(120.0_dp, 1, chi_got, kabs_got)
-    chi_want = k_abs_want + (1.0_dp - g_target) * k_sca_want
+    chi_want = k_abs_want + (1.0_dp - 0.999999_dp) * k_sca_want
     write(msg,'(a,f9.5,a,f9.5)') "got ", chi_got, " expected ", chi_want
-    call check("MRW lphase_function_file g override", &
-         abs(chi_got - chi_want) < 5.0e-4_dp * chi_want, trim(msg))
+    call check("MRW lphase_function_file keeps the dust model g", &
+         abs(chi_got - chi_want) < 1.0e-4_dp * chi_want, trim(msg))
     lphase_function_file = .false.
 
     ! lno_scattering override: k_sca = 0 -> chi_trans = kappa_abs

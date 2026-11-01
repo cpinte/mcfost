@@ -869,11 +869,10 @@ subroutine opacity(lambda, no_scatt)
   integer, intent(in) :: lambda
   logical, intent(in), optional :: no_scatt
 
-  integer :: icell, k, l, p_lambda
+  integer :: icell, k, p_lambda
   integer, dimension(n_grains_tot) :: p_k_arr
   real(kind=dp) ::  density, fact, k_abs_RE, k_abs_LTE, k_abs_tot, k_sca_tot, k_sca_g, rho0, d1, d_k
-  real(kind=dp) ::  g_pf, norm_pf, theta_pf
-  logical :: lcompute_obs, ldens0, compute_scatt, lhas_g_pos, luse_pf_g
+  logical :: lcompute_obs, ldens0, compute_scatt, lhas_g_pos
 
   ! Compute p_lambda: index into the scattering position arrays (ksca_CDF, tab_s11_pos, etc.)
   ! l_p_lambda_is_lambda is true for both method 1 (per grain) and method 2 (per cell, n_lambda grids)
@@ -919,22 +918,9 @@ subroutine opacity(lambda, no_scatt)
   endif
 
   ! Opacity and scattering probability calculation
+  ! g of the dust model (C_sca-weighted, wavelength dependent), also with a phase function
+  ! file: the file is monochromatic and only used for images (ray-tracing)
   lhas_g_pos = allocated(tab_g_pos)
-  luse_pf_g = lhas_g_pos .and. lphase_function_file .and. allocated(s11_file) .and. (.not. lisotropic)
-  g_pf = 0.0_dp
-  if (luse_pf_g) then
-     norm_pf = 0.0_dp
-     do l=1, nang_scatt-1
-        theta_pf = real(l, kind=dp) * pi / real(nang_scatt, kind=dp)
-        norm_pf = norm_pf + real(s11_file(l), kind=dp) * sin(theta_pf)
-        g_pf = g_pf + real(s11_file(l), kind=dp) * cos(theta_pf) * sin(theta_pf)
-     enddo
-     if (norm_pf > tiny_dp) then
-        g_pf = g_pf / norm_pf
-     else
-        g_pf = 0.0_dp
-     endif
-  endif
 
   do icell=1, p_n_cells
      kappa(icell,lambda) = 0.0
@@ -957,8 +943,6 @@ subroutine opacity(lambda, no_scatt)
      if (lhas_g_pos) then
         if (lisotropic .or. (k_sca_tot <= tiny_real)) then
            tab_g_pos(icell,lambda) = 0.0
-        else if (luse_pf_g) then
-           tab_g_pos(icell,lambda) = real(g_pf)
         else
            tab_g_pos(icell,lambda) = real(k_sca_g / k_sca_tot)
         endif

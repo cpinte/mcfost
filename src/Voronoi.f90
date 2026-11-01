@@ -1002,7 +1002,7 @@ module Voronoi_grid
     real(kind=dp), intent(in) :: x,y,z
 
     real(kind=dp) :: s_tmp, norm_n, d_star
-    integer :: i, id_n, ifirst, ilast
+    integer :: i, id_n, l, ifirst, ilast
 
     ! n = face normal, p = point on face, r = photon position
     real(kind=dp), dimension(3) :: n, p, r, r_cell, r_neighbour, r_star
@@ -1026,11 +1026,19 @@ module Voronoi_grid
     ifirst = Voronoi(icell)%first_neighbour
     ilast = Voronoi(icell)%last_neighbour
 
+    l = 0
     do i=ifirst,ilast
+       l = l+1
        id_n = neighbours_list(i)
 
        if (id_n > 0) then ! neighbouring Voronoi cell
-          r_neighbour(:) = Voronoi(id_n)%xyz(:)
+          ! same neighbour positions as cross_Voronoi_cell: ordered cache to limit cache
+          ! misses, then the contiguous Voronoi_xyz array (not the Voronoi derived type)
+          if (l <= n_saved_neighbours) then
+             r_neighbour(:) = Voronoi_neighbour_xyz(:,l,icell)
+          else
+             r_neighbour(:) = Voronoi_xyz(:,id_n)
+          endif
 
           ! Outward normal vector to bisector plane (from r_cell to r_neighbour)
           n(:) = r_neighbour(:) - r_cell(:)
