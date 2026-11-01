@@ -8,7 +8,12 @@ module read_phantom
 
   implicit none
 
-  public :: read_phantom_bin_files, read_phantom_hdf_files, check_phantom_file_variable_dust
+  public :: read_phantom_bin_files, read_phantom_hdf_files, check_phantom_file_variable_dust, lstar_from_phantom
+
+  ! The stellar parameters (Teff, radius) of this dump come from phantom's sinks:
+  ! compute_stellar_parameters must not overwrite them. Set at each read, unlike the
+  ! user option lfix_star
+  logical :: lstar_from_phantom = .false.
 
 contains
 
@@ -935,6 +940,8 @@ contains
     logical :: use_dust_particles = .false. ! 2-fluid: choose to use dust
     logical :: lupdate_photosphere
 
+    lstar_from_phantom = .false.
+
     ! We check the units by recomputing G
     G_phantom = ulength**3 / (utime**2 * umass)
     if (abs(G_phantom - Ggrav*1e3) > 1e-2 * G_phantom) call error("Phantom units are not consistent")
@@ -1329,7 +1336,7 @@ contains
           enddo
 
           if (lupdate_photosphere) then
-             lfix_star = .true.
+             lstar_from_phantom = .true.
              do i=1,n_stars
                 write(*,*) "Star #",i,"  Teff=", star(i)%T, "K, r=", real(star(i)%r), "Rsun"
              enddo

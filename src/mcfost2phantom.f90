@@ -260,7 +260,7 @@ contains
          n_SPH,x_SPH,y_SPH,z_SPH,h_SPH,vx_SPH,vy_SPH,vz_SPH,Tgas_SPH,particle_id,&
          SPH_grainsizes,massgas,massdust,rhogas,rhodust,dust_moments,extra_heating,ieos,apr_level)
 
-    if (.not.lfix_star) call compute_stellar_parameters()
+    if (.not.(lfix_star .or. lstar_from_phantom)) call compute_stellar_parameters()
 
     ! Performing the Voronoi tesselation & defining density arrays
     call SPH_to_Voronoi(n_SPH, ndusttypes, particle_id, x_SPH,y_SPH,z_SPH,h_SPH,vx_SPH,vy_SPH,vz_SPH,Tgas_SPH, &
@@ -345,6 +345,7 @@ contains
     endif
     ! SPH particles ignored by mcfost
     Tphantom = -1.
+    n_packets = 0.
 
     ! Remapping to phantom indices
     !radiation(ivorcl,:) = -1.
@@ -356,7 +357,7 @@ contains
           !radiation(ivorcl,i_SPH) = icell
        endif
     enddo
-    call set_ghost_particle_temperature(n_SPH, is_ghost, Tphantom)
+    call set_ghost_particle_temperature(np, n_SPH, particle_id, is_ghost, Tphantom, n_packets)
 
     ! Resetting memory state for next call
     do i=1, nb_proc
@@ -517,21 +518,25 @@ contains
 
   !*************************************************************************
 
-  subroutine set_ghost_particle_temperature(n_SPH, is_ghost, T_phantom)
+  subroutine set_ghost_particle_temperature(np, n_SPH, particle_id, is_ghost, T_phantom, n_packets)
     ! mcfost will detect particles on top of each other and flag them of ghost
-    ! Here we set the ghost tenperature == to the main particle temperature
+    ! Here we set the ghost tenperature == to the main particle temperature.
+    ! is_ghost and particle_id are indexed by the mcfost particle index (1:n_SPH),
+    ! is_ghost holds the phantom index of the main particle, T_phantom is indexed by the
+    ! phantom index
 
     use mcfost_env, only : sp
 
-    integer, intent(in) :: n_SPH
-    integer, dimension(n_SPH), intent(in) :: is_ghost
-    real(sp), dimension(n_SPH), intent(inout) :: T_phantom
+    integer, intent(in) :: np, n_SPH
+    integer, dimension(n_SPH), intent(in) :: particle_id, is_ghost
+    real(sp), dimension(np), intent(inout) :: T_phantom, n_packets
 
     integer :: i
 
     do i=1, n_SPH
        if (is_ghost(i) > 0) then
-          T_phantom(i) = T_phantom(is_ghost(i))
+          T_phantom(particle_id(i)) = T_phantom(is_ghost(i))
+          n_packets(particle_id(i)) = n_packets(is_ghost(i))
        endif
     end do
 

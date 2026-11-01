@@ -6,7 +6,7 @@ module SPH2mcfost
   use messages
   use sort, only : find_kth_smallest_inplace
   use density, only : normalize_dust_density, reduce_density, read_Voronoi_fits_file, find_non_empty_cell
-  use read_phantom, only : read_phantom_bin_files, read_phantom_hdf_files
+  use read_phantom, only : read_phantom_bin_files, read_phantom_hdf_files, lstar_from_phantom
   use sort, only : index_quicksort
   use stars, only : compute_stellar_parameters
 
@@ -102,7 +102,7 @@ contains
        if (allocated(massdust)) deallocate(massdust)
     endif
 
-    if (.not.lfix_star) call compute_stellar_parameters()
+    if (.not.(lfix_star .or. lstar_from_phantom)) call compute_stellar_parameters()
 
     ! Model limits
     call read_SPH_limits_file(limits_file, SPH_limits)
@@ -786,10 +786,14 @@ contains
     nkill = 0
     do i=1, n_SPH
        ii = order(i)
+       ! a ghost is removed from the mesh: it cannot be the main particle of other ghosts
+       ! (their mass would be lost, and they would get no temperature)
+       if (is_ghost(ii) > 0) cycle
        loop2 : do j=i+1, n_SPH
           jj = order(j)
           dr2 = (x(ii)-x(jj))**2 + (y(ii)-y(jj))**2 + (z(ii)-z(jj))**2
           if (dr2 < prec * x2(ii)) then
+             if (is_ghost(jj) > 0) cycle loop2 ! already merged into a main particle
              is_ghost(jj) = particle_id(ii)
              nkill = nkill+1
 
