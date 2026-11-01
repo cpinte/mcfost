@@ -203,7 +203,7 @@ subroutine alloc_dynamique(n_cells_max)
   endif
   if (alloc_status > 0) call error('Allocation error kappa_abs')
 
-  if (aniso_method==2) then
+  if ((aniso_method==2) .or. lTemp) then
      allocate(tab_g_pos(p_Nc,n_lambda),stat=alloc_status)
      if (alloc_status > 0) call error('Allocation error tab_albedo_pos, tab_g_pos')
      tab_g_pos = 0.0
@@ -600,8 +600,8 @@ subroutine realloc_step2()
   if (alloc_status > 0) call error('Allocation error tab_albedo_pos')
   tab_albedo_pos = 0
 
-  if (allocated(tab_g_pos)) then
-     deallocate(tab_g_pos)
+  if (allocated(tab_g_pos)) deallocate(tab_g_pos)
+  if (aniso_method==2) then
      ! todo : could be p_n_cells
      allocate(tab_g_pos(n_cells,n_lambda2), stat=alloc_status)
      if (alloc_status > 0) call error('Allocation error tab_g_pos')

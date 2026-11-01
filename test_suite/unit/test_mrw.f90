@@ -1,14 +1,31 @@
 program test_mrw
-  ! Unit test: Modified Random Walk (MRW) diffusion kernel (MRW.f90) and
+  ! Unit test: Modified Random Walk (MRW) diffusion kernel (MRW.f90),
   ! nearest-wall Euclidean distance routines on cylindrical, spherical, and
-  ! 3D Voronoi grids (cylindrical_grid.f90, spherical_grid.f90, Voronoi.f90).
+  ! 3D Voronoi grids (cylindrical_grid.f90, spherical_grid.f90, Voronoi.f90),
+  ! and Bjorkman & Wood (2001) pre-tabulated MRW mean opacities (thermal_emission.f90,
+  ! dust_prop.f90, mem.f90).
   !
   ! Built by "make unit_tests" in src/ and run by test_suite/test_unit.py.
   ! Exits with status 1 on failure.
 
-  use mcfost_env, only : dp, nb_proc
-  use constants, only : pi
+  use mcfost_env, only : dp, nb_proc, l_p_lambda_is_lambda, low_mem_scattering
+  use constants, only : pi, four_pi, hp, kb, c_light, thermal_const, sigma, &
+       AU_to_cm, AU_to_m, mum_to_cm
   use parameters
+  use wavelengths, only : n_lambda, lambda_min, lambda_max, lmono0, lmono, &
+       tab_lambda, tab_lambda_inf, tab_lambda_sup, tab_delta_lambda, &
+       tab_amu1, tab_amu2, tab_amu1_coating, tab_amu2_coating, init_lambda
+  use grains, only : n_grains_tot, grain_RE_LTE_start, grain_RE_LTE_end, &
+       dust_pop, grain, n_grains, M_grain, C_ext, C_sca, C_abs, C_abs_norm, &
+       tab_g, tab_albedo, tab_albedo_pos, tab_g_pos
+  use density, only : dust_density_o_n_grains, dust_mass, icell_not_empty
+  use dust_prop, only : kappa, kappa_abs_LTE, kappa_factor, opacity
+  use radiation_field, only : xKJ_abs, allocate_radiation_field_step1, deallocate_radiation_field
+  use temperature, only : tab_Temp, Tdust, Tdust_old
+  use thermal_emission, only : L_packet_th, chi_Rosseland_MRW, kappa_abs_MRW, &
+       allocate_temperature, allocate_thermal_emission, deallocate_thermal_emission, &
+       deallocate_temperature_calculation, init_reemission, Temp_finale, &
+       compute_MRW_opacities, eval_MRW_opacities_at_T
   use naleat, only : init_random_streams
   use MRW, only : n, zeta, y_MRW, gamma_MRW, cumulative_zeta_from_y, &
        initialize_cumulative_zeta, interp_y_from_zeta, make_MRW_step, &
@@ -44,6 +61,7 @@ program test_mrw
   call test_spherical_walls()
   call test_voronoi_walls(50.0_dp)
   call test_voronoi_walls(0.05_dp)
+  call test_mrw_opacities()
 
   write(*,'(a,i0,a,i0)') "test_mrw: failures = ", n_fail, " / ", n_test
   if (n_fail > 0) stop 1
@@ -839,5 +857,492 @@ contains
     if (allocated(wall)) deallocate(wall)
     if (allocated(star)) deallocate(star)
   end subroutine free_voronoi_grid
+
+  !======================================================================
+  ! 5. Bjorkman & Wood (2001) pre-tabulated MRW mean opacities & refresh
+  !======================================================================
+  subroutine free_opacity_fixture()
+    lsed_complete = .true.
+    call deallocate_thermal_emission()
+    call deallocate_radiation_field()
+    if (allocated(Tdust)) deallocate(Tdust)
+    if (allocated(Tdust_old)) deallocate(Tdust_old)
+    if (allocated(volume)) deallocate(volume)
+    if (allocated(tab_lambda)) deallocate(tab_lambda)
+    if (allocated(tab_lambda_inf)) deallocate(tab_lambda_inf)
+    if (allocated(tab_lambda_sup)) deallocate(tab_lambda_sup)
+    if (allocated(tab_delta_lambda)) deallocate(tab_delta_lambda)
+    if (allocated(tab_amu1)) deallocate(tab_amu1)
+    if (allocated(tab_amu2)) deallocate(tab_amu2)
+    if (allocated(tab_amu1_coating)) deallocate(tab_amu1_coating)
+    if (allocated(tab_amu2_coating)) deallocate(tab_amu2_coating)
+    if (allocated(dust_pop)) deallocate(dust_pop)
+    if (allocated(grain)) deallocate(grain)
+    if (allocated(n_grains)) deallocate(n_grains)
+    if (allocated(M_grain)) deallocate(M_grain)
+    if (allocated(C_ext)) deallocate(C_ext)
+    if (allocated(C_sca)) deallocate(C_sca)
+    if (allocated(C_abs)) deallocate(C_abs)
+    if (allocated(C_abs_norm)) deallocate(C_abs_norm)
+    if (allocated(tab_g)) deallocate(tab_g)
+    if (allocated(tab_albedo)) deallocate(tab_albedo)
+    if (allocated(tab_albedo_pos)) deallocate(tab_albedo_pos)
+    if (allocated(tab_g_pos)) deallocate(tab_g_pos)
+    if (allocated(kappa)) deallocate(kappa)
+    if (allocated(kappa_abs_LTE)) deallocate(kappa_abs_LTE)
+    if (allocated(kappa_factor)) deallocate(kappa_factor)
+    if (allocated(dust_density_o_n_grains)) deallocate(dust_density_o_n_grains)
+    if (allocated(dust_mass)) deallocate(dust_mass)
+    if (allocated(s11_file)) deallocate(s11_file)
+  end subroutine free_opacity_fixture
+
+  subroutine setup_opacity_fixture(nc, ng, nl, nt, var_dust, aniso_m)
+    integer, intent(in) :: nc, ng, nl, nt, aniso_m
+    logical, intent(in) :: var_dust
+
+    integer :: k
+
+    call free_opacity_fixture()
+
+    nb_proc = 1
+    n_cells = nc
+    lvariable_dust = var_dust
+    if (lvariable_dust) then
+       p_n_cells = n_cells
+    else
+       p_n_cells = 1
+    endif
+    n_rad = nc ; nz = 1 ; n_az = 1
+    n_zones = 1
+    n_pop = 1
+    n_grains_tot = ng
+    grain_RE_LTE_start = 1
+    grain_RE_LTE_end = ng
+
+    lRE_LTE = .true.
+    lRE_nLTE = .false.
+    lnRE = .false.
+    lonly_LTE = .true.
+    lonly_nLTE = .false.
+    lTemp = .true.
+    letape_th = .true.
+    lextra_heating = .false.
+    lreemission_stats = .false.
+    ldust_prop = .false.
+    lmono0 = .false.
+    lmono = .false.
+    lsed = .false.
+    lsed_complete = .false.
+    loutput_UV_field = .false.
+    loutput_J = .false.
+    loutput_J_step1 = .false.
+    lProDiMo = .false.
+    lML = .false.
+    lsave_n_packet_per_cell = .false.
+    lmcfost_lib = .false.
+    lisotropic = .false.
+    lno_scattering = .false.
+    lqsca_equal_qabs = .false.
+    lphase_function_file = .false.
+    l_p_lambda_is_lambda = .true.
+    low_mem_scattering = .true.
+    scattering_method = 1
+    aniso_method = aniso_m
+
+    n_lambda = nl
+    lambda_min = 0.05
+    lambda_max = 50000.0
+    call init_lambda()
+
+    T_min = 2.0
+    T_max = 2000.0
+    n_T = nt
+
+    allocate(volume(n_cells))
+    volume = 1.0_dp
+
+    allocate(dust_pop(n_pop))
+    dust_pop(1)%methode_chauffage = 1
+    dust_pop(1)%is_Misselt_opacity_file = .false.
+    dust_pop(1)%is_DustEM_opacity_file = .false.
+
+    allocate(grain(n_grains_tot), n_grains(n_grains_tot), M_grain(n_grains_tot))
+    do k = 1, n_grains_tot
+       grain(k)%zone = 1
+       grain(k)%methode_chauffage = 1
+       grain(k)%pop = 1
+       grain(k)%is_PAH = .false.
+    enddo
+    n_grains = 1.0_dp / real(n_grains_tot, dp)
+    M_grain = 1.0e-12
+
+    allocate(C_ext(n_grains_tot, n_lambda), C_sca(n_grains_tot, n_lambda), &
+         C_abs(n_grains_tot, n_lambda), C_abs_norm(n_grains_tot, n_lambda), &
+         tab_g(n_grains_tot, n_lambda), tab_albedo(n_grains_tot, n_lambda))
+    C_ext = 0.0 ; C_sca = 0.0 ; C_abs = 0.0 ; C_abs_norm = 0.0
+    tab_g = 0.0 ; tab_albedo = 0.0
+
+    allocate(kappa(p_n_cells, n_lambda), kappa_abs_LTE(p_n_cells, n_lambda), &
+         tab_albedo_pos(p_n_cells, n_lambda), kappa_factor(n_cells))
+    kappa = 0.0_dp ; kappa_abs_LTE = 0.0_dp ; tab_albedo_pos = 0.0 ; kappa_factor = 0.0_dp
+
+    ! Mirrors mem.f90 alloc_dynamique: allocated whenever aniso_method == 2 .or. lTemp
+    if ((aniso_method == 2) .or. lTemp) then
+       allocate(tab_g_pos(p_n_cells, n_lambda))
+       tab_g_pos = 0.0
+    endif
+
+    if (lvariable_dust) then
+       allocate(dust_density_o_n_grains(n_grains_tot, n_cells))
+    else
+       allocate(dust_density_o_n_grains(n_zones, n_cells))
+    endif
+    allocate(dust_mass(n_cells))
+    dust_density_o_n_grains = 0.0_dp
+    dust_mass = 0.0_dp
+
+    call allocate_temperature(n_cells)
+    call allocate_thermal_emission(n_cells, p_n_cells)
+    call allocate_radiation_field_step1(n_cells)
+    L_packet_th = 1.0_dp
+  end subroutine setup_opacity_fixture
+
+  subroutine test_mrw_opacities()
+    real(dp), parameter :: fact = AU_to_cm * mum_to_cm**2
+    integer :: l, t, am
+    real(dp) :: k_abs_want, k_sca_want, g_eff, chi_want, chi_got, kabs_got
+    real(dp) :: chi_c1, chi_c2, chi_c3, kabs_c1, kabs_c2, kabs_c3
+    real(dp) :: chi_v1, chi_v2, chi_v3, kabs_v1, kabs_v2, kabs_v3
+    real(dp) :: max_rel_chi, max_rel_kabs, wl0_um, nu_ratio, T_eval
+    real(dp) :: x_scale, kabs_exact, chi_exact, theta_l, g_target
+    real(dp) :: Qcool_T, Qcool_Tmin, Qheat_target
+    character(len=128) :: msg
+
+    !------------------------------------------------------------------
+    ! 5a. Grey pure-absorption limit: chi_Rosseland == kappa_abs == k0
+    !------------------------------------------------------------------
+    call setup_opacity_fixture(1, 1, 200, 100, .false., 1)
+    dust_density_o_n_grains(1, 1) = 1.0_dp / fact
+    dust_mass(1) = 1.0e20_dp
+    icell_not_empty = 1
+
+    k_abs_want = 42.5_dp
+    C_abs(1, :) = real(k_abs_want)
+    C_sca(1, :) = 0.0
+    C_ext(1, :) = C_abs(1, :)
+    C_abs_norm(1, :) = C_abs(1, :)
+    tab_g(1, :) = 0.0
+
+    do l = 1, n_lambda
+       call opacity(l, no_scatt=.true.)
+    enddo
+    call init_reemission(.false.)
+
+    max_rel_chi = 0.0_dp
+    max_rel_kabs = 0.0_dp
+    do t = 1, n_T
+       call eval_MRW_opacities_at_T(real(tab_Temp(t), dp), 1, chi_got, kabs_got)
+       max_rel_chi  = max(max_rel_chi,  abs(chi_got  - k_abs_want) / k_abs_want)
+       max_rel_kabs = max(max_rel_kabs, abs(kabs_got - k_abs_want) / k_abs_want)
+    enddo
+    ! Off-grid intermediate temperature
+    call eval_MRW_opacities_at_T(137.4_dp, 1, chi_got, kabs_got)
+    max_rel_chi  = max(max_rel_chi,  abs(chi_got  - k_abs_want) / k_abs_want)
+    max_rel_kabs = max(max_rel_kabs, abs(kabs_got - k_abs_want) / k_abs_want)
+
+    write(msg,'(a,es10.3,a,es10.3)') "rel_chi=", max_rel_chi, " rel_kabs=", max_rel_kabs
+    call check("MRW grey pure-abs chi_R == kappa_abs == k0 across all T", &
+         (max_rel_chi < 1.0e-6_dp) .and. (max_rel_kabs < 1.0e-6_dp), trim(msg))
+
+    !------------------------------------------------------------------
+    ! 5b. Multi-grain anisotropic scattering (1 - g) transport reduction
+    !     for BOTH aniso_method = 1 (Mie) and aniso_method = 2 (HG),
+    !     plus lisotropic, lno_scattering, g -> 1, and lphase_function_file
+    !------------------------------------------------------------------
+    do am = 1, 2
+       call setup_opacity_fixture(1, 2, 160, 80, .false., am)
+       dust_density_o_n_grains(1, 1) = 2.0_dp / fact ! n_grains = [0.5, 0.5] -> density*fact = 1 per grain
+       dust_mass(1) = 1.0e20_dp
+       icell_not_empty = 1
+
+       ! Grain 1: C_abs=10, C_sca=10, g=0.2 ; Grain 2: C_abs=20, C_sca=30, g=0.8
+       C_abs(1, :) = 10.0 ; C_sca(1, :) = 10.0 ; C_ext(1, :) = 20.0 ; tab_g(1, :) = 0.2
+       C_abs(2, :) = 20.0 ; C_sca(2, :) = 30.0 ; C_ext(2, :) = 50.0 ; tab_g(2, :) = 0.8
+       C_abs_norm = C_abs
+
+       k_abs_want = 30.0_dp
+       k_sca_want = 40.0_dp
+       g_eff = (10.0_dp * 0.2_dp + 30.0_dp * 0.8_dp) / 40.0_dp ! 0.65
+       chi_want = k_abs_want + (1.0_dp - g_eff) * k_sca_want   ! 30 + 0.35*40 = 44.0
+
+       do l = 1, n_lambda
+          call opacity(l, no_scatt=.true.)
+       enddo
+       call init_reemission(.false.)
+
+       call eval_MRW_opacities_at_T(120.0_dp, 1, chi_got, kabs_got)
+       write(msg,'(a,i1,a,f8.4,a,f8.4)') "aniso=", am, " chi=", chi_got, " kabs=", kabs_got
+       call check("MRW multi-grain (1-g) transport reduction", &
+            (abs(chi_got - chi_want) < 1.0e-5_dp * chi_want) .and. &
+            (abs(kabs_got - k_abs_want) < 1.0e-5_dp * k_abs_want), trim(msg))
+    enddo
+
+    ! Forward-peaked g -> 1 limit: chi_trans -> kappa_abs
+    tab_g(1, :) = 0.999999 ; tab_g(2, :) = 0.999999
+    do l = 1, n_lambda
+       call opacity(l, no_scatt=.true.)
+    enddo
+    call init_reemission(.false.)
+    call eval_MRW_opacities_at_T(120.0_dp, 1, chi_got, kabs_got)
+    call check("MRW forward scattering g->1 reduces chi_trans -> kappa_abs", &
+         abs(chi_got - k_abs_want) < 1.0e-4_dp * k_abs_want)
+
+    ! lisotropic override: forces effective g = 0 -> chi_trans = k_abs + k_sca = 70
+    lisotropic = .true.
+    do l = 1, n_lambda
+       call opacity(l, no_scatt=.true.)
+    enddo
+    call init_reemission(.false.)
+    call eval_MRW_opacities_at_T(120.0_dp, 1, chi_got, kabs_got)
+    call check("MRW lisotropic forces g=0 (chi_trans = k_abs + k_sca)", &
+         abs(chi_got - (k_abs_want + k_sca_want)) < 1.0e-5_dp * (k_abs_want + k_sca_want))
+    lisotropic = .false.
+
+    ! lphase_function_file override: s11(theta) = 1 + 3*g_target*cos(theta) -> <cos(theta)> = g_target
+    lphase_function_file = .true.
+    g_target = 0.25_dp
+    allocate(s11_file(0:nang_scatt))
+    do l = 0, nang_scatt
+       theta_l = real(l, dp) * pi / real(nang_scatt, dp)
+       s11_file(l) = real(1.0_dp + 3.0_dp * g_target * cos(theta_l))
+    enddo
+    do l = 1, n_lambda
+       call opacity(l, no_scatt=.true.)
+    enddo
+    call init_reemission(.false.)
+    call eval_MRW_opacities_at_T(120.0_dp, 1, chi_got, kabs_got)
+    chi_want = k_abs_want + (1.0_dp - g_target) * k_sca_want
+    write(msg,'(a,f9.5,a,f9.5)') "got ", chi_got, " expected ", chi_want
+    call check("MRW lphase_function_file g override", &
+         abs(chi_got - chi_want) < 5.0e-4_dp * chi_want, trim(msg))
+    lphase_function_file = .false.
+
+    ! lno_scattering override: k_sca = 0 -> chi_trans = kappa_abs
+    lno_scattering = .true.
+    do l = 1, n_lambda
+       call opacity(l, no_scatt=.true.)
+    enddo
+    call init_reemission(.false.)
+    call eval_MRW_opacities_at_T(120.0_dp, 1, chi_got, kabs_got)
+    call check("MRW lno_scattering forces chi_trans == kappa_abs", &
+         (abs(chi_got - k_abs_want) < 1.0e-5_dp * k_abs_want) .and. &
+         (abs(kabs_got - k_abs_want) < 1.0e-5_dp * k_abs_want))
+    lno_scattering = .false.
+
+    ! Pure scattering (zero thermal absorption): MRW must be disabled (chi_R = 0, kabs = 0)
+    C_abs = 0.0 ; C_abs_norm = 0.0 ; C_sca = 25.0 ; C_ext = 25.0
+    do l = 1, n_lambda
+       call opacity(l, no_scatt=.true.)
+    enddo
+    call init_reemission(.false.)
+    call eval_MRW_opacities_at_T(120.0_dp, 1, chi_got, kabs_got)
+    call check("MRW zero thermal absorption disables MRW (chi_R = 0)", &
+         (chi_got == 0.0_dp) .and. (kabs_got == 0.0_dp))
+
+    !------------------------------------------------------------------
+    ! 5c. Non-grey power-law dust opacity kappa_nu = k0 * (nu / nu0)^2
+    !     with scattering k_sca = 0.5 * k_abs, g = 0.6 (chi_nu = 1.2 * k_abs_nu):
+    !     Exact analytical Riemann-zeta values:
+    !       kappa_abs_MRW(T)     = k0 * (kB*T / (h*nu0))^2 * (20 * pi^2 / 7)
+    !       chi_Rosseland_MRW(T) = (1.2*k0) * (kB*T / (h*nu0))^2 * (4 * pi^2 / 5)
+    !       kappa_abs_MRW / chi_Rosseland_MRW = (1 / 1.2) * (25 / 7)
+    !------------------------------------------------------------------
+    call setup_opacity_fixture(1, 1, 400, 120, .false., 1)
+    dust_density_o_n_grains(1, 1) = 1.0_dp / fact
+    dust_mass(1) = 1.0e20_dp
+    icell_not_empty = 1
+
+    wl0_um = 100.0_dp
+    do l = 1, n_lambda
+       nu_ratio = wl0_um / tab_lambda(l)
+       C_abs(1, l) = real(10.0_dp * (nu_ratio**2))
+       C_sca(1, l) = real(5.0_dp  * (nu_ratio**2))
+       C_ext(1, l) = C_abs(1, l) + C_sca(1, l)
+       C_abs_norm(1, l) = C_abs(1, l)
+       tab_g(1, l) = 0.6
+    enddo
+
+    do l = 1, n_lambda
+       call opacity(l, no_scatt=.true.)
+    enddo
+    call init_reemission(.false.)
+
+    ! Test at an off-grid intermediate temperature T_eval = 85.3 K
+    T_eval = 85.3_dp
+    call eval_MRW_opacities_at_T(T_eval, 1, chi_got, kabs_got)
+    x_scale = (wl0_um * 1.0e-6_dp * T_eval) / real(thermal_const, dp)
+    kabs_exact = 10.0_dp * (x_scale**2) * (20.0_dp * pi * pi / 7.0_dp)
+    chi_exact  = 12.0_dp * (x_scale**2) * (4.0_dp  * pi * pi / 5.0_dp)
+
+    write(msg,'(a,es12.5,a,es12.5)') "got ", kabs_got, " exact ", kabs_exact
+    call check("MRW beta=2 analytical kappa_dBdT = k0*(kT/hnu0)^2 * 20*pi^2/7", &
+         abs(kabs_got - kabs_exact) < 1.5e-3_dp * kabs_exact, trim(msg))
+
+    write(msg,'(a,es12.5,a,es12.5)') "got ", chi_got, " exact ", chi_exact
+    call check("MRW beta=2 analytical chi_Rosseland = chi0*(kT/hnu0)^2 * 4*pi^2/5", &
+         abs(chi_got - chi_exact) < 1.5e-3_dp * chi_exact, trim(msg))
+
+    ! Verify T^2 scaling between 60 K and 180 K (factor of 9.0)
+    call eval_MRW_opacities_at_T(60.0_dp,  1, chi_c1, kabs_c1)
+    call eval_MRW_opacities_at_T(180.0_dp, 1, chi_c2, kabs_c2)
+    write(msg,'(a,f10.6,a,f10.6)') "chi_ratio=", chi_c2 / chi_c1, " kabs_ratio=", kabs_c2 / kabs_c1
+    call check("MRW beta=2 log-log interpolation exact T^2 scaling (x9)", &
+         (abs(chi_c2 / chi_c1 - 9.0_dp) < 1.5e-3_dp * 9.0_dp) .and. &
+         (abs(kabs_c2 / kabs_c1 - 9.0_dp) < 1.5e-3_dp * 9.0_dp), trim(msg))
+
+    !------------------------------------------------------------------
+    ! 5d. Live compute_MRW_opacities(id, icell, ...) + kappa_factor &
+    !     ldens0 empty-cell-1 invariance (lvariable_dust=.false. vs .true.)
+    !     + sublimation/settling opacity refresh
+    !------------------------------------------------------------------
+    ! Case A: lvariable_dust = .false. (p_n_cells = 1), cell 1 EMPTY (icell_not_empty = 2),
+    !         cell 2 density = 1x, cell 3 density = 3.5x.
+    call setup_opacity_fixture(3, 1, 300, 120, .false., 1)
+    volume = [2.0_dp, 2.0_dp, 2.0_dp]
+    dust_density_o_n_grains(1, 1) = 0.0_dp
+    dust_density_o_n_grains(1, 2) = 1.0_dp / fact
+    dust_density_o_n_grains(1, 3) = 3.5_dp / fact
+    dust_mass = [0.0_dp, 2.0e20_dp, 7.0e20_dp] ! rho3 / rho2 = 3.5 -> kappa_factor = [0, 1, 3.5]
+    icell_not_empty = 2
+
+    do l = 1, n_lambda
+       nu_ratio = 100.0_dp / tab_lambda(l)
+       C_abs(1, l) = real(8.0_dp * (1.0_dp + nu_ratio))
+       C_sca(1, l) = real(4.0_dp * (1.0_dp + nu_ratio))
+       C_ext(1, l) = C_abs(1, l) + C_sca(1, l)
+       C_abs_norm(1, l) = C_abs(1, l)
+       tab_g(1, l) = 0.5
+       call opacity(l, no_scatt=.true.)
+    enddo
+    call init_reemission(.false.)
+
+    ! Empty cell 1 must return 0 (never trigger MRW) and keep dust_density(:,1) == 0 after ldens0
+    call compute_MRW_opacities(1, 1, chi_c1, kabs_c1)
+    call check("MRW empty cell 1 (ldens0, kappa_factor=0) -> chi=0, kabs=0", &
+         (chi_c1 == 0.0_dp) .and. (kabs_c1 == 0.0_dp) .and. &
+         (dust_density_o_n_grains(1, 1) == 0.0_dp))
+
+    ! Deposit energy in cells 2 & 3 so both sit at physical equilibrium temperature T_eval = 110 K:
+    ! For grey/non-grey uniform dust, Qcool(T) - Qcool(T_min) omits kappa_factor (same as xKJ_abs).
+    T_eval = 110.0_dp
+    Qcool_T    = discrete_Qcool(1, T_eval)
+    Qcool_Tmin = discrete_Qcool(1, real(tab_Temp(1), dp))
+    Qheat_target = Qcool_T - Qcool_Tmin
+    xKJ_abs(2, 1) = Qheat_target * volume(2) / L_packet_th
+    xKJ_abs(3, 1) = Qheat_target * volume(3) / L_packet_th
+
+    call Temp_finale()
+    call check("MRW live Temp_LTE recovers target 110 K in cells 2 & 3", &
+         (abs(real(Tdust(2), dp) - T_eval) < 0.5_dp) .and. &
+         (abs(real(Tdust(3), dp) - T_eval) < 0.5_dp))
+
+    call compute_MRW_opacities(1, 2, chi_c2, kabs_c2)
+    call compute_MRW_opacities(1, 3, chi_c3, kabs_c3)
+
+    ! chi_trans_cell MUST scale with kappa_factor(3)/kappa_factor(2) = 3.5;
+    ! kappa_abs_ref MUST omit kappa_factor (matching save_radiation_field's xKJ_abs)!
+    call check("MRW uniform dust chi_trans scales with kappa_factor (3.5x)", &
+         abs(chi_c3 - 3.5_dp * chi_c2) < 1.0e-11_dp * chi_c2)
+    call check("MRW uniform dust kappa_abs_ref omits kappa_factor (matches xKJ_abs)", &
+         abs(kabs_c3 - kabs_c2) < 1.0e-11_dp * kabs_c2)
+
+    ! Case B: lvariable_dust = .true. (p_n_cells = 3) with IDENTICAL physical densities!
+    call setup_opacity_fixture(3, 1, 300, 120, .true., 1)
+    volume = [2.0_dp, 2.0_dp, 2.0_dp]
+    dust_density_o_n_grains(1, 1) = 0.0_dp
+    dust_density_o_n_grains(1, 2) = 1.0_dp / fact
+    dust_density_o_n_grains(1, 3) = 3.5_dp / fact
+    dust_mass = [0.0_dp, 2.0e20_dp, 7.0e20_dp]
+    icell_not_empty = 2
+
+    do l = 1, n_lambda
+       nu_ratio = 100.0_dp / tab_lambda(l)
+       C_abs(1, l) = real(8.0_dp * (1.0_dp + nu_ratio))
+       C_sca(1, l) = real(4.0_dp * (1.0_dp + nu_ratio))
+       C_ext(1, l) = C_abs(1, l) + C_sca(1, l)
+       C_abs_norm(1, l) = C_abs(1, l)
+       tab_g(1, l) = 0.5
+       call opacity(l, no_scatt=.true.)
+    enddo
+    call init_reemission(.false.)
+
+    ! In lvariable_dust=.true., kappa_abs_LTE(icell,:) includes local density (kappa_factor=1),
+    ! so cell 3's Qcool is 3.5x cell 2's Qcool at 110 K:
+    xKJ_abs(2, 1) = (discrete_Qcool(2, T_eval) - discrete_Qcool(2, real(tab_Temp(1), dp))) * volume(2) / L_packet_th
+    xKJ_abs(3, 1) = (discrete_Qcool(3, T_eval) - discrete_Qcool(3, real(tab_Temp(1), dp))) * volume(3) / L_packet_th
+
+    call compute_MRW_opacities(1, 1, chi_v1, kabs_v1)
+    call compute_MRW_opacities(1, 2, chi_v2, kabs_v2)
+    call compute_MRW_opacities(1, 3, chi_v3, kabs_v3)
+
+    call check("MRW variable_dust empty cell 1 -> chi=0, kabs=0", &
+         (chi_v1 == 0.0_dp) .and. (kabs_v1 == 0.0_dp))
+    call check("MRW physical chi_trans identical between lvariable_dust F and T", &
+         (abs(chi_v2 - chi_c2) < 1.0e-10_dp * chi_c2) .and. &
+         (abs(chi_v3 - chi_c3) < 1.0e-10_dp * chi_c3))
+    call check("MRW variable_dust kappa_abs_ref scales 3.5x with local density", &
+         abs(kabs_v3 - 3.5_dp * kabs_c3) < 1.0e-10_dp * kabs_v3)
+
+    ! Opacity refresh test (simulating dust sublimation / hydrostatic settling):
+    ! Halve density in cell 3 and completely sublimate cell 2 -> recompute opacity + init_reemission
+    dust_density_o_n_grains(1, 2) = 0.0_dp
+    dust_mass(2) = 0.0_dp
+    dust_density_o_n_grains(1, 3) = 0.5_dp * (3.5_dp / fact)
+    dust_mass(3) = 3.5e20_dp
+    icell_not_empty = 3
+
+    do l = 1, n_lambda
+       call opacity(l, no_scatt=.true.)
+    enddo
+    call init_reemission(.false.)
+
+    call eval_MRW_opacities_at_T(T_eval, 2, chi_got, kabs_got)
+    call check("MRW sublimated cell refreshes to zero opacity & zero albedo/g", &
+         (chi_got == 0.0_dp) .and. (kabs_got == 0.0_dp) .and. &
+         all(tab_albedo_pos(2, :) == 0.0) .and. all(tab_g_pos(2, :) == 0.0))
+
+    call eval_MRW_opacities_at_T(T_eval, 3, chi_got, kabs_got)
+    call check("MRW halved dust density refreshes chi_trans & kappa_abs by 0.5x", &
+         (abs(chi_got - 0.5_dp * chi_v3) < 1.0e-5_dp * chi_v3) .and. &
+         (abs(kabs_got - 0.5_dp * kabs_v3) < 1.0e-5_dp * kabs_v3))
+
+    ! Verify deallocate_temperature_calculation frees MRW tables cleanly before Step 2
+    call deallocate_temperature_calculation()
+    call check("MRW tables freed by deallocate_temperature_calculation", &
+         (.not. allocated(chi_Rosseland_MRW)) .and. (.not. allocated(kappa_abs_MRW)))
+
+    call free_opacity_fixture()
+  end subroutine test_mrw_opacities
+
+  real(dp) function discrete_Qcool(p_ic, Temp_val) result(Q_val)
+    integer, intent(in) :: p_ic
+    real(dp), intent(in) :: Temp_val
+    integer :: l
+    real(dp) :: cst_E, cst, wl, delta_wl, cst_wl, B_wl
+
+    cst_E = 2.0_dp * hp * (c_light**2) * four_pi
+    cst = real(thermal_const, dp) / Temp_val
+    Q_val = 0.0_dp
+    do l = 1, n_lambda
+       wl = tab_lambda(l) * 1.0e-6_dp
+       delta_wl = tab_delta_lambda(l) * 1.0e-6_dp
+       cst_wl = cst / wl
+       if (cst_wl < 500.0_dp) then
+          B_wl = delta_wl / ((wl**5) * (exp(cst_wl) - 1.0_dp))
+          Q_val = Q_val + kappa_abs_LTE(p_ic, l) * B_wl
+       endif
+    enddo
+    Q_val = Q_val * cst_E
+  end function discrete_Qcool
 
 end program test_mrw

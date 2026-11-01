@@ -869,10 +869,11 @@ subroutine opacity(lambda, no_scatt)
   integer, intent(in) :: lambda
   logical, intent(in), optional :: no_scatt
 
-  integer :: icell, k, p_lambda
+  integer :: icell, k, l, p_lambda
   integer, dimension(n_grains_tot) :: p_k_arr
-  real(kind=dp) ::  density, fact, k_abs_RE, k_abs_LTE, k_abs_tot, k_sca_tot, rho0, d1, d_k
-  logical :: lcompute_obs,  ldens0, compute_scatt
+  real(kind=dp) ::  density, fact, k_abs_RE, k_abs_LTE, k_abs_tot, k_sca_tot, k_sca_g, rho0, d1, d_k
+  real(kind=dp) ::  g_pf, norm_pf, theta_pf
+  logical :: lcompute_obs, ldens0, compute_scatt, lhas_g_pos, luse_pf_g
 
   ! Compute p_lambda: index into the scattering position arrays (ksca_CDF, tab_s11_pos, etc.)
   ! l_p_lambda_is_lambda is true for both method 1 (per grain) and method 2 (per cell, n_lambda grids)
@@ -918,26 +919,49 @@ subroutine opacity(lambda, no_scatt)
   endif
 
   ! Opacity and scattering probability calculation
+  lhas_g_pos = allocated(tab_g_pos)
+  luse_pf_g = lhas_g_pos .and. lphase_function_file .and. allocated(s11_file) .and. (.not. lisotropic)
+  g_pf = 0.0_dp
+  if (luse_pf_g) then
+     norm_pf = 0.0_dp
+     do l=1, nang_scatt-1
+        theta_pf = real(l, kind=dp) * pi / real(nang_scatt, kind=dp)
+        norm_pf = norm_pf + real(s11_file(l), kind=dp) * sin(theta_pf)
+        g_pf = g_pf + real(s11_file(l), kind=dp) * cos(theta_pf) * sin(theta_pf)
+     enddo
+     if (norm_pf > tiny_dp) then
+        g_pf = g_pf / norm_pf
+     else
+        g_pf = 0.0_dp
+     endif
+  endif
+
   do icell=1, p_n_cells
      kappa(icell,lambda) = 0.0
      k_sca_tot = 0.0
+     k_sca_g = 0.0
 
      do  k=1,n_grains_tot ! Expensive when n_cells is large
         density = dust_density_o_n_grains(p_k_arr(k),icell) * n_grains(k)
         kappa(icell,lambda) = kappa(icell,lambda) + C_ext(k,lambda) * density
         k_sca_tot = k_sca_tot + C_sca(k,lambda) * density
+        if (lhas_g_pos) k_sca_g = k_sca_g + C_sca(k,lambda) * density * tab_g(k,lambda)
      enddo !k
 
-     if (kappa(icell,lambda) > tiny_real) tab_albedo_pos(icell,lambda) = k_sca_tot/kappa(icell,lambda)
+     if (kappa(icell,lambda) > tiny_real) then
+        tab_albedo_pos(icell,lambda) = k_sca_tot/kappa(icell,lambda)
+     else
+        tab_albedo_pos(icell,lambda) = 0.0
+     endif
 
-     if (aniso_method==2) then
-        tab_g_pos(icell,lambda) = 0.0
-        do  k=1,n_grains_tot ! Expensive when n_cells is large
-           density=dust_density_o_n_grains(p_k_arr(k),icell) * n_grains(k)
-           tab_g_pos(icell,lambda) = tab_g_pos(icell,lambda) + &
-                C_sca(k,lambda) * density * tab_g(k,lambda)
-        enddo ! k
-        if (k_sca_tot > tiny_real) tab_g_pos(icell,lambda) = tab_g_pos(icell,lambda)/k_sca_tot
+     if (lhas_g_pos) then
+        if (lisotropic .or. (k_sca_tot <= tiny_real)) then
+           tab_g_pos(icell,lambda) = 0.0
+        else if (luse_pf_g) then
+           tab_g_pos(icell,lambda) = real(g_pf)
+        else
+           tab_g_pos(icell,lambda) = real(k_sca_g / k_sca_tot)
+        endif
      endif
 
      if (lRE_LTE) then
@@ -1070,6 +1094,7 @@ subroutine opacity(lambda, no_scatt)
   if (lno_scattering) then
      kappa = kappa_abs_LTE
      tab_albedo_pos = 0.0_dp
+     if (lhas_g_pos) tab_g_pos = 0.0
   endif
 
   ! scattering = abs

@@ -170,14 +170,14 @@ contains
 
   !----------------------------------------------
 
-  subroutine make_MRW_step(id, x,y,z, u,v,w, d, rec_Planck_opacity, ct)
+  subroutine make_MRW_step(id, x,y,z, u,v,w, d, chi_trans, ct)
 
     use naleat, only : random_isotropic_direction
 
     integer, intent(in) :: id
     real(kind=dp), intent(inout) :: x, y, z
     real(kind=dp), intent(out) :: u, v, w, ct
-    real(kind=dp), intent(in) :: d, rec_Planck_opacity
+    real(kind=dp), intent(in) :: d, chi_trans
 
     real(dp) :: un, vn, wn, y_sample
 
@@ -191,9 +191,10 @@ contains
     call sample_lambertian_direction(id, un, vn, wn, u, v, w)
 
     ! Sample y0 from cumulative exit distribution P(t) and solve Eq. (8) of Min et al. (2009):
-    ! D = 1 / (3 * rec_Planck_opacity), cst_ct = 3 / pi^2
+    ! D = 1 / (3 * chi_trans), cst_ct = 3 / pi^2, where chi_trans [AU^-1] is the local
+    ! Rosseland transport mean extinction (including kappa_factor) in B&W mode.
     y_sample = sample_zeta(id)
-    ct = -log(y_sample) * cst_ct * rec_Planck_opacity * (d * d)
+    ct = -log(y_sample) * cst_ct * chi_trans * (d * d)
 
     return
 
