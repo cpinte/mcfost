@@ -117,7 +117,7 @@ subroutine allocate_thermal_emission(Nc,p_Nc)
   if (alloc_status > 0) call error('Allocation error log_E_em')
   log_Qcool_minus_extra_heating = 0.0
 
-  if (lRE_LTE) then
+  if (lRE_LTE .and. lMRW) then
      if (allocated(chi_Rosseland_MRW)) deallocate(chi_Rosseland_MRW)
      if (allocated(kappa_abs_MRW)) deallocate(kappa_abs_MRW)
      allocate(chi_Rosseland_MRW(n_T,p_Nc), kappa_abs_MRW(n_T,p_Nc), stat=alloc_status)

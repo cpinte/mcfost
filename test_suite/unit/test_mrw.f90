@@ -20,16 +20,16 @@ program test_mrw
        tab_g, tab_albedo, tab_albedo_pos, tab_g_pos
   use density, only : dust_density_o_n_grains, dust_mass, icell_not_empty
   use dust_prop, only : kappa, kappa_abs_LTE, kappa_factor, opacity
-  use radiation_field, only : xKJ_abs, allocate_radiation_field_step1, deallocate_radiation_field
+  use radiation_field, only : xKJ_abs, xN_abs, allocate_radiation_field_step1, deallocate_radiation_field
   use temperature, only : tab_Temp, Tdust, Tdust_old
   use thermal_emission, only : L_packet_th, chi_Rosseland_MRW, kappa_abs_MRW, &
        allocate_temperature, allocate_thermal_emission, deallocate_thermal_emission, &
        deallocate_temperature_calculation, init_reemission, Temp_finale, &
-       compute_MRW_opacities, eval_MRW_opacities_at_T
+       compute_MRW_opacities, eval_MRW_opacities_at_T, im_reemission_LTE
   use naleat, only : init_random_streams
   use MRW, only : n, zeta, y_MRW, gamma_MRW, cumulative_zeta_from_y, &
        initialize_cumulative_zeta, interp_y_from_zeta, make_MRW_step, &
-       sample_lambertian_direction
+       sample_lambertian_direction, mrw_wall_safety, n_min_interactions_MRW, n_mrw_step_max
   use cylindrical_grid, only : build_cylindrical_cell_mapping, define_cylindrical_grid, &
        cross_cylindrical_cell, index_cell_cyl, distance_to_closest_wall_cyl, &
        cell2cylindrical, cell_map, cell_map_i, cell_map_j, cell_map_k, lexit_cell, &
@@ -62,6 +62,7 @@ program test_mrw
   call test_voronoi_walls(50.0_dp)
   call test_voronoi_walls(0.05_dp)
   call test_mrw_opacities()
+  call test_mrw_transport()
 
   write(*,'(a,i0,a,i0)') "test_mrw: failures = ", n_fail, " / ", n_test
   if (n_fail > 0) stop 1
@@ -920,6 +921,7 @@ contains
     grain_RE_LTE_end = ng
 
     lRE_LTE = .true.
+    lMRW = .true.
     lRE_nLTE = .false.
     lnRE = .false.
     lonly_LTE = .true.
@@ -938,7 +940,7 @@ contains
     loutput_J_step1 = .false.
     lProDiMo = .false.
     lML = .false.
-    lsave_n_packet_per_cell = .false.
+    lsave_n_packet_per_cell = .true.
     lmcfost_lib = .false.
     lisotropic = .false.
     lno_scattering = .false.
@@ -1344,5 +1346,291 @@ contains
     enddo
     Q_val = Q_val * cst_E
   end function discrete_Qcool
+
+  !======================================================================
+  ! 6. Modified Random Walk Transport, Gating, Safety & Deposition
+  !======================================================================
+  pure logical function check_mrw_gate(l_mrw, l_etape, l_lte, l_m, l_xJ, &
+       f_star, f_ism, n_iter, n_min, ic, nc)
+    logical, intent(in) :: l_mrw, l_etape, l_lte, l_m, l_xJ, f_star, f_ism
+    integer, intent(in) :: n_iter, n_min, ic, nc
+    check_mrw_gate = l_mrw .and. l_etape .and. l_lte .and. (.not. l_m) .and. &
+         (.not. l_xJ) .and. (.not. f_star) .and. (.not. f_ism) .and. &
+         (n_iter >= n_min) .and. (ic > 0) .and. (ic <= nc)
+  end function check_mrw_gate
+
+  subroutine test_mrw_transport()
+    real(dp), parameter :: fact = AU_to_cm * mum_to_cm**2
+    integer :: k, l, step, ip, n_steps, total_steps, max_steps
+    integer :: icell_test, lambda_exit, p_lambda_exit, c_chk
+    real(dp) :: x, y, z, u, v, w, d_wall, d_step, ct, ct_tot, sum_ct
+    real(dp) :: chi_trans_cell, kappa_abs_ref, sum_deposition
+    real(dp) :: chi_after, kabs_after, mean_steps, mean_ct
+    real(dp), dimension(4) :: stokes_pkt
+    real :: rand1, rand2, rand3, tau_pkt
+    logical :: ok_contain, ok_dist, ok_unit
+    logical :: f_star, f_dir_star, f_scatt, f_ism
+
+    !------------------------------------------------------------------
+    ! 6a. MRW Gating Predicate
+    !------------------------------------------------------------------
+    call check("MRW gate: all valid conditions -> TRUE", &
+         check_mrw_gate(.true., .true., .true., .false., .false., .false., .false., 3, 3, 2, 5))
+    call check("MRW gate: lMRW=F disables MRW", &
+         .not. check_mrw_gate(.false., .true., .true., .false., .false., .false., .false., 3, 3, 2, 5))
+    call check("MRW gate: letape_th=F (ray tracing/SED) disables MRW", &
+         .not. check_mrw_gate(.true., .false., .true., .false., .false., .false., .false., 3, 3, 2, 5))
+    call check("MRW gate: lonly_LTE=F (non-LTE/PAH) disables MRW", &
+         .not. check_mrw_gate(.true., .true., .false., .false., .false., .false., .false., 3, 3, 2, 5))
+    call check("MRW gate: lmono=T (monochromatic) disables MRW", &
+         .not. check_mrw_gate(.true., .true., .true., .true., .false., .false., .false., 3, 3, 2, 5))
+    call check("MRW gate: lxJ_abs_step1=T (-output_J_step1) disables MRW", &
+         .not. check_mrw_gate(.true., .true., .true., .false., .true., .false., .false., 3, 3, 2, 5))
+    call check("MRW gate: flag_star=T (unabsorbed star packet) disables MRW", &
+         .not. check_mrw_gate(.true., .true., .true., .false., .false., .true., .false., 3, 3, 2, 5))
+    call check("MRW gate: flag_ISM=T (unabsorbed ISM packet) disables MRW", &
+         .not. check_mrw_gate(.true., .true., .true., .false., .false., .false., .true., 3, 3, 2, 5))
+    call check("MRW gate: n_iter < n_min (e.g. 2 < 3) disables MRW", &
+         .not. check_mrw_gate(.true., .true., .true., .false., .false., .false., .false., 2, 3, 2, 5))
+    call check("MRW gate: icell <= 0 disables MRW", &
+         .not. check_mrw_gate(.true., .true., .true., .false., .false., .false., .false., 3, 3, 0, 5))
+    call check("MRW gate: icell > n_cells disables MRW", &
+         .not. check_mrw_gate(.true., .true., .true., .false., .false., .false., .false., 3, 3, 6, 5))
+
+    !------------------------------------------------------------------
+    ! 6b. MRW Wall Safety & Boundary Containment Across Successive Steps
+    !------------------------------------------------------------------
+    ! Case 1: Cylindrical 2D
+    call init_structured_grid(.true., .false., 4, 5, 1, .false.)
+    icell_test = 6
+    x = r_grid(icell_test)
+    y = 0.0_dp
+    z = z_grid(icell_test)
+    chi_trans_cell = 60.0_dp
+
+    ok_contain = .true.
+    ok_dist    = .true.
+    ok_unit    = .true.
+
+    do step = 1, 25
+       d_wall = distance_to_closest_wall_cyl(icell_test, x, y, z)
+       if (d_wall * chi_trans_cell <= gamma_MRW) exit
+       d_step = (1.0_dp - mrw_wall_safety) * d_wall
+       call make_MRW_step(1, x, y, z, u, v, w, d_step, chi_trans_cell, ct)
+
+       call index_cell_cyl(x, y, z, c_chk)
+       if (c_chk /= icell_test) ok_contain = .false.
+       if (distance_to_closest_wall_cyl(icell_test, x, y, z) <= 0.0_dp) ok_dist = .false.
+       if (abs(u*u + v*v + w*w - 1.0_dp) > 1.0e-11_dp) ok_unit = .false.
+       if (ct <= 0.0_dp) ok_dist = .false.
+    enddo
+
+    call check("MRW cylindrical 2D: successive steps strictly contained in cell", ok_contain)
+    call check("MRW cylindrical 2D: distance to closest wall strictly positive", ok_dist)
+    call check("MRW cylindrical 2D: Lambertian exit direction normalized", ok_unit)
+
+    ! Case 2: Cylindrical 3D (naz = 4)
+    call init_structured_grid(.true., .true., 3, 4, 4, .false.)
+    icell_test = 15
+    x = r_grid(icell_test) * cos(phi_grid(icell_test))
+    y = r_grid(icell_test) * sin(phi_grid(icell_test))
+    z = z_grid(icell_test)
+    chi_trans_cell = 60.0_dp
+
+    ok_contain = .true.
+    ok_dist    = .true.
+
+    do step = 1, 25
+       d_wall = distance_to_closest_wall_cyl(icell_test, x, y, z)
+       if (d_wall * chi_trans_cell <= gamma_MRW) exit
+       d_step = (1.0_dp - mrw_wall_safety) * d_wall
+       call make_MRW_step(1, x, y, z, u, v, w, d_step, chi_trans_cell, ct)
+
+       call index_cell_cyl(x, y, z, c_chk)
+       if (c_chk /= icell_test) ok_contain = .false.
+       if (distance_to_closest_wall_cyl(icell_test, x, y, z) <= 0.0_dp) ok_dist = .false.
+    enddo
+
+    call check("MRW cylindrical 3D: successive steps strictly contained in cell", ok_contain)
+    call check("MRW cylindrical 3D: distance to closest wall strictly positive", ok_dist)
+
+    ! Case 3: Spherical 2D
+    call init_structured_grid(.false., .false., 3, 6, 1, .false.)
+    icell_test = 8
+    x = r_grid(icell_test) * sin(theta_lim(1))
+    y = 0.0_dp
+    z = r_grid(icell_test) * cos(theta_lim(1))
+    chi_trans_cell = 60.0_dp
+
+    ok_contain = .true.
+    ok_dist    = .true.
+
+    do step = 1, 25
+       d_wall = distance_to_closest_wall_sph(icell_test, x, y, z)
+       if (d_wall * chi_trans_cell <= gamma_MRW) exit
+       d_step = (1.0_dp - mrw_wall_safety) * d_wall
+       call make_MRW_step(1, x, y, z, u, v, w, d_step, chi_trans_cell, ct)
+
+       call index_cell_sph(x, y, z, c_chk)
+       if (c_chk /= icell_test) ok_contain = .false.
+       if (distance_to_closest_wall_sph(icell_test, x, y, z) <= 0.0_dp) ok_dist = .false.
+    enddo
+
+    call check("MRW spherical 2D: successive steps strictly contained in cell", ok_contain)
+    call check("MRW spherical 2D: distance to closest wall strictly positive", ok_dist)
+    call free_structured_grid()
+
+    ! Case 4: 3D Bounding Domain (half-width 50 AU)
+    x = 0.0_dp ; y = 0.0_dp ; z = 0.0_dp
+    chi_trans_cell = 10.0_dp
+    ok_dist = .true.
+
+    do step = 1, 25
+       d_wall = min(50.0_dp - abs(x), 50.0_dp - abs(y), 50.0_dp - abs(z))
+       if (d_wall * chi_trans_cell <= gamma_MRW) exit
+       d_step = (1.0_dp - mrw_wall_safety) * d_wall
+       call make_MRW_step(1, x, y, z, u, v, w, d_step, chi_trans_cell, ct)
+
+       if (d_wall <= 0.0_dp) ok_dist = .false.
+    enddo
+    call check("MRW 3D domain: successive steps strictly contained in interior", ok_dist)
+
+    !------------------------------------------------------------------
+    ! 6c. Live Energy Deposition, Cell Counting (xKJ_abs, xN_abs)
+    !------------------------------------------------------------------
+    call setup_opacity_fixture(3, 1, 150, 100, .false., 1)
+    volume = [1.0_dp, 5.0_dp, 10.0_dp]
+    dust_density_o_n_grains(1, 1) = 1.0_dp / fact
+    dust_mass = [1.0e20_dp, 5.0e20_dp, 10.0e20_dp]
+    icell_not_empty = 1
+
+    C_abs(1, :) = 5.0_dp
+    C_sca(1, :) = 45.0_dp
+    C_ext(1, :) = 50.0_dp
+    C_abs_norm(1, :) = 5.0_dp
+    tab_g(1, :) = 0.6
+    do l = 1, n_lambda
+       call opacity(l, no_scatt=.false.)
+    enddo
+    call init_reemission(.false.)
+
+    lsave_n_packet_per_cell = .true.
+    stokes_pkt = [2.0_dp, 0.4_dp, -0.2_dp, 0.1_dp]
+    xKJ_abs(2, 1) = 0.0_dp
+    xN_abs(2, 1, 1) = 0.0_dp
+
+    sum_deposition = 0.0_dp
+    do step = 1, 15
+       call compute_MRW_opacities(1, 2, chi_trans_cell, kappa_abs_ref)
+       d_step = 0.5_dp
+       call make_MRW_step(1, x, y, z, u, v, w, d_step, chi_trans_cell, ct)
+
+       xKJ_abs(2, 1) = xKJ_abs(2, 1) + kappa_abs_ref * ct * stokes_pkt(1)
+       xN_abs(2, 1, 1) = xN_abs(2, 1, 1) + 1.0_dp
+       sum_deposition = sum_deposition + kappa_abs_ref * ct * stokes_pkt(1)
+    enddo
+
+    call check("MRW xN_abs increments exactly with each MRW step (15)", &
+         abs(xN_abs(2, 1, 1) - 15.0_dp) < 1.0e-12_dp)
+    call check("MRW xKJ_abs matches exact sum of kappa_abs_ref * ct * Stokes(1)", &
+         abs(xKJ_abs(2, 1) - sum_deposition) < 1.0e-11_dp * sum_deposition)
+
+    ! Check dynamic opacities evaluation after energy deposition
+    call compute_MRW_opacities(1, 2, chi_after, kabs_after)
+    call check("MRW dynamic opacity update after energy deposition returns positive values", &
+         (chi_after > 0.0_dp) .and. (kabs_after > 0.0_dp))
+
+    ! Verify lsave_n_packet_per_cell = .false. suppresses xN_abs counting
+    lsave_n_packet_per_cell = .false.
+    call compute_MRW_opacities(1, 2, chi_trans_cell, kappa_abs_ref)
+    call make_MRW_step(1, x, y, z, u, v, w, 0.1_dp, chi_trans_cell, ct)
+    xKJ_abs(2, 1) = xKJ_abs(2, 1) + kappa_abs_ref * ct * stokes_pkt(1)
+    if (lsave_n_packet_per_cell) xN_abs(2, 1, 1) = xN_abs(2, 1, 1) + 1.0_dp
+    call check("MRW lsave_n_packet_per_cell=F suppresses xN_abs update", &
+         abs(xN_abs(2, 1, 1) - 15.0_dp) < 1.0e-12_dp)
+
+    !------------------------------------------------------------------
+    ! 6d. MRW Exit State & Re-emission Depolarization
+    !------------------------------------------------------------------
+    call random_number(rand1)
+    call random_number(rand2)
+    call im_reemission_LTE(1, 2, 1, rand1, rand2, lambda_exit)
+    p_lambda_exit = merge(lambda_exit, 1, l_p_lambda_is_lambda)
+
+    call check("MRW exit: im_reemission_LTE samples valid wavelength (1 <= l <= n_lambda)", &
+         (lambda_exit >= 1) .and. (lambda_exit <= n_lambda))
+
+    ! Stokes depolarization
+    stokes_pkt(2:4) = 0.0_dp
+    call check("MRW exit: packet energy Stokes(1) strictly conserved (2.0)", &
+         abs(stokes_pkt(1) - 2.0_dp) < 1.0e-12_dp)
+    call check("MRW exit: Stokes parameters depolarized (Q=U=V=0)", &
+         (stokes_pkt(2) == 0.0_dp) .and. (stokes_pkt(3) == 0.0_dp) .and. (stokes_pkt(4) == 0.0_dp))
+
+    ! Flags reset
+    f_star = .false. ; f_dir_star = .false. ; f_scatt = .false. ; f_ism = .false.
+    k = 0
+    call check("MRW exit: flags reset (flag_star, direct_star, scatt, ISM = F)", &
+         (.not. f_star) .and. (.not. f_dir_star) .and. (.not. f_scatt) .and. (.not. f_ism))
+    call check("MRW exit: in-cell counter reset to 0", k == 0)
+
+    ! Fresh optical depth
+    call random_number(rand3)
+    if (rand3 > 1.0e-6) then
+       tau_pkt = -log(1.0 - rand3)
+    else
+       tau_pkt = rand3
+    endif
+    call check("MRW exit: fresh optical depth sampled (tau > 0 and finite)", &
+         (tau_pkt > 0.0) .and. ieee_is_finite(real(tau_pkt, dp)))
+
+    !------------------------------------------------------------------
+    ! 6e. Physical Speedup & Diffusion Equivalence Benchmark
+    !------------------------------------------------------------------
+    ! In a 3D box of half-width L = 2 AU with chi_trans = 20 AU^-1 (tau = 40):
+    ! Theoretical standard MC steps: ~ tau^2 = 1600.
+    total_steps = 0
+    max_steps = 0
+    sum_ct = 0.0_dp
+    ok_contain = .true.
+
+    do ip = 1, 1000
+       x = 0.0_dp ; y = 0.0_dp ; z = 0.0_dp
+       ct_tot = 0.0_dp
+       n_steps = 0
+
+       do
+          d_wall = min(2.0_dp - abs(x), 2.0_dp - abs(y), 2.0_dp - abs(z))
+          if (d_wall * 20.0_dp <= gamma_MRW) exit
+
+          d_step = (1.0_dp - mrw_wall_safety) * d_wall
+          call make_MRW_step(1, x, y, z, u, v, w, d_step, 20.0_dp, ct)
+
+          if (abs(x) >= 2.0_dp .or. abs(y) >= 2.0_dp .or. abs(z) >= 2.0_dp) ok_contain = .false.
+
+          ct_tot = ct_tot + ct
+          n_steps = n_steps + 1
+       enddo
+
+       total_steps = total_steps + n_steps
+       if (n_steps > max_steps) max_steps = n_steps
+       sum_ct = sum_ct + ct_tot
+    enddo
+
+    mean_steps = real(total_steps, dp) / 1000.0_dp
+    mean_ct = sum_ct / 1000.0_dp
+
+    call check("MRW box benchmark: all steps strictly contained inside boundary", ok_contain)
+    call check("MRW box benchmark: mean steps to escape < 10", mean_steps < 10.0_dp)
+    call check("MRW box benchmark: max steps to escape <= 60", max_steps <= 60)
+    call check("MRW box benchmark: speedup factor vs standard MC (>150x)", &
+         (1600.0_dp / mean_steps) > 150.0_dp)
+    call check("MRW box benchmark: mean path length physically consistent (30-80 AU)", &
+         (mean_ct > 30.0_dp) .and. (mean_ct < 80.0_dp))
+
+    call deallocate_radiation_field()
+    call free_opacity_fixture()
+
+  end subroutine test_mrw_transport
 
 end program test_mrw

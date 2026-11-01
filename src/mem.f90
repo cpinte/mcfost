@@ -203,7 +203,7 @@ subroutine alloc_dynamique(n_cells_max)
   endif
   if (alloc_status > 0) call error('Allocation error kappa_abs')
 
-  if ((aniso_method==2) .or. lTemp) then
+  if ((aniso_method==2) .or. (lTemp .and. lMRW)) then
      allocate(tab_g_pos(p_Nc,n_lambda),stat=alloc_status)
      if (alloc_status > 0) call error('Allocation error tab_albedo_pos, tab_g_pos')
      tab_g_pos = 0.0

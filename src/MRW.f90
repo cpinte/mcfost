@@ -9,6 +9,9 @@ module MRW
 
   real(dp) :: gamma_MRW = 2.0_dp
   real(dp), parameter :: cst_ct = 3.0_dp / (pi * pi)
+  real(dp), parameter :: mrw_wall_safety = 1.0e-5_dp
+  integer, parameter :: n_min_interactions_MRW = 3
+  integer, parameter :: n_mrw_step_max = 100000
 
 contains
 
@@ -67,8 +70,11 @@ contains
 
     implicit none
 
+    logical, save :: lzeta_initialized = .false.
     integer :: i, iter
     real(dp) :: y_lo, y_hi, y_mid
+
+    if (lzeta_initialized) return
 
     zeta(1) = 0.0_dp
     y_MRW(1) = 0.0_dp
@@ -90,6 +96,7 @@ contains
 
     zeta(n) = 1.0_dp
     y_MRW(n) = 1.0_dp
+    lzeta_initialized = .true.
 
     return
 
@@ -124,6 +131,7 @@ contains
 
     real(dp) :: zeta_random
 
+    call initialize_cumulative_zeta()
     zeta_random = real(sprng(stream(id)), kind=dp)
     sample_zeta = interp_y_from_zeta(zeta_random)
 

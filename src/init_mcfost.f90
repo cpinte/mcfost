@@ -19,6 +19,7 @@ module init_mcfost
   use read_pluto, only : read_pluto_parameters
   use read_spherical_grid, only : read_spherical_grid_parameters
   use read_phantom, only : check_phantom_file_variable_dust
+  use MRW, only : gamma_MRW
 
   implicit none
 
@@ -60,6 +61,7 @@ subroutine set_default_variables()
   n_az = 1
   root_dir = "."
   seed_dir = "."
+  lMRW = .false.
   lapprox_diffusion = .true.
   lonly_diff_approx = .false.
   lbenchmark_Pascucci = .false.
@@ -701,6 +703,37 @@ subroutine initialisation_mcfost()
      case("-diff_approx")
         i_arg = i_arg+1
         lforce_diff_approx=.true.
+     case("-mrw")
+        lMRW = .true.
+        i_arg = i_arg + 1
+        if (i_arg <= n_args) then
+           call get_command_argument(i_arg, s)
+           if (s(1:1) /= "-") then
+              read(s,*,iostat=ios) gamma_MRW
+              if (ios == 0) then
+                 if (gamma_MRW < 2.0_dp) call error("gamma_MRW must be >= 2.0")
+                 write(*,*) "MRW enabled with gamma =", gamma_MRW
+                 i_arg = i_arg + 1
+              else
+                 write(*,*) "MRW enabled"
+              endif
+           else
+              write(*,*) "MRW enabled"
+           endif
+        else
+           write(*,*) "MRW enabled"
+        endif
+     case("-no_mrw", "-no-mrw")
+        i_arg = i_arg + 1
+        lMRW = .false.
+     case("-gamma_mrw", "-mrw_gamma")
+        i_arg = i_arg + 1
+        if (i_arg > n_args) call error("gamma_MRW value needed")
+        call get_command_argument(i_arg, s)
+        read(s,*,iostat=ios) gamma_MRW
+        if (ios /= 0 .or. gamma_MRW < 2.0_dp) call error("gamma_MRW must be a number >= 2.0")
+        lMRW = .true.
+        i_arg = i_arg + 1
      case("-mol")
         i_arg = i_arg+1
         lemission_mol=.true.
@@ -2038,6 +2071,8 @@ subroutine display_help()
   write(*,*) "        : -diff_approx : enforce computation of T structure with diff approx."
   write(*,*) "        : -no_diff_approx : compute T structure with only MC method"
   write(*,*) "        : -only_diff_approx : only compute the diffusion approx"
+  write(*,*) "        : -mrw [gamma] : use Modified Random Walk for optically thick cells (gamma >= 2, default 2)"
+  write(*,*) "        : -no_mrw : disable Modified Random Walk (default)"
   write(*,*) "        : -tau_dark_zone_obs <tau_dark_zone> (default : 100)"
   write(*,*) "        : -tau_dark_zone_eq_th <tau_dark_zone> (default : 1500)"
   write(*,*) "        : -origin : save origin of packets received the interest bin"

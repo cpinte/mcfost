@@ -36,6 +36,7 @@ module parameters
 
   logical :: lRE_LTE, lRE_nLTE, lnRE, lonly_LTE, lonly_nLTE
   logical :: loutput_J, loutput_J_step1, loutput_UV_field, lxJ_abs, lxJ_abs_step1
+  logical :: lMRW
 
   ! Scattering calculation method: to choose to optimize memory size and CPU time
   ! 0 -> automatique
