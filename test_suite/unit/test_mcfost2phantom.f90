@@ -110,8 +110,9 @@ contains
     npoftype = np ; massoftype = m
 
     ! sinks: the star at the centre, then a planet at 50 au. When the star has a Teff from
-    ! phantom, the planet is a 100 K black body with the accretion radius as radius:
-    ! kept small here, a large star inside the Voronoi mesh gives wrong temperatures (X88)
+    ! phantom, the planet is a 100 K black body with its accretion radius (0.1 au) as
+    ! radius: a large star in the Voronoi mesh (star neighbour flags, star fields not set
+    ! by the reader such as fUV)
     xyzmh_ptmass = 0.0_dp ; vxyz_ptmass = 0.0_dp
     xyzmh_ptmass(4,1) = 1.0_dp ; xyzmh_ptmass(5:6,1) = 0.5_dp
     if (present(Teff)) then ! luminosity in code units (erg/s -> W), Teff in K
@@ -119,7 +120,7 @@ contains
        xyzmh_ptmass(13,1) = Teff
     endif
     if (nptmass > 1) then
-       xyzmh_ptmass(1,2) = 50.0_dp ; xyzmh_ptmass(4,2) = 1.0e-3_dp ; xyzmh_ptmass(5:6,2) = 1.0e-4_dp
+       xyzmh_ptmass(1,2) = 50.0_dp ; xyzmh_ptmass(4,2) = 1.0e-3_dp ; xyzmh_ptmass(5:6,2) = 0.1_dp
        vxyz_ptmass(2,2) = sqrt(1.0_dp/50.0_dp)
     endif
 

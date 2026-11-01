@@ -211,6 +211,7 @@ extern "C"
 
           // If the Voronoi cell is elongated, we intersect it with a dodecahedron
           was_cell_cut[pid_loc] = false;
+          stellar_neighb[pid_loc] = false; // set below if the cell is a star's neighbour
           if (delta_edge > threshold * h[pid])
           {
             cutting_distance = cutting_distance_o_h * h[pid];

@@ -235,12 +235,14 @@ module parameters
   ! Stars
   type star_type
      ! todo : indicate all units
-     real :: T, M, fUV, slope_UV, othin_sublimation_radius
-     real :: Mdot ! Msun
-     real(kind=dp) :: r, x,y,z, vx,vy,vz
-     logical :: lb_body, out_model, find_spectrum, force_Mdot
-     character(len=512) :: spectrum
-     integer :: icell
+     ! Default values: the hydro readers reallocate star at each dump and only set some
+     ! of the fields (e.g. fUV was undefined when Teff and r came from phantom's sinks)
+     real :: T = 0., M = 0., fUV = 0., slope_UV = 0., othin_sublimation_radius = 0.
+     real :: Mdot = 0. ! Msun
+     real(kind=dp) :: r = 0., x = 0., y = 0., z = 0., vx = 0., vy = 0., vz = 0.
+     logical :: lb_body = .false., out_model = .false., find_spectrum = .true., force_Mdot = .false.
+     character(len=512) :: spectrum = ""
+     integer :: icell = 0
   end type star_type
   logical :: laccretion_shock
 
