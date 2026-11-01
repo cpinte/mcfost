@@ -556,6 +556,25 @@ def test_mathis_field_option():
     assert "-Mathis_field can only be used with -benchmark_SHG" in result.stdout
 
 
+def test_phantom_avg():
+    # -phantom-avg: several phantom dumps read together and averaged (here the same dump
+    # twice). The particles of all the files are kept with their mass divided by the
+    # number of files, and the sinks are those of the first file. Reading several dumps
+    # with sinks stopped with an allocation error (E4)
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    root_dir = "discF_00500_avg"
+    clean_results(root_dir)
+    dump = "test_data/discF_00500/discF_00500"
+    stdout = run_mcfost("test_data/discF_00500/discF_00500.para", root_dir,
+                        "-phantom-avg 2 "+dump+" "+dump+" -not_random_Voronoi -disk_struct", timeout=600)
+    assert "There are now           2 stars in the model" in stdout
+    # gas mass of the model: half of the gas mass of the particles of the 2 files
+    m_particles = [float(l.split()[-2]) for l in stdout.splitlines() if "SPH gas mass is" in l][0]
+    m_model = [float(l.split()[-2]) for l in stdout.splitlines() if "Total  gas mass in model" in l][-1]
+    assert abs(m_model / (0.5 * m_particles) - 1.0) < 0.01
+
+
 # Pascucci et al. 2004 benchmark: SEDs and midplane temperatures compared with the
 # RADMC and RADICAL results of the paper (distributed with the MCFOST utils).
 # Optically thin cases run for every pull request, optically thick ones only locally (slow).

@@ -423,6 +423,7 @@ contains
           enddo !l
           mass = mass * volume(icell)
 
+          mdust = 0.0_dp ! star cells (iSPH == 0) have no dust
           if (iSPH > 0) mdust =  massgas(iSPH) * dust_moments(3,iSPH) * 12.*amu/mass_per_H
           mdust_tot = mdust_tot + mdust
 

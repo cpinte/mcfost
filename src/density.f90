@@ -2162,7 +2162,9 @@ subroutine normalize_dust_density(disk_dust_mass)
         total_sum =  total_sum * AU3_to_cm3 * g_to_Msun
 
         if (total_sum > tiny_dp) then
-           factor = d_p%mass / total_sum
+           ! f: total dust mass given by the caller (e.g. from the hydro dump) relative to
+           ! the parameter file. It was only applied without variable dust
+           factor = f * d_p%mass / total_sum
            do icell=1, n_cells
               do l=d_p%ind_debut, d_p%ind_fin
                  dust_density_o_n_grains(l,icell) = dust_density_o_n_grains(l,icell) * factor

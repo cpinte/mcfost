@@ -11,6 +11,8 @@ program test_mcfost2phantom
   ! array has the maximum number of sinks: mcfost allocates once.
   ! With the argument "overflow", max_particles is not given and the second call has
   ! more particles than the first: mcfost must stop with an error (test_unit.py).
+  ! With the argument "dust", one dust species (dustfrac 0.01): the dust mass of the
+  ! model must follow the gas mass of the particles (test_unit.py reads it).
   ! Built by "make unit_tests" in src/ and run by test_suite/test_unit.py, from
   ! test_suite/ (parameter file unit/mcfost2phantom.para). Exits with status 1 on failure.
 
@@ -24,7 +26,8 @@ program test_mcfost2phantom
   real(dp), parameter :: pi = 3.141592653589793_dp
   real(dp), parameter :: udist = au_cm, umass = Msun_g
   real(dp), parameter :: hfact = 1.2_dp
-  integer, parameter :: nsinkproperties = 18, ntypes = 1, ndusttypes = 0
+  integer, parameter :: nsinkproperties = 18, ntypes = 1
+  integer :: ndusttypes = 0
   integer, parameter :: maxp = 8000, maxptmass = 10
 
   real(dp) :: utime, SPH_limits(6)
@@ -35,6 +38,15 @@ program test_mcfost2phantom
   utime = sqrt(udist**3/(G_cgs*umass))
   mode = ""
   if (command_argument_count() > 0) call get_command_argument(1, mode)
+
+  if (mode == "dust") then
+     ndusttypes = 1
+     call init_mcfost_phantom("unit/mcfost2phantom.para", ndusttypes, .false., "", SPH_limits, ierr, &
+          max_particles=maxp)
+     call check(ierr == 0, "init_mcfost_phantom with dust")
+     call run_disc(5000, 1, "dust call: 5000 particles, 1 dust species")
+     call finish()
+  endif
 
   if (mode == "overflow") then
      call init_mcfost_phantom("unit/mcfost2phantom.para", ndusttypes, .false., "", SPH_limits, ierr)
@@ -77,7 +89,7 @@ contains
     real(dp), allocatable :: xyzh(:,:), vxyzu(:,:), xyzmh_ptmass(:,:), vxyz_ptmass(:,:), dustfrac(:,:), T_gas(:)
     integer(kind=1), allocatable :: iphase(:), apr_level(:)
     real, allocatable :: Tphantom(:), n_packets(:)
-    real(dp) :: grainsize(0), graindens(0), dudt(0), massoftype(ntypes), mu_gas
+    real(dp) :: grainsize(ndusttypes), graindens(ndusttypes), dudt(0), massoftype(ntypes), mu_gas
     integer :: npoftype(ntypes), i, n_T, ierr_run
     real(dp) :: r, phi, z, H, sigma, rho, m, vk, u(3)
 
@@ -107,6 +119,10 @@ contains
        endif
     endif
     iphase = 1_1 ; apr_level = 1_1 ; T_gas = 20.0_dp
+    ! dust species (dust mode): 1 micron grains, dust-to-gas ratio 0.01, in code units
+    if (ndusttypes > 0) then
+       dustfrac = 0.01_dp ; grainsize = 1.0e-4_dp/udist ; graindens = 3.0_dp/(umass/udist**3)
+    endif
     npoftype = np ; massoftype = m
 
     ! sinks: the star at the centre, then a planet at 50 au. When the star has a Teff from

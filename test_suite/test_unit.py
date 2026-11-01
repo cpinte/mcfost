@@ -38,3 +38,16 @@ def test_mcfost2phantom_overflow(build_unit_tests):
     print(result.stdout)
     assert result.returncode != 0, result.stdout
     assert "more particles than allocated by mcfost" in result.stdout
+
+
+def test_mcfost2phantom_dust_mass(build_unit_tests):
+    # library called with one dust species: the dust mass of the model follows the gas
+    # mass of the particles (1e-2 Msun) with the gas-to-dust ratio of the parameter file
+    # (100), not the dust mass of the parameter file (1e-3 Msun)
+    result = subprocess.run([os.path.join(_unit_dir, "test_mcfost2phantom"), "dust"],
+                            capture_output=True, text=True, cwd=_test_dir)
+    print(result.stdout)
+    assert result.returncode == 0, result.stdout
+    masses = [float(l.split()[-2]) for l in result.stdout.splitlines() if "Total dust mass in model" in l]
+    assert masses, result.stdout
+    assert all(abs(m / 1.0e-4 - 1.0) < 0.05 for m in masses), masses
