@@ -29,6 +29,19 @@ module naleat
 
 contains
 
+  subroutine init_random_streams(n_streams)
+    integer, intent(in) :: n_streams
+    integer :: i
+
+    if (allocated(stream)) deallocate(stream)
+    allocate(stream(n_streams))
+    stream = 0
+    do i = 1, n_streams
+       stream(i) = init_sprng(gtype, i - 1, n_streams, seed, SPRNG_DEFAULT)
+    enddo
+
+  end subroutine init_random_streams
+
   subroutine random_isotropic_direction(id, u,v,w)
     ! Generate a randomly distributed vector (u,w,w)
 

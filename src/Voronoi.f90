@@ -998,66 +998,81 @@ module Voronoi_grid
 
   real(dp) function distance_to_closest_wall_Voronoi(icell,x,y,z) result(s)
 
-
     integer, intent(in) :: icell
     real(kind=dp), intent(in) :: x,y,z
 
-    ! n = normale a la face, p = point sur la face, r = position du photon, k = direction de vol
-    real(kind=dp) :: s_tmp, den
-    integer :: i, id_n, l, ifirst, ilast
+    real(kind=dp) :: s_tmp, norm_n, d_star
+    integer :: i, id_n, ifirst, ilast
 
-    ! n = normale a la face, p = point sur la face, r = position du photon, k = direction de vol
-    real, dimension(3) :: n, p, r, k, r_cell, r_neighbour
+    ! n = face normal, p = point on face, r = photon position
+    real(kind=dp), dimension(3) :: n, p, r, r_cell, r_neighbour, r_star
 
-    if (Voronoi(icell)%was_cut) then
-       s=0
+    if ((icell <= 0) .or. (icell > n_cells)) then
+       s = 0.0_dp
+       return
+    endif
+
+    if (Voronoi(icell)%was_cut .or. Voronoi(icell)%is_star) then
+       s = 0.0_dp
        return
     endif
 
     r(1) = x ; r(2) = y ; r(3) = z
 
-    s=1e30
+    s = huge(1.0_dp)
 
-    ! We do all the access to Voronoi(icell) now
-    r_cell = Voronoi(icell)%xyz(:)
+    ! Access Voronoi(icell) metadata once
+    r_cell(:) = Voronoi(icell)%xyz(:)
     ifirst = Voronoi(icell)%first_neighbour
     ilast = Voronoi(icell)%last_neighbour
 
-    l=0
     do i=ifirst,ilast
-       l = l+1
-       id_n = neighbours_list(i) ! id du voisin
+       id_n = neighbours_list(i)
 
-       if (id_n > 0) then ! cell
-          if (l <= n_saved_neighbours) then ! we used an ordered array to limit cache misses
-             r_neighbour(:) = Voronoi_neighbour_xyz(:,l,icell)
-          else
-             r_neighbour(:) = Voronoi_xyz(:,id_n)
+       if (id_n > 0) then ! neighbouring Voronoi cell
+          r_neighbour(:) = Voronoi(id_n)%xyz(:)
+
+          ! Outward normal vector to bisector plane (from r_cell to r_neighbour)
+          n(:) = r_neighbour(:) - r_cell(:)
+          norm_n = norm2(n)
+          if (norm_n <= tiny_dp) then
+             s = 0.0_dp
+             return
           endif
 
-          ! unnormalized vector to plane
-          n(:) = r_neighbour(:) - r_cell(:)
-          k(:) = n(:) ! We use the normal also as a direction
+          ! Midpoint on the bisector plane
+          p(:) = 0.5_dp * (r_neighbour(:) + r_cell(:))
 
-          ! test direction
-          den = dot_product(n, k)
-
-          ! point on the plane
-          p(:) = 0.5 * (r_neighbour(:) + r_cell(:))
-          ! All of the above is the same for each step as long as we stay in the same cell
-
-
-          s_tmp = dot_product(n, p-r) / den
-
-          if (s_tmp < 0.) s_tmp = huge(1.0)
-       else ! id_n < 0 : neighbourgh is a wall
-          s_tmp = 0.0_dp ! so do not want to run the MRW in that case, so we set d=0
+          ! Signed Euclidean distance to the bisector plane (<= 0 if on/outside face)
+          s_tmp = dot_product(n, p - r) / norm_n
+          if (s_tmp <= 0.0_dp) then
+             s = 0.0_dp
+             return
+          endif
+       else ! id_n <= 0 : neighbour is an outer domain wall; disable MRW in boundary cells
+          s = 0.0_dp
+          return
        endif
 
        if (s_tmp < s) then
           s = s_tmp
        endif
     enddo
+
+    ! Bound distance by stellar surfaces in star-neighbour cells
+    if (Voronoi(icell)%is_star_neighbour) then
+       do i=1, n_stars
+          r_star = [star(i)%x, star(i)%y, star(i)%z]
+          d_star = norm2(r - r_star) - star(i)%r
+          if (d_star <= 0.0_dp) then
+             s = 0.0_dp
+             return
+          endif
+          if (d_star < s) s = d_star
+       enddo
+    endif
+
+    if (s == huge(1.0_dp)) s = 0.0_dp
 
     return
 

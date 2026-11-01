@@ -3,8 +3,8 @@ module spherical_grid
   use constants
   use parameters
   use cylindrical_grid, only: cell2cylindrical, cell_map, cell_map_i, cell_map_j, cell_map_k, lexit_cell, r_lim, r_lim_2, r_lim_3, &
-       cell_height, r_grid, z_grid, phi_grid, region_map, z_lim, w_lim, theta_lim, tan_theta_lim, tan_phi_lim, &
-       volume, l_dark_zone, zmax, cos_phi_lim, sin_phi_lim
+       cell_height, r_grid, z_grid, phi_grid, region_map, z_lim, w_lim, theta_lim, tan_theta_lim, cos_theta_lim, tan_phi_lim, &
+       volume, l_dark_zone, zmax, cos_phi_lim, sin_phi_lim, distance_to_phi_walls
   use messages
 
   implicit none
@@ -453,46 +453,60 @@ end subroutine indice_cellule_sph_theta
     integer, intent(in) :: icell
     real(kind=dp), intent(in) :: x,y,z
 
-    real(dp) :: r,s1,s2,s3,s4,s5,s6,r2_cyl,rcyl,z0
-    integer :: ri0,thetaj0,k0
+    real(dp) :: r,s1,s2,s3,s4,s_phi,r2_cyl,rcyl,z0
+    integer :: ri0,thetaj0,ja,k0
+
+    if ((icell <= 0) .or. (icell > n_cells)) then
+       s = 0.0_dp
+       return
+    endif
 
     ! 3D cell indices
     call cell2cylindrical(icell, ri0,thetaj0,k0)
+    ja = abs(thetaj0)
 
-    ! cyclindrical walls
+    if ((ri0 < 1) .or. (ri0 > n_rad) .or. (ja < 1) .or. (ja > nz)) then
+       s = 0.0_dp
+       return
+    endif
+
+    if (l3D .and. (z * real(thetaj0, kind=dp) < 0.0_dp)) then
+       s = 0.0_dp
+       return
+    endif
+
+    ! Spherical radial walls
     r2_cyl = x*x+y*y
     rcyl = sqrt(r2_cyl)
     r = sqrt(r2_cyl+z*z)
     s1 = r_lim(ri0) - r
     s2 = r - r_lim(ri0-1)
 
-    ! theta walls (same method as phi)
+    ! Elevation (theta) cone walls: theta_lim is measured from the midplane [0, pi/2],
+    ! with w_lim = sin(theta_lim) and cos_theta_lim = cos(theta_lim)
     z0 = abs(z)
-    s3 = abs(rcyl*w_lim(thetaj0) - z0*cos_phi_lim(thetaj0))
-    s4 = abs(rcyl*w_lim(thetaj0-1) - z0*cos_phi_lim(thetaj0-1))
-
-    if (l3D) then
-       ! phi walls
-       !
-       ! Distance between a line with equation a*x+by+c=0, ie y=-a/b*x-c/b and point (x0,y0) is:
-       !
-       ! d = |a*x0+b*y0+c|/sqrt(a**2+b**2)
-       !
-       ! In case of phi walls, we have y = x * tan(phi) so:
-       !
-       ! a = -sin(phi)
-       ! b = cos(phi)
-       ! c = 0
-       !
-       ! and therefore
-       !
-       ! d = |x0*sin(phi) - y0*cos(theta)| / sqrt[cos^2 + sin^2]
-       s5 = abs(x*sin_phi_lim(k0) - y*cos_phi_lim(k0))
-       s6 = abs(x*sin_phi_lim(k0-1) - y*cos_phi_lim(k0-1))
-       s = min(s1,s2,s3,s4,s5,s6)
+    if (ja == nz) then
+       ! Polar cap cell encloses the z-axis (theta_lim(nz) = pi/2): no upper theta cone wall
+       s3 = huge(1.0_dp)
     else
-       s = min(s1,s2,s3,s4)
+       s3 = rcyl*w_lim(ja) - z0*cos_theta_lim(ja)
     endif
+
+    if ((.not. l3D) .and. (ja == 1)) then
+       ! In 2D, cell j=1 spans [-theta_lim(1), +theta_lim(1)] across the midplane
+       s4 = huge(1.0_dp)
+    else
+       s4 = z0*cos_theta_lim(ja-1) - rcyl*w_lim(ja-1)
+    endif
+
+    if (l3D .and. (n_az > 1)) then
+       s_phi = distance_to_phi_walls(x, y, rcyl, k0)
+       s = min(s1, s2, s3, s4, s_phi)
+    else
+       s = min(s1, s2, s3, s4)
+    endif
+
+    s = max(0.0_dp, s)
 
     return
 
