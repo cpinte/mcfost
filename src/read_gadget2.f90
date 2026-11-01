@@ -284,9 +284,9 @@ contains
     character*4 :: blockid
     ! npart(0) = SPH gas; npart(5) = N-body / sink particles
     integer :: npart(0:5), ntot, len, flag_sfr, flag_feedback, unused(33), nall(0:5)
-    integer :: n_stars, alloc_status
+    integer :: n_mass, alloc_status, i_star, i_mass, i_part, k ! n_stars is the global one (was shadowed)
     double precision :: massarr(0:5), time, redshift
-    real, allocatable :: pos(:,:), vel(:,:), mass_stars(:), u(:), rho(:), hsml(:)
+    real, allocatable :: pos(:,:), vel(:,:), mass_block(:), u(:), rho(:), hsml(:)
     integer, allocatable :: id(:)
     real, allocatable :: nh(:), ne(:)
 
@@ -323,7 +323,11 @@ contains
     write(*,*) ''
     write(*,*) '        Total gas particles: ', npart(0)
     write(*,*) '          Gas particle mass: ', massarr(0)
-    write(*,*) "            Total gas mass : ", npart(0) * massarr(0) * usolarmass
+    if (massarr(0) == 0.) then
+       write(*,*) "            Total gas mass : individual masses (MASS block)"
+    else
+       write(*,*) "            Total gas mass : ", npart(0) * massarr(0) * usolarmass
+    endif
     write(*,*) '           particle #5 mass: ', massarr(:)
     write(*,*) '     Total N-body particles: ', npart(5)
     write(*,*) '             Time in orbits: ', time / (2. * pi)
@@ -332,13 +336,19 @@ contains
     n_SPH = npart(0)
     ntot = sum(npart)
 
-    ! Particles with zero MassTable entry store individual masses in MASS
-    n_stars = 0
+    ! Particles with zero MassTable entry store individual masses in the MASS block, in
+    ! the order of the types. Stars: the non-gas particles with individual masses (the
+    ! gas was counted as stars when it had individual masses)
+    n_mass = 0
     do j = 0, 5
+       if (massarr(j) == 0.) n_mass = n_mass + npart(j)
+    end do
+    n_stars = 0
+    do j = 1, 5
        if (massarr(j) == 0.) n_stars = n_stars + npart(j)
     end do
 
-    allocate(pos(3,ntot), vel(3,ntot), id(ntot), mass_stars(n_stars), &
+    allocate(pos(3,ntot), vel(3,ntot), id(ntot), mass_block(n_mass), &
          u(npart(0)), ne(npart(0)), nh(npart(0)))
     allocate(hsml(npart(0)), rho(npart(0)))
 
@@ -369,12 +379,12 @@ contains
           read(iunit) id
           write(*,*) '                 Block read: ', blockid, '        (IDs)'
        else if (blockid == 'MASS') then
-          testlen = (4 * n_stars) + 8
+          testlen = (4 * n_mass) + 8
           if (len /= testlen) then
              ierr = 3
              exit loop
           end if
-          read(iunit) mass_stars
+          read(iunit) mass_block
           write(*,*) '                 Block read: ', blockid, '        (Masses)'
        else if (blockid == 'U   ') then
           testlen = (4 * npart(0)) + 8
@@ -448,7 +458,11 @@ contains
     vx(:) = vel(1,1:n_SPH) * uvelocity
     vy(:) = vel(2,1:n_SPH) * uvelocity
     vz(:) = vel(3,1:n_SPH) * uvelocity
-    massgas(:) = massarr(0) * usolarmass
+    if (massarr(0) == 0.) then ! gas particles with individual masses: first in the MASS block
+       massgas(:) = mass_block(1:n_SPH) * usolarmass
+    else
+       massgas(:) = massarr(0) * usolarmass
+    endif
     rhogas(:) = 0.0_dp
 
     do i = 1, n_SPH
@@ -462,15 +476,25 @@ contains
        if (allocated(star)) deallocate(star)
        allocate(star(n_stars))
 
-       do i=1,n_stars
-          star(i)%x = pos(1,n_SPH + i) * ulength_au
-          star(i)%y = pos(2,n_SPH + i) * ulength_au
-          star(i)%z = pos(3,n_SPH + i) * ulength_au
-          star(i)%vx = vel(1,n_SPH + i) * uvelocity
-          star(i)%vy = vel(2,n_SPH + i) * uvelocity
-          star(i)%vz = vel(3,n_SPH + i) * uvelocity
-          star(i)%M =  mass_stars(i) * usolarmass
-          write(*,*) i, star(i)%M
+       ! particles in the order of the types (positions), masses in the MASS block for the
+       ! types with individual masses only (after the gas if it has individual masses)
+       i_star = 0 ; i_part = npart(0) ; i_mass = 0
+       if (massarr(0) == 0.) i_mass = npart(0)
+       do j=1, 5
+          do k=1, npart(j)
+             i_part = i_part + 1
+             if (massarr(j) == 0.) then
+                i_star = i_star + 1 ; i_mass = i_mass + 1
+                star(i_star)%x = pos(1,i_part) * ulength_au
+                star(i_star)%y = pos(2,i_part) * ulength_au
+                star(i_star)%z = pos(3,i_part) * ulength_au
+                star(i_star)%vx = vel(1,i_part) * uvelocity
+                star(i_star)%vy = vel(2,i_part) * uvelocity
+                star(i_star)%vz = vel(3,i_part) * uvelocity
+                star(i_star)%M =  mass_block(i_mass) * usolarmass
+                write(*,*) i_star, star(i_star)%M
+             endif
+          enddo
        enddo
     endif
 

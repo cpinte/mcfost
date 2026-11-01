@@ -139,7 +139,7 @@ contains
     real, parameter :: Mp = 1e-3
     real, parameter :: Omega_p = 1.0
     real, parameter :: x = 1.0, y=0.0, z=0.0
-    real, parameter :: vx=0.0, vy=1.0, vz=1.0
+    real, parameter :: vx=0.0, vy=1.0, vz=0.0 ! circular orbit in the midplane (vz was 1)
 
     usolarmass = 1.0_dp
     ulength_au = 1.0_dp
@@ -188,8 +188,9 @@ contains
           star(i)%force_Mdot = star_old(i)%force_Mdot
           star(i)%Mdot = star_old(i)%Mdot
        enddo
-       ! If we have new stars
-       do i=n_stars_old,n_stars
+       ! If we have new stars (from n_stars_old+1: the loop reset the last existing star,
+       ! or wrote star(0) without previous star)
+       do i=n_stars_old+1,n_stars
           star(i)%force_Mdot = .false.
           star(i)%Mdot = 0.
        enddo

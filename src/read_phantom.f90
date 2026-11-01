@@ -988,7 +988,7 @@ contains
     integer  :: i,j,k,itypei,alloc_status,i_star, n_stars_old, ifile,n_skip,nsinkproperties
     real(dp) :: xi,yi,zi,hi,vxi,vyi,vzi,T_gasi,rhogasi,rhodusti,gasfraci,dustfraci,totlum,qtermi,pmassi
     real(dp) :: ulength_scaled, umass_scaled, utime_scaled,udens,uerg_per_s,uWatt,ulength_au,ulength_m,usolarmass,uvelocity
-    real(dp) :: vphi, vr, phi, cos_phi, sin_phi, r_cyl, r_cyl2, r_sph, G_phantom
+    real(dp) :: vphi, vr, phi, cos_phi, sin_phi, r_cyl, r_cyl2, r_sph, G_phantom, M_central
     real(dp), allocatable :: xyzmh_ptmass(:,:),vxyz_ptmass(:,:)
 
     logical :: use_dust_particles = .false. ! 2-fluid: choose to use dust
@@ -1234,6 +1234,11 @@ contains
        endif
 
        if (lVphi_kep) then
+          ! central mass: first sink, plus the second one if any (binary)
+          if (n_stars < 1) call error("Keplerian velocities (lVphi_kep) need a central sink particle")
+          M_central = xyzmh_ptmass(4,1)
+          if (n_stars > 1) M_central = M_central + xyzmh_ptmass(4,2)
+          M_central = M_central * usolarmass ! Msun (scale_mass_units_factor assumed umass = Msun)
           do i=1, n_SPH
              r_cyl2 = x(i)**2 + y(i)**2
              r_cyl = sqrt(r_cyl2)
@@ -1248,7 +1253,7 @@ contains
              !vphi = - vx(i) * sin_phi + vy(i) * cos_phi
 
              ! Keplerian vphi
-             vphi = sqrt(Ggrav *  (xyzmh_ptmass(4,1) + xyzmh_ptmass(4,2)) * scale_mass_units_factor * Msun_to_kg  &
+             vphi = sqrt(Ggrav * M_central * Msun_to_kg  &
                   * (r_cyl * AU_to_m)**2 /  (r_sph * AU_to_m)**3 )
 
              vx(i) = vr * cos_phi - vphi * sin_phi
@@ -1262,9 +1267,13 @@ contains
              ! the atomic transfer and the ionisation state, at the moment
              ! we just assume everything is fully ionised to compute Tgas
              !
-             rhogasi = rhogasi*g_to_kg/cm_to_m**3
-             T_gas(j) = get_temp_from_u(rhogasi,vxyzu(4,i)*uvelocity**2,0.6_dp,ieos)
-             if (mod(j,100000).eq.0) print*,i,T_gas(j),'vel=',vxi*uvelocity,vyi*uvelocity,vzi*uvelocity,'m/s'
+             ! for each particle (was done once, with indices and density left over from the
+             ! previous loops)
+             do j=1, n_SPH
+                rhogasi = rhogas(j)*g_to_kg/cm_to_m**3
+                T_gas(j) = get_temp_from_u(rhogasi,vxyzu(4,particle_id(j))*uvelocity**2,0.6_dp,ieos)
+                if (mod(j,100000).eq.0) print*,j,T_gas(j)
+             enddo
           endif
        endif
     endif

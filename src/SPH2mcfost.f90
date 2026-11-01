@@ -540,8 +540,13 @@ contains
                    else if (r_grain(k) > a_SPH(ndusttypes+1)) then ! large grains
                       dust_density_o_n_grains(k,icell) = rho_dust(ndusttypes+1) / n_grains(k)
                    else ! interpolation
-                      if (r_grain(k) > a_sph(l+1)) l = l+1
+                      ! a grain size can skip several hydro sizes: advance until it is bracketed
+                      ! (a single step extrapolated, f > 1, possibly to negative densities)
+                      do while ((r_grain(k) > a_sph(l+1)) .and. (l < ndusttypes))
+                         l = l+1
+                      enddo
                       f = (log(r_grain(k))-log_a_sph(l))/(log_a_sph(l+1)-log_a_sph(l))
+                      f = min(max(f, 0.0_dp), 1.0_dp)
                       dust_density_o_n_grains(k,icell) = (rho_dust(l) + f * (rho_dust(l+1)  - rho_dust(l))) / n_grains(k)
                    endif
                 else
