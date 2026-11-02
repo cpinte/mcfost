@@ -358,4 +358,38 @@ module parameters
 
   type(symspheric_model) :: atmos_1d
 
+contains
+
+  subroutine resize_stars(n_stars_new, lkeep_all)
+    ! Reallocates star for n_stars_new stars and updates n_stars, for the hydro readers.
+    ! The existing stars keep their forced accretion rate (force_Mdot, Mdot), or all their
+    ! properties with lkeep_all; the other stars get the default values of star_type.
+
+    integer, intent(in) :: n_stars_new
+    logical, intent(in), optional :: lkeep_all
+
+    type(star_type), dimension(:), allocatable :: star_old
+    integer :: i
+    logical :: lall
+
+    lall = .false.
+    if (present(lkeep_all)) lall = lkeep_all
+
+    if (allocated(star)) call move_alloc(star, star_old)
+    allocate(star(n_stars_new))
+    if (allocated(star_old)) then
+       do i=1, min(n_stars_new, size(star_old))
+          if (lall) then
+             star(i) = star_old(i)
+          else
+             star(i)%force_Mdot = star_old(i)%force_Mdot
+             star(i)%Mdot = star_old(i)%Mdot
+          endif
+       enddo
+       deallocate(star_old)
+    endif
+    n_stars = n_stars_new
+
+  end subroutine resize_stars
+
 end module parameters

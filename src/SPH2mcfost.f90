@@ -541,7 +541,9 @@ contains
                       dust_density_o_n_grains(k,icell) = rho_dust(ndusttypes+1) / n_grains(k)
                    else ! interpolation
                       ! a grain size can skip several hydro sizes: advance until it is bracketed
-                      ! (a single step extrapolated, f > 1, possibly to negative densities)
+                      ! (a single step extrapolated, f > 1, possibly to negative densities).
+                      ! r_grain is only sorted within a dust population: restart at the next one
+                      if (r_grain(k) < a_sph(l)) l = 1
                       do while ((r_grain(k) > a_sph(l+1)) .and. (l < ndusttypes))
                          l = l+1
                       enddo

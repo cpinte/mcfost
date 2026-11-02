@@ -72,14 +72,13 @@ contains
     integer, intent(out) :: ndusttypes,n_SPH,ierr
 
     integer(HID_T) :: file_id, header_id, group_id
-    integer :: npart(6), n_sinks, alloc_status, i, n_stars_old
+    integer :: npart(6), n_sinks, alloc_status, i
     real(dp) :: mass_table(6), unit_length_cgs, unit_mass_cgs, unit_vel_cgs
     real(dp) :: ulength_au, usolarmass, uvelocity, x0, y0, z0
     real(dp), allocatable :: coords(:,:), vels(:,:), sink_coords(:,:), sink_vels(:,:)
     real(dp), allocatable :: sink_mass(:)
     real(sp), allocatable :: hsml_sp(:), mass_sp(:)
     logical :: got, recentred
-    type(star_type), allocatable :: star_old(:)
 
     ierr = 0
     ndusttypes = 0
@@ -205,23 +204,9 @@ contains
        write(*,*) '  Recentring on first sink at code coords: ', real(x0), real(y0), real(z0)
 
        ! Update stellar positions / masses, preserving para-file T, radius, spectrum
-       n_stars_old = n_stars
-       n_stars = n_sinks
-       if (n_stars /= n_stars_old) then
-          write(*,*) '  Updating number of stars from', n_stars_old, 'to', n_stars
-          if (n_stars_old > 0) then
-             allocate(star_old(n_stars_old))
-             star_old(:) = star(:)
-             deallocate(star)
-             allocate(star(n_stars))
-             do i = 1, min(n_stars,n_stars_old)
-                star(i) = star_old(i)
-             enddo
-             deallocate(star_old)
-          else
-             if (allocated(star)) deallocate(star)
-             allocate(star(n_stars))
-          endif
+       if (n_sinks /= n_stars) then
+          write(*,*) '  Updating number of stars from', n_stars, 'to', n_sinks
+          call resize_stars(n_sinks, lkeep_all=.true.)
        endif
 
        do i = 1, n_stars
@@ -284,7 +269,7 @@ contains
     character*4 :: blockid
     ! npart(0) = SPH gas; npart(5) = N-body / sink particles
     integer :: npart(0:5), ntot, len, flag_sfr, flag_feedback, unused(33), nall(0:5)
-    integer :: n_mass, alloc_status, i_star, i_mass, i_part, k ! n_stars is the global one (was shadowed)
+    integer :: n_mass, n_sinks, alloc_status, i_star, i_mass, i_part, k
     double precision :: massarr(0:5), time, redshift
     real, allocatable :: pos(:,:), vel(:,:), mass_block(:), u(:), rho(:), hsml(:)
     integer, allocatable :: id(:)
@@ -343,9 +328,9 @@ contains
     do j = 0, 5
        if (massarr(j) == 0.) n_mass = n_mass + npart(j)
     end do
-    n_stars = 0
+    n_sinks = 0
     do j = 1, 5
-       if (massarr(j) == 0.) n_stars = n_stars + npart(j)
+       if (massarr(j) == 0.) n_sinks = n_sinks + npart(j)
     end do
 
     allocate(pos(3,ntot), vel(3,ntot), id(ntot), mass_block(n_mass), &
@@ -469,12 +454,16 @@ contains
        particle_id(i) = i
     enddo
 
-    write(*,*) "Found", n_stars, "stars in the Gadget-2 file"
-    if (n_stars > 0) then
-       write(*,*) "Updating the stellar properties"
-
-       if (allocated(star)) deallocate(star)
-       allocate(star(n_stars))
+    ! As in the HDF5 reader: without star in the file, the stars of the parameter file are
+    ! used; otherwise only the positions, velocities and masses are updated (para-file T,
+    ! radius and spectrum preserved, as with -fix_star)
+    write(*,*) "Found", n_sinks, "stars in the Gadget-2 file"
+    if (n_sinks > 0) then
+       write(*,*) "Updating the stellar positions, velocities and masses"
+       if (n_sinks /= n_stars) then
+          write(*,*) '  Updating number of stars from', n_stars, 'to', n_sinks
+          call resize_stars(n_sinks, lkeep_all=.true.)
+       endif
 
        ! particles in the order of the types (positions), masses in the MASS block for the
        ! types with individual masses only (after the gas if it has individual masses)

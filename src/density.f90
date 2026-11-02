@@ -1342,7 +1342,6 @@ subroutine read_density_file()
 
   logical :: lread_gas_density, lread_gas_velocity
 
-  type(star_type), dimension(:), allocatable :: star_old
   integer  :: i_star, n_stars_old
 
   if (lplanet_az) then ! Planet is along x-axis by default in wakeflow
@@ -1419,23 +1418,8 @@ subroutine read_density_file()
         write(*,*) "Updating the stellar properties:"
         write(*,*) "There are now", n_stars, "stars in the model"
 
-        ! Saving if the accretion rate was forced
-        allocate(star_old(n_stars_old))
-        if (allocated(star)) then
-           star_old(:) = star(:)
-           deallocate(star)
-        endif
-        allocate(star(n_stars))
-        do i=1, min(n_stars, n_stars_old)
-           star(i)%force_Mdot = star_old(i)%force_Mdot
-           star(i)%Mdot = star_old(i)%Mdot
-        enddo
-        ! If we have new stars
-        do i=n_stars_old+1,n_stars
-           star(i)%force_Mdot = .false.
-           star(i)%Mdot = 0.
-        enddo
-        deallocate(star_old)
+        ! Keeping the forced accretion rates, new stars with the default values
+        call resize_stars(n_stars)
 
         do i=1, n_stars
            if (.not.star(i)%force_Mdot) then

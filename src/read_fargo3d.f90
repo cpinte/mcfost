@@ -354,7 +354,6 @@ contains
 
 
     integer :: n_stars_old, i
-    type(star_type), dimension(:), allocatable :: star_old
 
     if (n_planets > 0) then
        simu_time = time(n_planets) * utime
@@ -377,24 +376,8 @@ contains
        write(*,*) "Updating the stellar properties:"
        write(*,*) "There are now", n_stars, "stars in the model"
 
-       ! Saving if the accretion rate was forced
-       allocate(star_old(n_stars_old))
-       if (allocated(star)) then
-          star_old(:) = star(:)
-          deallocate(star)
-       endif
-       allocate(star(n_stars))
-       do i=1, min(n_stars, n_stars_old)
-          star(i)%force_Mdot = star_old(i)%force_Mdot
-          star(i)%Mdot = star_old(i)%Mdot
-       enddo
-       ! If we have new stars (from n_stars_old+1: the loop reset the last existing star,
-       ! or wrote star(0) without previous star)
-       do i=n_stars_old+1,n_stars
-          star(i)%force_Mdot = .false.
-          star(i)%Mdot = 0.
-       enddo
-       deallocate(star_old)
+       ! Keeping the forced accretion rates, new stars with the default values
+       call resize_stars(n_stars)
        star(:)%find_spectrum = .true.
     endif
 

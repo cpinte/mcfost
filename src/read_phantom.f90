@@ -984,7 +984,6 @@ contains
     real(dp), dimension(:), allocatable, intent(out) :: SPH_grainsizes ! mum
     real, dimension(:), allocatable, intent(out) :: extra_heating
 
-    type(star_type), dimension(:), allocatable :: star_old
     integer  :: i,j,k,itypei,alloc_status,i_star, n_stars_old, ifile,n_skip,nsinkproperties
     real(dp) :: xi,yi,zi,hi,vxi,vyi,vzi,T_gasi,rhogasi,rhodusti,gasfraci,dustfraci,totlum,qtermi,pmassi
     real(dp) :: ulength_scaled, umass_scaled, utime_scaled,udens,uerg_per_s,uWatt,ulength_au,ulength_m,usolarmass,uvelocity
@@ -1330,23 +1329,8 @@ contains
        write(*,*) "Updating the stellar properties:"
        write(*,*) "There are now", n_stars, "stars in the model"
 
-       ! Saving if the accretion rate was forced
-       allocate(star_old(n_stars_old))
-       if (allocated(star)) then
-          star_old(:) = star(:)
-          deallocate(star)
-       endif
-       allocate(star(n_stars))
-       do i=1, min(n_stars, n_stars_old)
-          star(i)%force_Mdot = star_old(i)%force_Mdot
-          star(i)%Mdot = star_old(i)%Mdot
-       enddo
-       ! If we have new stars
-       do i=n_stars_old+1,n_stars
-          star(i)%force_Mdot = .false.
-          star(i)%Mdot = 0.
-       enddo
-       deallocate(star_old)
+       ! Keeping the forced accretion rates, new stars with the default values
+       call resize_stars(n_stars)
 
        if (n_stars > 0) then
          do i=1,n_stars
@@ -1382,8 +1366,9 @@ contains
                 star(i)%r = xyzmh_ptmass(14,i) * ulength_m / Rsun
                 star(i)%T =  Teff_Sun * (xyzmh_ptmass(12,i) * uWatt / Lsun)**0.25 / sqrt(star(i)%r)
              else if (xyzmh_ptmass(12,i) > tiny_real) then
-                ! We use the luminosity and a radius estimate
-                write(*,*) "Using Lum from phantom + effective radius from sink:"
+                ! We use the luminosity and a radius estimate. Only kept if a sink has Teff or Reff
+                ! (lupdate_photosphere): otherwise the stellar parameters come from the isochrones
+                write(*,*) "Using Lum from phantom + effective radius from sink (isochrones if no sink has Teff or Reff):"
                 star(i)%T = 100.
                 star(i)%r = 0.001
                 if (xyzmh_ptmass(12,i) > tiny_real) then

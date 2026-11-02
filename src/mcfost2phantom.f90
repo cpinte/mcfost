@@ -7,6 +7,7 @@ module mcfost2phantom
   ! to init_mcfost_phantom, phantom's maxp) and of sinks (size of xyzmh_ptmass).
   integer, save, private :: n_particles_max = 0 ! 0: not given, the first call's number is used
   integer, save, private :: n_cells_alloc = 0   ! 0: not allocated yet
+  integer, save, private :: n_stars_alloc = 0   ! number of stars the stellar arrays are allocated for
 
 contains
 
@@ -70,9 +71,9 @@ contains
        endif
     endif
 
+    ! n_cells_alloc is not reset: the arrays stay allocated if the library is initialised again
     n_particles_max = 0
     if (present(max_particles)) n_particles_max = max_particles
-    n_cells_alloc = 0
 
     lISM_heating = .false.
     if (present(use_ISM_heating)) then
@@ -276,12 +277,18 @@ contains
     if (n_cells_alloc == 0) then
        if (n_particles_max > 0) then
           n_cells_alloc = n_particles_max + n_sinks_max
+       else if (use_apr) then
+          ! factor 8: value used in phantom (config.F90) for the maximum number of particles with APR
+          n_cells_alloc = 8 * n_SPH + n_sinks_max
+          write(*,*) "WARNING: max_particles not given to init_mcfost_phantom,"
+          write(*,*) "allocating for", n_cells_alloc, "cells (8 x number of particles of this call, APR)"
        else
           n_cells_alloc = n_cells + n_sinks_max
           write(*,*) "WARNING: max_particles not given to init_mcfost_phantom,"
           write(*,*) "allocating for", n_cells_alloc, "cells (number of particles of this call)"
        endif
-       call alloc_dynamique(n_cells_max = n_cells_alloc, n_stars_max = n_sinks_max)
+       n_stars_alloc = n_sinks_max
+       call alloc_dynamique(n_cells_max = n_cells_alloc, n_stars_max = n_stars_alloc)
        alloc_status = 0
        allocate(xN_abs(n_cells_alloc,1,nb_proc),  stat=alloc_status)
        if (alloc_status /= 0) call error("Allocation error xN_abs")
@@ -290,6 +297,11 @@ contains
        write(*,*) "Number of cells =", n_cells, ", allocated for", n_cells_alloc
        call error("mcfost2phantom: more particles than allocated by mcfost", &
             msg2="give the maximum number of particles to init_mcfost_phantom (max_particles)")
+    endif
+    if (n_stars > n_stars_alloc) then
+       write(*,*) "Number of stars =", n_stars, ", allocated for", n_stars_alloc
+       call error("mcfost2phantom: more sinks than allocated by mcfost", &
+            msg2="pass the full xyzmh_ptmass array (maxptmass columns) to run_mcfost_phantom")
     endif
     xN_abs = 0.0 ! number of packets per cell for this call
     call no_dark_zone()
