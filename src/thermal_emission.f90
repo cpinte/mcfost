@@ -841,10 +841,13 @@ subroutine init_MRW_cells()
   ! transport opacity interpolated in temperature is at most its maximum over the
   ! temperature grid. If d_max * chi_max <= gamma_MRW, the MRW never triggers in the cell.
 
-  use MRW, only : gamma_MRW
+  use MRW, only : gamma_MRW, initialize_cumulative_zeta
 
   integer :: icell, p_icell
   real(kind=dp) :: d_max, chi_max
+
+  ! sample_zeta does not initialise the table (not thread safe): done here for library mode
+  call initialize_cumulative_zeta()
 
   if (allocated(chi_max_MRW)) deallocate(chi_max_MRW)
   allocate(chi_max_MRW(n_cells))

@@ -133,7 +133,7 @@ contains
 
     real(dp) :: zeta_random
 
-    call initialize_cumulative_zeta()
+    ! the table is initialised before the transport (transfert_poussiere and init_MRW_cells)
     zeta_random = real(sprng(stream(id)), kind=dp)
     sample_zeta = interp_y_from_zeta(zeta_random)
 
