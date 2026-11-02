@@ -18,9 +18,9 @@ def MC_similar(x, y, threshold=0.03, mask_threshold=1e-24):
     return p75 < threshold
 
 
-def run_mcfost_cmd(args, timeout=120):
+def run_mcfost_cmd(args, timeout=120, env=None):
     cmd = [_mcfost_bin] + args
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env)
     return result
 
 
@@ -118,14 +118,16 @@ def test_mrw_optically_thick_benchmark(tmp_path):
     dir_std = str(tmp_path / "run_std_1e4")
     dir_mrw = str(tmp_path / "run_mrw_1e4")
 
-    res_std = run_mcfost_cmd([test_para_path, "-star_bb", "-root_dir", dir_std, "-no_mrw"])
+    # Fixed seed and 1 thread: reproducible, the check tests the MRW bias and not the noise
+    env = dict(os.environ, OMP_NUM_THREADS="1")
+    res_std = run_mcfost_cmd([test_para_path, "-star_bb", "-root_dir", dir_std, "-no_mrw", "-seed", "1"], env=env)
     assert res_std.returncode == 0
 
-    res_mrw = run_mcfost_cmd([test_para_path, "-star_bb", "-root_dir", dir_mrw, "-mrw"])
+    res_mrw = run_mcfost_cmd([test_para_path, "-star_bb", "-root_dir", dir_mrw, "-mrw", "-seed", "1"], env=env)
     assert res_mrw.returncode == 0
 
-    T_std = fits.getdata(os.path.join(dir_std, "data_th", "Temperature.fits.gz")).astype(np.float64)
-    T_mrw = fits.getdata(os.path.join(dir_mrw, "data_th", "Temperature.fits.gz")).astype(np.float64)
+    T_std = fits.getdata(os.path.join(dir_std, "seed=1", "data_th", "Temperature.fits.gz")).astype(np.float64)
+    T_mrw = fits.getdata(os.path.join(dir_mrw, "seed=1", "data_th", "Temperature.fits.gz")).astype(np.float64)
 
     # Midplane check
     valid = T_std[0, :] > 2.7

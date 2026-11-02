@@ -2071,7 +2071,7 @@ subroutine display_help()
   write(*,*) "        : -diff_approx : enforce computation of T structure with diff approx."
   write(*,*) "        : -no_diff_approx : compute T structure with only MC method"
   write(*,*) "        : -only_diff_approx : only compute the diffusion approx"
-  write(*,*) "        : -mrw [gamma] : use Modified Random Walk for optically thick cells (gamma >= 2, default 2)"
+  write(*,*) "        : -mrw [gamma] : use Modified Random Walk for optically thick cells (gamma >= 2, default 5)"
   write(*,*) "        : -gamma_mrw <gamma> : set gamma threshold for MRW (same as -mrw <gamma>)"
   write(*,*) "        : -no_mrw : disable Modified Random Walk (default)"
   write(*,*) "        : -tau_dark_zone_obs <tau_dark_zone> (default : 100)"

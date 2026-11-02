@@ -1581,9 +1581,11 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
      if (lMRW .and. letape_th .and. lonly_LTE .and. (.not. lmono) .and. (.not. lxJ_abs_step1) .and. &
           (.not. flag_star) .and. (.not. flag_ISM) .and. (n_iteractions_in_cell >= n_min_interactions_MRW) .and. &
           (icell > 0) .and. (icell <= n_cells)) then
-        if (associated(distance_to_closest_wall)) then
+        ! chi_max_MRW: upper bound of chi_trans in the cell (0 if the MRW cannot trigger): the
+        ! temperature and the MRW opacities are only computed if d * chi_max_MRW can exceed gamma
+        if (associated(distance_to_closest_wall) .and. (chi_max_MRW(icell) > 0.0_dp)) then
            d = distance_to_closest_wall(icell, x, y, z)
-           if (d > 0.0_dp) then
+           if (d * chi_max_MRW(icell) > gamma_MRW) then
               call compute_MRW_opacities(id, icell, chi_trans_cell, kappa_abs_ref)
               if (d * chi_trans_cell > gamma_MRW) then
                  lmrw_done = .false.

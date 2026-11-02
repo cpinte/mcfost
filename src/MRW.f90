@@ -7,7 +7,9 @@ module MRW
   integer, parameter :: n = 10000
   real(dp), dimension(n), save :: zeta, y_MRW
 
-  real(dp) :: gamma_MRW = 2.0_dp
+  ! gamma = 2 (Fleck & Canfield 1984 minimum) biases T low by 4-7 % in the thick midplane just
+  ! outside the dark zone (Pinte 2009 tau = 1e4): 5 is a compromise between accuracy and speed
+  real(dp) :: gamma_MRW = 5.0_dp
   real(dp), parameter :: cst_ct = 3.0_dp / (pi * pi)
   real(dp), parameter :: mrw_wall_safety = 1.0e-5_dp
   integer, parameter :: n_min_interactions_MRW = 3

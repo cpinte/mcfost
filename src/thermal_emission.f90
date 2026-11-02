@@ -19,7 +19,7 @@ module thermal_emission
 
   public :: prob_E_cell, E_totale, nbre_reemission, frac_E_stars, frac_E_disk, L_packet_th, E_abs_nRE, E_abs_nRE_id, &
        correct_E_emission, &
-       DensE, DensE_m1, Dcoeff, chi_Rosseland_MRW, kappa_abs_MRW
+       DensE, DensE_m1, Dcoeff, chi_Rosseland_MRW, kappa_abs_MRW, chi_max_MRW
 
   public :: allocate_temperature, deallocate_temperature_calculation, realloc_emitting_fractions, &
        allocate_thermal_emission, deallocate_thermal_emission, allocate_weight_proba_emission, &
@@ -43,6 +43,10 @@ module thermal_emission
   !   chi_Rosseland_MRW(T, p_icell) = [int (dB/dT) / (kappa_abs + (1-g)*kappa_sca) dlambda]^(-1) * [int (dB/dT) dlambda]
   !   kappa_abs_MRW(T, p_icell)     = [int kappa_abs * (dB/dT) dlambda] / [int (dB/dT) dlambda]
   real(kind=dp), dimension(:,:), allocatable :: chi_Rosseland_MRW, kappa_abs_MRW ! n_T, p_Nc
+  ! Upper bound of the MRW transport opacity of each cell over the temperature grid, with
+  ! kappa_factor [AU^-1]; 0 if the MRW cannot trigger in the cell (d_max * chi_max <= gamma_MRW).
+  ! The MRW opacities are only computed when d * chi_max_MRW(icell) > gamma_MRW
+  real(kind=dp), dimension(:), allocatable :: chi_max_MRW ! n_cells
   real(kind=dp), dimension(:,:), allocatable :: log_E_em_1grain  !n_grains,0:n_T
   real(kind=dp), dimension(:,:), allocatable :: E_em_1grain_nRE, log_E_em_1grain_nRE !n_grains,0:n_T
   ! enthalpy of non equilibrium grains, at the temperature bin centers [Hz] and edges [J]
@@ -241,6 +245,7 @@ subroutine deallocate_thermal_emission()
   if (allocated(tab_Temp)) deallocate(tab_Temp)
   if (allocated(chi_Rosseland_MRW)) deallocate(chi_Rosseland_MRW)
   if (allocated(kappa_abs_MRW)) deallocate(kappa_abs_MRW)
+  if (allocated(chi_max_MRW)) deallocate(chi_max_MRW)
   if (lsed_complete) then
      if (allocated(log_Qcool_minus_extra_heating)) deallocate(log_Qcool_minus_extra_heating)
      if (allocated(DensE)) deallocate(DensE, DensE_m1, Dcoeff)
@@ -266,6 +271,7 @@ subroutine deallocate_temperature_calculation()
      deallocate(log_Qcool_minus_extra_heating)
      if (allocated(chi_Rosseland_MRW)) deallocate(chi_Rosseland_MRW)
      if (allocated(kappa_abs_MRW)) deallocate(kappa_abs_MRW)
+     if (allocated(chi_max_MRW)) deallocate(chi_max_MRW)
   endif
   if (lRE_nLTE) deallocate(kabs_nLTE_CDF, kdB_dT_1grain_nLTE_CDF, log_E_em_1grain,xT_ech_1grain)
   if (lreemission_stats) deallocate(nbre_reemission)
@@ -684,6 +690,7 @@ subroutine init_reemission(lheating,dudt)
 
   if (lRE_LTE .and. allocated(chi_Rosseland_MRW) .and. allocated(kappa_abs_MRW)) then
      call init_MRW_opacities(dB_dT)
+     call init_MRW_cells()
   endif
 
   write(*,*) "Done"
@@ -825,6 +832,36 @@ pure subroutine interp_MRW_pair(T1, T2, frac, p_icell, icell, chi_trans_cell, ka
   chi_trans_cell = chi_ref * kfac
 
 end subroutine interp_MRW_pair
+
+!********************************************************************
+
+subroutine init_MRW_cells()
+  ! Cells where the MRW can trigger: the distance to the closest wall is at most the radius
+  ! of a sphere of the cell volume, d_max = (3 V / 4 pi)^(1/3), for any cell shape, and the
+  ! transport opacity interpolated in temperature is at most its maximum over the
+  ! temperature grid. If d_max * chi_max <= gamma_MRW, the MRW never triggers in the cell.
+
+  use MRW, only : gamma_MRW
+
+  integer :: icell, p_icell
+  real(kind=dp) :: d_max, chi_max
+
+  if (allocated(chi_max_MRW)) deallocate(chi_max_MRW)
+  allocate(chi_max_MRW(n_cells))
+
+  do icell=1, n_cells
+     p_icell = merge(icell, icell1, lvariable_dust)
+     chi_max = maxval(chi_Rosseland_MRW(:,p_icell)) * kappa_factor(icell)
+     d_max = (3.0_dp * volume(icell) / (4.0_dp * pi))**(1.0_dp/3.0_dp)
+     if (d_max * chi_max > gamma_MRW) then
+        chi_max_MRW(icell) = chi_max
+     else
+        chi_max_MRW(icell) = 0.0_dp
+     endif
+  enddo
+  write(*,*) "MRW possible in", count(chi_max_MRW > 0.0_dp), "cells out of", n_cells
+
+end subroutine init_MRW_cells
 
 !********************************************************************
 
