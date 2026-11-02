@@ -233,7 +233,7 @@ contains
     allocate(dustfrac(ndusttypes,np_tot),grainsize(ndusttypes),graindens(ndusttypes))
     allocate(dudt(np_tot),ifiles(np_tot),massoftype(n_files,ntypes_max),npartoftype(ntypes_tot))
     if (ldust_moments) allocate(nucleation(n_nucleation,np_tot))
-    ! sink particles of all the files, allocated once (E4: allocated for each file), with
+    ! sink particles of all the files, allocated once (were allocated for each file), with
     ! size 0 if there is none (they are passed to phantom_2_mcfost)
     allocate(xyzmh_ptmass(nsinkproperties,nptmass_tot), vxyz_ptmass(3,nptmass_tot))
     xyzmh_ptmass(:,:) = 0.
@@ -432,7 +432,7 @@ contains
                             got_itype = .true.
                             read(iunit,iostat=ierr) itype(np0+1:np0+np)
                             ! types are not shifted for the next files: the mass of a particle
-                            ! is massoftype(ifile,itype) and gas is itype == 1 (E4)
+                            ! is massoftype(ifile,itype) and gas is itype == 1
                          case('apr_level')
                             matched = .true.
                             got_apr = .true.
@@ -700,9 +700,9 @@ contains
          massoftype(n_files,ntypes_max),        &
          npartoftype(ntypes_tot),               &
          apr_level(np_tot))
-    ! sink particles of all the files, allocated once (E4: allocated for each file)
+    ! sink particles of all the files, allocated once (were allocated for each file)
     allocate(xyzmh_ptmass(nsinkproperties,nptmass_tot), vxyz_ptmass(3,nptmass_tot))
-    xyzmh_ptmass(:,:) = 0. ! as the binary reader: rows not in the file stay at 0 (E3)
+    xyzmh_ptmass(:,:) = 0. ! as the binary reader: rows not in the file stay at 0
     vxyz_ptmass(:,:) = 0.
     nptmass_found = 0 ! cumulated over the files
 

@@ -374,7 +374,7 @@ contains
        write(*,*) n_inside, "particles inside gap of sink particle #", i_planet
     enddo
 
-    ! randomize_azimuth rotates the particles with mask == 0 (E10: gap and outside were swapped)
+    ! randomize_azimuth rotates the particles with mask == 0 (gap and outside were swapped)
     if (inside) then
        mask(:) = 1 - mask(:)
     endif

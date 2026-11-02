@@ -560,7 +560,7 @@ def test_phantom_avg():
     # -phantom-avg: several phantom dumps read together and averaged (here the same dump
     # twice). The particles of all the files are kept with their mass divided by the
     # number of files, and the sinks are those of the first file. Reading several dumps
-    # with sinks stopped with an allocation error (E4)
+    # with sinks stopped with an allocation error
     if not compute_models:
         pytest.skip("Only run when computing models")
     root_dir = "discF_00500_avg"
@@ -614,7 +614,7 @@ def write_gadget2_test_file(filename):
 
 def test_gadget2_binary():
     # Gadget-2 reader: gas with individual masses (MASS block) was counted as stars, with a
-    # zero gas mass (E11); stars are the non-gas particles with individual masses
+    # zero gas mass; stars are the non-gas particles with individual masses
     if not compute_models:
         pytest.skip("Only run when computing models")
     root_dir = "gadget2_test"
