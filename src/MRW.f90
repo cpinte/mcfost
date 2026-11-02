@@ -127,13 +127,15 @@ contains
   real(dp) function sample_zeta(id)
 
     use naleat, only : stream
+    use messages, only : error
 #include "sprng_f.h"
 
     integer, intent(in) :: id
 
     real(dp) :: zeta_random
 
-    ! the table is initialised before the transport (transfert_poussiere and init_MRW_cells)
+    ! the table is initialised in init_MRW_cells, before the transport (y_MRW(n) = 1 once set)
+    if (y_MRW(n) < 1.0_dp) call error("MRW: zeta table not initialised")
     zeta_random = real(sprng(stream(id)), kind=dp)
     sample_zeta = interp_y_from_zeta(zeta_random)
 

@@ -352,6 +352,7 @@ contains
   ! 2. Cylindrical nearest-wall distance vs ray-sweep & sphere containment
   !======================================================================
   subroutine test_cylindrical_walls()
+    call initialize_cumulative_zeta() ! used by make_MRW_step
     call verify_cylindrical_config(.false., 4, 5, 1, "cyl 2D")
     call verify_cylindrical_config(.true.,  3, 4, 1, "cyl 3D n_az=1")
     call verify_cylindrical_config(.true.,  3, 4, 2, "cyl 3D n_az=2")
@@ -493,6 +494,7 @@ contains
   subroutine test_spherical_walls()
     ! Note: nz = 6 > n_az = 1 and n_az = 4 explicitly tests the old OOB bug
     ! where cos_phi_lim(1:n_az) was indexed by thetaj0 (up to nz, or negative in 3D).
+    call initialize_cumulative_zeta() ! used by make_MRW_step
     call verify_spherical_config(.false., 3, 6, 1, .false., "sph 2D cos-grid (nz=6>n_az=1)")
     call verify_spherical_config(.false., 3, 5, 1, .true.,  "sph 2D regular-theta")
     call verify_spherical_config(.true.,  3, 6, 1, .false., "sph 3D n_az=1 (z<0 & z>0)")
@@ -1371,6 +1373,8 @@ contains
     real :: rand1, rand2, rand3, tau_pkt
     logical :: ok_contain, ok_dist, ok_unit
     logical :: f_star, f_dir_star, f_scatt, f_ism
+
+    call initialize_cumulative_zeta() ! used by make_MRW_step
 
     !------------------------------------------------------------------
     ! 6a. MRW Gating Predicate

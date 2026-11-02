@@ -44,7 +44,6 @@ subroutine init_dust_transfer()
 ! Added the case where Mueller matrices are given as inputs
 ! 20/04/2023
 
-  use MRW, only : initialize_cumulative_zeta
   use utils
   implicit none
 
@@ -58,9 +57,6 @@ subroutine init_dust_transfer()
 
   ! Packet energy mise a 1
   E_paquet = 1.0_dp
-
-  ! Compute equation (7) of Min et al (2009) for Modified Random Walk
-  call initialize_cumulative_zeta()
 
   ! Building the wavelength & basic dust properties grid
   call init_lambda()

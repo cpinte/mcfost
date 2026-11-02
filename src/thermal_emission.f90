@@ -846,7 +846,7 @@ subroutine init_MRW_cells()
   integer :: icell, p_icell
   real(kind=dp) :: d_max, chi_max
 
-  ! sample_zeta does not initialise the table (not thread safe): done here for library mode
+  ! Table of equation (7) of Min et al (2009), used by sample_zeta: only initialised here
   call initialize_cumulative_zeta()
 
   if (allocated(chi_max_MRW)) deallocate(chi_max_MRW)
