@@ -1511,7 +1511,8 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
   ! - separate 1st scattering and the rest
   ! - lom deleted !
 
-  use MRW, only : make_MRW_step, gamma_MRW, mrw_wall_safety, n_min_interactions_MRW, n_mrw_step_max
+  use MRW, only : make_MRW_step, gamma_MRW, mrw_wall_safety, n_min_interactions_MRW, n_mrw_step_max, &
+       mrw_chain_mode, z_extrap_MRW
   use thermal_emission, only : compute_MRW_opacities, im_reemission_LTE
   use radiation_field, only : xKJ_abs, xN_abs
 
@@ -1591,13 +1592,20 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
                     if (step_count > n_mrw_step_max) exit
 
                     d_step = (1.0_dp - mrw_wall_safety) * d
-                    call make_MRW_step(id, x, y, z, u, v, w, d_step, chi_trans_cell, ct)
+                    if ((mrw_chain_mode == 2) .and. (step_count > 1)) then
+                       call make_MRW_step(id, x, y, z, u, v, w, d_step, chi_trans_cell, ct, 0.0_dp)
+                    else
+                       call make_MRW_step(id, x, y, z, u, v, w, d_step, chi_trans_cell, ct, z_extrap_MRW)
+                    endif
 
                     ! Continuous path-length absorption deposition (matching save_radiation_field)
                     xKJ_abs(icell, id) = xKJ_abs(icell, id) + kappa_abs_ref * ct * Stokes(1)
                     if (lsave_n_packet_per_cell) xN_abs(icell, 1, id) = xN_abs(icell, 1, id) + 1.0_dp
 
                     lmrw_done = .true.
+                    ! One step per walk: the next walk starts after n_min_interactions_MRW real
+                    ! interactions, with a fresh direction (see mrw_chain_mode)
+                    if (mrw_chain_mode == 0) exit
 
                     ! Distance from the new sphere boundary point
                     d = distance_to_closest_wall(icell, x, y, z)

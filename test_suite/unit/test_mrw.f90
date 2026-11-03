@@ -29,7 +29,7 @@ program test_mrw
   use naleat, only : init_random_streams
   use MRW, only : n, zeta, y_MRW, gamma_MRW, cumulative_zeta_from_y, &
        initialize_cumulative_zeta, interp_y_from_zeta, make_MRW_step, &
-       sample_lambertian_direction, mrw_wall_safety, n_min_interactions_MRW, n_mrw_step_max
+       sample_exit_direction, z_extrap_MRW, mrw_wall_safety, n_min_interactions_MRW, n_mrw_step_max
   use cylindrical_grid, only : build_cylindrical_cell_mapping, define_cylindrical_grid, &
        cross_cylindrical_cell, index_cell_cyl, distance_to_closest_wall_cyl, &
        cell2cylindrical, cell_map, cell_map_i, cell_map_j, cell_map_k, lexit_cell, &
@@ -123,8 +123,8 @@ contains
     real(dp) :: quad_mean, exact_mean_lny
     real(dp) :: x0, y0, z0, x, y, z, u, v, w, ct, R0, chi
     real(dp) :: dx, dy, dz, step_r, norm_u, mu
-    real(dp) :: sum_ct, sum_mu, sum_mu2, sum_dx, sum_dy, sum_dz
-    real(dp) :: R_macro, d_rem, r_cur, sum_r2_stop
+    real(dp) :: sum_ct, sum_mu, sum_mu2, sum_dx, sum_dy, sum_dz, f_peak
+    real(dp) :: R_macro, d_rem, r_cur, sum_r2_stop, sum_R02, sum_ct_exp, ct_exp
     real(dp) :: max_r_err, max_u_err, min_mu
     logical :: all_finite
     character(len=128) :: msg
@@ -173,22 +173,24 @@ contains
     call check("MRW quadrature <-ln(y)> = pi^2/6", &
          abs(quad_mean - exact_mean_lny) < 5.0e-5_dp * exact_mean_lny, trim(msg))
 
-    ! North & south pole Lambertian direction checks (including wn = -1.0)
+    ! North & south pole exit direction checks (including wn = -1.0)
     min_mu = 1.0_dp
     max_u_err = 0.0_dp
     do i = 1, 1000
-       call sample_lambertian_direction(1, 0.0_dp, 0.0_dp, -1.0_dp, u, v, w)
+       call sample_exit_direction(1, 0.0_dp, 0.0_dp, -1.0_dp, u, v, w)
        max_u_err = max(max_u_err, abs(sqrt(u*u + v*v + w*w) - 1.0_dp))
        min_mu = min(min_mu, -w)
-       call sample_lambertian_direction(1, 0.0_dp, 0.0_dp, 1.0_dp, u, v, w)
+       call sample_exit_direction(1, 0.0_dp, 0.0_dp, 1.0_dp, u, v, w)
        max_u_err = max(max_u_err, abs(sqrt(u*u + v*v + w*w) - 1.0_dp))
        min_mu = min(min_mu, w)
     enddo
-    call check("MRW Lambertian poles unit norm & outward", &
+    call check("MRW exit direction at the poles: unit norm & outward", &
          (max_u_err < 1.0e-14_dp) .and. (min_mu >= 0.0_dp))
 
     ! Monte Carlo verification of make_MRW_step (catches A11 y-coordinate overwrite,
-    ! verifies <ct> = 0.5 * R0^2 * chi, isotropic sphere displacement, Lambertian moments)
+    ! verifies <ct> = 0.5 * (R0 + z_extrap/chi)^2 * chi, isotropic sphere displacement, exit
+    ! direction moments: gamma = R0 chi = 240, fraction 1.16 / 240.24 of 9 mu^8 (<mu> = 0.9,
+    ! <mu^2> = 9/11), the rest from mu (1 + 1.5 mu) (<mu> = 17/24, <mu^2> = 0.55))
     x0 = 1.5_dp ; y0 = -7.25_dp ; z0 = 3.1_dp
     R0 = 2.4_dp ; chi = 100.0_dp
 
@@ -226,22 +228,36 @@ contains
     call check("MRW step direction unit norm & outward mu >= 0", &
          (max_u_err < 1.0e-13_dp) .and. (min_mu >= -1.0e-14_dp))
 
-    write(msg,'(a,es12.5,a,es12.5)') "got ", sum_ct / n_mc, " expected ", 0.5_dp * R0 * R0 * chi
-    call check("MRW step <ct> = 0.5 * R0^2 * chi", &
-         abs(sum_ct / n_mc - 0.5_dp * R0 * R0 * chi) < 0.015_dp * (0.5_dp * R0 * R0 * chi), trim(msg))
+    ct_exp = 0.5_dp * (R0 + z_extrap_MRW / chi)**2 * chi
+    write(msg,'(a,es12.5,a,es12.5)') "got ", sum_ct / n_mc, " expected ", ct_exp
+    call check("MRW step <ct> = 0.5 * (R0 + z_extrap/chi)^2 * chi", &
+         abs(sum_ct / n_mc - ct_exp) < 0.015_dp * ct_exp, trim(msg))
     call check("MRW step isotropic <dr> ~ 0", &
          max(abs(sum_dx), abs(sum_dy), abs(sum_dz)) / (n_mc * R0) < 0.015_dp)
-    call check("MRW step Lambertian <mu>=2/3 and <mu^2>=1/2", &
-         (abs(sum_mu / n_mc - 2.0_dp/3.0_dp) < 0.01_dp) .and. &
-         (abs(sum_mu2 / n_mc - 0.5_dp) < 0.01_dp))
+    write(msg,'(a,f7.4,a,f7.4)') "<mu> = ", sum_mu / n_mc, " <mu^2> = ", sum_mu2 / n_mc
+    f_peak = 1.16_dp / (R0 * chi + 0.24_dp)
+    call check("MRW step exit direction <mu> and <mu^2> (large sphere)", &
+         (abs(sum_mu / n_mc - (f_peak * 0.9_dp + (1.0_dp - f_peak) * 17.0_dp/24.0_dp)) < 0.005_dp) .and. &
+         (abs(sum_mu2 / n_mc - (f_peak * 9.0_dp/11.0_dp + (1.0_dp - f_peak) * 0.55_dp)) < 0.005_dp), trim(msg))
+
+    ! Exact transport walk (isotropic interactions, unit mean free path) from the centre of a
+    ! sphere of radius gamma, until it crosses the surface: its mean path is reproduced by the
+    ! MRW step with the extrapolated boundary (16.3 at gamma = 5), not without (12.5), and its
+    ! mean exit cosine by the gamma-dependent exit law (0.83 at gamma = 2, 0.76 at 5)
+    call check_exact_walk(2.0_dp)
+    call check_exact_walk(5.0_dp)
+    call check_exact_walk(10.0_dp)
 
     ! Multi-step chained adaptive MRW walk inside a macro-sphere of radius R_macro:
     ! Using R0 = 0.5 * (R_macro - |r|) forces ~15-30 chained steps per walk;
-    ! by Dynkin's formula, E[sum ct_k] = 0.5 * E[r_stop^2] * chi.
+    ! the isotropic displacements give E[sum R0_k^2] = E[r_stop^2] (Dynkin's formula), and
+    ! E[sum ct_k] = E[sum 0.5 * (R0_k + z_extrap/chi)^2 * chi].
     R_macro = 1.0_dp
     chi = 5.0e3_dp
     sum_ct = 0.0_dp
     sum_r2_stop = 0.0_dp
+    sum_R02 = 0.0_dp
+    sum_ct_exp = 0.0_dp
     do i = 1, n_chain
        x = 0.0_dp ; y = 0.0_dp ; z = 0.0_dp
        do
@@ -251,14 +267,70 @@ contains
           R0 = 0.5_dp * d_rem
           call make_MRW_step(1, x, y, z, u, v, w, R0, chi, ct)
           sum_ct = sum_ct + ct
+          sum_R02 = sum_R02 + R0 * R0
+          sum_ct_exp = sum_ct_exp + 0.5_dp * (R0 + z_extrap_MRW / chi)**2 * chi
        enddo
        sum_r2_stop = sum_r2_stop + (x*x + y*y + z*z)
     enddo
-    write(msg,'(a,es12.5,a,es12.5)') "got ", sum_ct / n_chain, " expected ", 0.5_dp * (sum_r2_stop / n_chain) * chi
-    call check("MRW chained multi-step <sum ct> = 0.5 * <r_stop^2> * chi", &
-         abs(sum_ct / n_chain - 0.5_dp * (sum_r2_stop / n_chain) * chi) < &
-         0.025_dp * (0.5_dp * (sum_r2_stop / n_chain) * chi), trim(msg))
+    write(msg,'(a,es12.5,a,es12.5)') "got ", sum_R02 / n_chain, " expected ", sum_r2_stop / n_chain
+    call check("MRW chained multi-step <sum R0^2> = <r_stop^2>", &
+         abs(sum_R02 - sum_r2_stop) < 0.025_dp * sum_r2_stop, trim(msg))
+    write(msg,'(a,es12.5,a,es12.5)') "got ", sum_ct / n_chain, " expected ", sum_ct_exp / n_chain
+    call check("MRW chained multi-step <sum ct> = <sum 0.5 (R0 + z_extrap/chi)^2 chi>", &
+         abs(sum_ct - sum_ct_exp) < 0.025_dp * sum_ct_exp, trim(msg))
   end subroutine test_mrw_kernel
+
+  subroutine check_exact_walk(gam)
+    ! Mean path and mean exit cosine of the exact walk out of a sphere of radius gam (unit mean
+    ! free path, isotropic interactions) vs the MRW step for R0 = gam, chi = 1
+    real(dp), intent(in) :: gam
+    integer, parameter :: n_walk = 20000, n_step = 200000
+    real(dp) :: p(3), d(3), rnd(3), b, c, s_exit, l, path, sum_path, sum_ct, sum_ct2, ct
+    real(dp) :: x, y, z, u, v, w, mean_exact, err_exact, mean_mrw, sum_mu_exact, sum_mu_mrw
+    integer :: i
+    character(len=128) :: msg
+
+    sum_path = 0.0_dp ; sum_ct2 = 0.0_dp ; sum_mu_exact = 0.0_dp
+    do i = 1, n_walk
+       p = 0.0_dp ; path = 0.0_dp
+       do
+          call random_number(rnd)
+          d(3) = 2.0_dp * rnd(1) - 1.0_dp
+          d(1) = sqrt(1.0_dp - d(3)**2) * cos(2.0_dp * pi * rnd(2))
+          d(2) = sqrt(1.0_dp - d(3)**2) * sin(2.0_dp * pi * rnd(2))
+          l = -log(1.0_dp - rnd(3))
+          b = dot_product(p, d) ; c = dot_product(p, p) - gam * gam
+          s_exit = -b + sqrt(b * b - c)
+          if (l >= s_exit) then
+             path = path + s_exit
+             sum_mu_exact = sum_mu_exact + dot_product(p + s_exit * d, d) / gam
+             exit
+          endif
+          p = p + l * d ; path = path + l
+       enddo
+       sum_path = sum_path + path ; sum_ct2 = sum_ct2 + path * path
+    enddo
+    mean_exact = sum_path / n_walk
+    err_exact = sqrt(max(sum_ct2 / n_walk - mean_exact**2, 0.0_dp) / n_walk)
+
+    sum_ct = 0.0_dp ; sum_mu_mrw = 0.0_dp
+    do i = 1, n_step
+       x = 0.0_dp ; y = 0.0_dp ; z = 0.0_dp
+       call make_MRW_step(1, x, y, z, u, v, w, gam, 1.0_dp, ct)
+       sum_ct = sum_ct + ct
+       sum_mu_mrw = sum_mu_mrw + (x * u + y * v + z * w) / gam
+    enddo
+    mean_mrw = sum_ct / n_step
+
+    write(msg,'(a,f6.1,a,f8.3,a,f6.3,a,f8.3)') "gamma =", gam, ": exact", mean_exact, " +-", err_exact, &
+         ", MRW", mean_mrw
+    call check("MRW step <ct> matches the exact walk out of the sphere", &
+         abs(mean_mrw - mean_exact) < 0.02_dp * mean_exact, trim(msg))
+    write(msg,'(a,f6.1,a,f7.4,a,f7.4)') "gamma =", gam, ": exact <mu>", sum_mu_exact / n_walk, &
+         ", MRW", sum_mu_mrw / n_step
+    call check("MRW step <mu> at exit matches the exact walk", &
+         abs(sum_mu_mrw / n_step - sum_mu_exact / n_walk) < 0.01_dp, trim(msg))
+  end subroutine check_exact_walk
 
   !======================================================================
   ! Grid setup/teardown helpers for cylindrical & spherical tests
@@ -1432,7 +1504,7 @@ contains
 
     call check("MRW cylindrical 2D: successive steps strictly contained in cell", ok_contain)
     call check("MRW cylindrical 2D: distance to closest wall strictly positive", ok_dist)
-    call check("MRW cylindrical 2D: Lambertian exit direction normalized", ok_unit)
+    call check("MRW cylindrical 2D: exit direction normalized", ok_unit)
 
     ! Case 2: Cylindrical 3D (naz = 4)
     call init_structured_grid(.true., .true., 3, 4, 4, .false.)
