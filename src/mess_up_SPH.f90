@@ -275,7 +275,8 @@ contains
 
   subroutine randomize_azimuth(np, xyzh, vxyzu, mask)
     ! Randomly rotate all the particles around the z axis
-    ! Only rotates particles that are masked (ie where mask == .true.)
+    ! Only rotates particles that are not masked (mask == 0): mask > 0 for the particles
+    ! masked or deleted by the other options
 
     integer, intent(in) :: np
     real(kind=dp), dimension(:,:), intent(inout) :: xyzh, vxyzu
@@ -331,7 +332,7 @@ contains
     ! Randomly rotate all the particles inside or outside cylinder
     ! a width +/- factor * r_Hill of the planet
     ! Rotation is performed around the z axis
-    ! Only rotates particles that are masked (ie where mask == .true.)
+    ! mask is 1 in the gaps, then set to 0 for the particles to rotate (randomize_azimuth)
 
     integer, intent(in) :: np, nptmass
     real(kind=dp), dimension(:,:), intent(inout) :: xyzh, vxyzu
@@ -339,7 +340,7 @@ contains
     real(kind=dp), intent(in) :: udist, factor
     logical, intent(in) :: inside
 
-    integer, dimension(np) :: mask ! true for the particles in the gaps
+    integer, dimension(np) :: mask ! 1 in the gaps, then 0 for the particles to rotate
 
     integer :: i_planet, i, n_inside
     real(kind=dp) :: r_Hill2, r_hill, r_planet, r_minus2, r_plus2, r2
@@ -373,7 +374,8 @@ contains
        write(*,*) n_inside, "particles inside gap of sink particle #", i_planet
     enddo
 
-    if (.not.inside) then
+    ! randomize_azimuth rotates the particles with mask == 0 (gap and outside were swapped)
+    if (inside) then
        mask(:) = 1 - mask(:)
     endif
 

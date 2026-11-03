@@ -1342,7 +1342,6 @@ subroutine read_density_file()
 
   logical :: lread_gas_density, lread_gas_velocity
 
-  type(star_type), dimension(:), allocatable :: star_old
   integer  :: i_star, n_stars_old
 
   if (lplanet_az) then ! Planet is along x-axis by default in wakeflow
@@ -1419,23 +1418,8 @@ subroutine read_density_file()
         write(*,*) "Updating the stellar properties:"
         write(*,*) "There are now", n_stars, "stars in the model"
 
-        ! Saving if the accretion rate was forced
-        allocate(star_old(n_stars_old))
-        if (allocated(star)) then
-           star_old(:) = star(:)
-           deallocate(star)
-        endif
-        allocate(star(n_stars))
-        do i=1, min(n_stars, n_stars_old)
-           star(i)%force_Mdot = star_old(i)%force_Mdot
-           star(i)%Mdot = star_old(i)%Mdot
-        enddo
-        ! If we have new stars
-        do i=n_stars_old+1,n_stars
-           star(i)%force_Mdot = .false.
-           star(i)%Mdot = 0.
-        enddo
-        deallocate(star_old)
+        ! Keeping the forced accretion rates, new stars with the default values
+        call resize_stars(n_stars)
 
         do i=1, n_stars
            if (.not.star(i)%force_Mdot) then
@@ -2162,7 +2146,9 @@ subroutine normalize_dust_density(disk_dust_mass)
         total_sum =  total_sum * AU3_to_cm3 * g_to_Msun
 
         if (total_sum > tiny_dp) then
-           factor = d_p%mass / total_sum
+           ! f: total dust mass given by the caller (e.g. from the hydro dump) relative to
+           ! the parameter file. It was only applied without variable dust
+           factor = f * d_p%mass / total_sum
            do icell=1, n_cells
               do l=d_p%ind_debut, d_p%ind_fin
                  dust_density_o_n_grains(l,icell) = dust_density_o_n_grains(l,icell) * factor

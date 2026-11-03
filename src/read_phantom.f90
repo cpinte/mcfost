@@ -8,7 +8,12 @@ module read_phantom
 
   implicit none
 
-  public :: read_phantom_bin_files, read_phantom_hdf_files, check_phantom_file_variable_dust
+  public :: read_phantom_bin_files, read_phantom_hdf_files, check_phantom_file_variable_dust, lstar_from_phantom
+
+  ! The stellar parameters (Teff, radius) of this dump come from phantom's sinks:
+  ! compute_stellar_parameters must not overwrite them. Set at each read, unlike the
+  ! user option lfix_star
+  logical :: lstar_from_phantom = .false.
 
 contains
 
@@ -136,6 +141,7 @@ contains
     character(len=lentag) :: tag
     character(len=lenid)  :: fileid
     integer :: np,ntypes,nptmass,ngrains,dustfluidtype,ndudt,nptmass0,nptmass_j,nptmass_found
+    integer :: nptmass_file, nptmass_tot, nptmass_first ! sinks of a file, of all the files, of the first one
     integer, parameter :: maxtypes = 6
     integer, parameter :: maxfiles = 3
     integer, parameter :: maxinblock = 128
@@ -155,6 +161,7 @@ contains
 
     ! We first read the number of particules in each phantom file
     np_tot = 0
+    nptmass_tot = 0 ; nptmass_first = 0
     ntypes_tot = 0
     ntypes_max = 0
     do ifile=1, n_files
@@ -200,6 +207,14 @@ contains
        ntypes_tot = ntypes_tot + ntypes
        ntypes_max = max(ntypes_max,ntypes)
 
+       ! sinks of this file, including the 2 sinks of a binary potential
+       call extract('nptmass',nptmass_file,hdr,ierr,default=0)
+       call extract('x2',x2,hdr,ierr)
+       if (ierr == 0) nptmass_file = nptmass_file + 2
+       ierr = 0
+       nptmass_tot = nptmass_tot + nptmass_file
+       if (ifile == 1) nptmass_first = nptmass_file
+
        call extract('mass_per_H',mass_per_h,hdr,ierr)
        if (ierr /= 0) then
           ! No dust nucleation
@@ -218,6 +233,12 @@ contains
     allocate(dustfrac(ndusttypes,np_tot),grainsize(ndusttypes),graindens(ndusttypes))
     allocate(dudt(np_tot),ifiles(np_tot),massoftype(n_files,ntypes_max),npartoftype(ntypes_tot))
     if (ldust_moments) allocate(nucleation(n_nucleation,np_tot))
+    ! sink particles of all the files, allocated once (were allocated for each file), with
+    ! size 0 if there is none (they are passed to phantom_2_mcfost)
+    allocate(xyzmh_ptmass(nsinkproperties,nptmass_tot), vxyz_ptmass(3,nptmass_tot))
+    xyzmh_ptmass(:,:) = 0.
+    vxyz_ptmass(:,:) = 0.
+    nptmass_found = 0 ! cumulated over the files
 
     np0 = 0
     ntypes0 = 0
@@ -283,15 +304,9 @@ contains
        endif
        write(*,*) "Converting them to", nptmass, "stars/planets"
 
-       if (nptmass > 0) then
-          allocate(xyzmh_ptmass(nsinkproperties,nptmass), vxyz_ptmass(3,nptmass)) !HACK
-          xyzmh_ptmass(:,:) = 0.
-          vxyz_ptmass(:,:) = 0.
-       endif
-
        allocate(tmp(np), tmp_dp(np))
 
-       if (npartoftype(2) > 0) then
+       if (npartoftype(ntypes0+2) > 0) then ! types of this file
           dustfluidtype = 2
           call warning("Phantom dump contains two-fluid dust particles, may be discarded")
        else
@@ -332,7 +347,6 @@ contains
 
        ndudt = 0
        ngrains = 0
-       nptmass_found = 0
        do iblock = 1,nblocks
           call read_block_header(narraylengths,number8,nums,iunit,ierr)
           if (ierr /= 0) call error('Reading block header')
@@ -373,7 +387,7 @@ contains
                                ierr = 1 ;
                                return
                             endif
-                            read(iunit,iostat=ierr) dustfrac(ngrains,:)
+                            read(iunit,iostat=ierr) tmp_dp ; dustfrac(ngrains,np0+1:np0+np) = tmp_dp
                             got_dustfrac = .true.
                          ! Nucleation
                          case('K0')
@@ -417,7 +431,8 @@ contains
                             matched = .true.
                             got_itype = .true.
                             read(iunit,iostat=ierr) itype(np0+1:np0+np)
-                            itype(np0+1:np0+np) = itype(np0+1:np0+np) + ntypes0 ! shifting types for succesive files
+                            ! types are not shifted for the next files: the mass of a particle
+                            ! is massoftype(ifile,itype) and gas is itype == 1
                          case('apr_level')
                             matched = .true.
                             got_apr = .true.
@@ -481,7 +496,7 @@ contains
        enddo ! block
 
        ! for backwards compatibility with pre-apr files
-       if (.not.got_apr) apr_level(:) = int(1,kind=1)
+       if (.not.got_apr) apr_level(np0+1:np0+np) = int(1,kind=1)
 
        if (lpotential) then
           call extract('x2',xyzmh_ptmass(1,nptmass_found+1),hdr,ierr)
@@ -501,6 +516,7 @@ contains
           call extract('vx1',vxyz_ptmass(1,nptmass_found+2),hdr,ierr)
           call extract('vy1',vxyz_ptmass(2,nptmass_found+2),hdr,ierr)
           call extract('vz1',vxyz_ptmass(3,nptmass_found+2),hdr,ierr)
+          nptmass_found = nptmass_found + 2
        endif
 
        deallocate(tmp, tmp_dp)
@@ -538,8 +554,13 @@ contains
        gastemperature = 2.74
     endif
 
+    ! sinks of all the files (-phantom-multi, -phantom-add), or of the first file only when
+    ! averaging snapshots (-phantom-avg), so that the stars are not counted n_files times
+    nptmass = nptmass_found
+    if (lphantom_avg) nptmass = nptmass_first
+
     if (got_h) then
-       call modify_dump(np, nptmass, xyzh, vxyzu, xyzmh_ptmass, ulength, mask)
+       call modify_dump(np_tot, nptmass, xyzh, vxyzu, xyzmh_ptmass, ulength, mask)
 
        call phantom_2_mcfost(np_tot,nptmass,ntypes_max,ndusttypes,ldust_moments,n_files,dustfluidtype,xyzh,&
             vxyzu,gastemperature,itype,grainsize,dustfrac,nucleation,massoftype,xyzmh_ptmass,vxyz_ptmass,&
@@ -592,6 +613,7 @@ contains
 
     integer :: ifile, np0, ntypes0, np_tot, ntypes_tot, ntypes_max
     integer :: np,ntypes,nptmass,dustfluidtype,ndudt
+    integer :: nptmass_tot, nptmass_first, nptmass_found, i0, i1 ! sinks of all the files, of the first one
     integer :: ndustsmall,ndustlarge,ieos
 
     integer, parameter :: maxtypes = 100
@@ -602,6 +624,7 @@ contains
     real(dp), allocatable, dimension(:)   :: dudt, tmp_dp,gastemperature
     real(dp), allocatable, dimension(:)   :: grainsize, graindens
     real(dp), allocatable, dimension(:,:) :: xyzh,xyzmh_ptmass,vxyz_ptmass,dustfrac,vxyzu,nucleation
+    real(dp), allocatable, dimension(:) :: sink_tmp
     integer, allocatable, dimension(:) :: npartoftype
     real(dp), allocatable, dimension(:,:) :: massoftype !(maxfiles,maxtypes)
     real(dp) :: hfact,umass,utime,ulength
@@ -617,6 +640,7 @@ contains
     np_tot = 0
     ntypes_tot = 0
     ntypes_max = 0
+    nptmass_tot = 0 ; nptmass_first = 0
 
     ! Read file headers to get particle numbers
     file_headers: do ifile=1, n_files
@@ -644,6 +668,10 @@ contains
           ! ndusttype must be the same for all files : todo : add a test
           ndusttypes = ndustsmall + ndustlarge
        endif
+       call read_from_hdf5(nptmass,'nptmass',hdf5_group_id,got,ierr)
+       if (.not.got) nptmass = 0
+       nptmass_tot = nptmass_tot + nptmass
+       if (ifile == 1) nptmass_first = nptmass
 
        ! close the header group
        call close_hdf5group(hdf5_group_id,ierr)
@@ -672,6 +700,11 @@ contains
          massoftype(n_files,ntypes_max),        &
          npartoftype(ntypes_tot),               &
          apr_level(np_tot))
+    ! sink particles of all the files, allocated once (were allocated for each file)
+    allocate(xyzmh_ptmass(nsinkproperties,nptmass_tot), vxyz_ptmass(3,nptmass_tot))
+    xyzmh_ptmass(:,:) = 0. ! as the binary reader: rows not in the file stay at 0
+    vxyz_ptmass(:,:) = 0.
+    nptmass_found = 0 ! cumulated over the files
 
     ! Read file data
     np0 = 0
@@ -690,7 +723,7 @@ contains
        ! read from header
        call read_from_hdf5(np,'nparttot',hdf5_group_id,got,ierr)
        call read_from_hdf5(ntypes,'ntypes',hdf5_group_id,got,ierr)
-       call read_from_hdf5(npartoftype,'npartoftype',hdf5_group_id,got,ierr)
+       call read_from_hdf5(npartoftype(ntypes0+1:ntypes0+ntypes),'npartoftype',hdf5_group_id,got,ierr)
        call read_from_hdf5(nptmass,'nptmass',hdf5_group_id,got,ierr)
        call read_from_hdf5(ndusttypes,'ndusttypes',hdf5_group_id,got,ierr)
        if (.not. got) then
@@ -726,7 +759,7 @@ contains
 
        allocate(tmp(np), tmp_dp(np))
 
-       if (npartoftype(2) > 0) then
+       if (npartoftype(ntypes0+2) > 0) then ! types of this file
           dustfluidtype = 2
           call warning("Phantom dump contains two-fluid dust particles, may be discarded")
        else
@@ -756,7 +789,7 @@ contains
        if (ierr /= 0) call error("cannot read Phantom HDF particles group in "//trim(filename))
 
        ! for backwards compatibilty with pre-apr files
-       if (.not.got_apr) apr_level(:) = int(1,kind=1)
+       if (.not.got_apr) apr_level(np0+1:np0+np) = int(1,kind=1)
 
        ! close the particles group
        call close_hdf5group(hdf5_group_id,ierr)
@@ -766,20 +799,41 @@ contains
        call open_hdf5group(hdf5_file_id,'sinks',hdf5_group_id,ierr)
        if (ierr /= 0) call error("cannot open Phantom HDF sinks group in "//trim(filename))
 
-       ! read sinks
-       allocate(xyzmh_ptmass(nsinkproperties,nptmass), vxyz_ptmass(3,nptmass))
-       call read_from_hdf5(xyzmh_ptmass(1:3,:),'xyz',hdf5_group_id,got,ierr)
-       call read_from_hdf5(xyzmh_ptmass(4,:),'m',hdf5_group_id,got,ierr)
-       call read_from_hdf5(xyzmh_ptmass(5,:),'h',hdf5_group_id,got,ierr)
-       call read_from_hdf5(xyzmh_ptmass(6,:),'hsoft',hdf5_group_id,got,ierr)
-       call read_from_hdf5(vxyz_ptmass(:,:),'vxyz',hdf5_group_id,got,ierr)
+       ! read the sinks of this file, after those of the previous files
+       if (nptmass > 0) then
+          i0 = nptmass_found + 1 ; i1 = nptmass_found + nptmass
+          call read_from_hdf5(xyzmh_ptmass(1:3,i0:i1),'xyz',hdf5_group_id,got,ierr)
+          call read_from_hdf5(vxyz_ptmass(:,i0:i1),'vxyz',hdf5_group_id,got,ierr)
+          if (ierr /= 0)  call error("cannot read Phantom HDF sinks group in "//trim(filename))
 
-       if (ierr /= 0)  call error("cannot read Phantom HDF sinks group in "//trim(filename))
-
-       call read_from_hdf5(xyzmh_ptmass(16,:),'mdotav',hdf5_group_id,got,ierr)
-       if (ierr /= 0) then
-          call warning("mdotav not present")
-          ierr =0
+          ! Rows of xyzmh_ptmass (mass, radii, then optional properties as in the binary
+          ! reader: accretion rate, luminosity, effective temperature and radius, used by
+          ! phantom_2_mcfost for the stellar parameters) read into a contiguous array: a
+          ! row passed to the intent(out) argument would be overwritten by a temporary
+          ! when absent
+          allocate(sink_tmp(nptmass))
+          call read_from_hdf5(sink_tmp,'m',hdf5_group_id,got,ierr)
+          if (.not.got) call error("cannot read the sink masses in "//trim(filename))
+          xyzmh_ptmass(4,i0:i1) = sink_tmp
+          call read_from_hdf5(sink_tmp,'h',hdf5_group_id,got,ierr)
+          if (got) xyzmh_ptmass(5,i0:i1) = sink_tmp
+          call read_from_hdf5(sink_tmp,'hsoft',hdf5_group_id,got,ierr)
+          if (got) xyzmh_ptmass(6,i0:i1) = sink_tmp
+          call read_from_hdf5(sink_tmp,'mdotav',hdf5_group_id,got,ierr)
+          if (got) then
+             xyzmh_ptmass(16,i0:i1) = sink_tmp
+          else
+             call warning("mdotav not present")
+          endif
+          call read_from_hdf5(sink_tmp,'lum',hdf5_group_id,got,ierr)
+          if (got) xyzmh_ptmass(12,i0:i1) = sink_tmp
+          call read_from_hdf5(sink_tmp,'Teff',hdf5_group_id,got,ierr)
+          if (got) xyzmh_ptmass(13,i0:i1) = sink_tmp
+          call read_from_hdf5(sink_tmp,'Reff',hdf5_group_id,got,ierr)
+          if (got) xyzmh_ptmass(14,i0:i1) = sink_tmp
+          ierr = 0
+          deallocate(sink_tmp)
+          nptmass_found = nptmass_found + nptmass
        endif
 
        ! close the sinks group
@@ -799,6 +853,7 @@ contains
        np0 = np0 + np
        ntypes0 = ntypes0 + ntypes
 
+       deallocate(tmp, tmp_dp) ! allocated for each file
     enddo file_data
 
     if ((ndusttypes > 0) .and. .not. got_dustfrac) then
@@ -812,9 +867,13 @@ contains
     gastemperature = 2.74
     write(*,*) 'Gas temperature not read from hdf files, setting to T=cmb to avoid dust sublimation'
 
+    ! sinks of all the files (-phantom-multi, -phantom-add), or of the first file only when
+    ! averaging snapshots (-phantom-avg), so that the stars are not counted n_files times
+    nptmass = nptmass_found
+    if (lphantom_avg) nptmass = nptmass_first
     write(*,*) "Found", nptmass, "point masses in the phantom file"
 
-    call modify_dump(np, nptmass, xyzh, vxyzu, xyzmh_ptmass, ulength, mask)
+    call modify_dump(np_tot, nptmass, xyzh, vxyzu, xyzmh_ptmass, ulength, mask)
 
     call phantom_2_mcfost(np_tot,nptmass,ntypes_max,ndusttypes,ldust_moments,n_files,      &
          dustfluidtype,xyzh,vxyzu,gastemperature,itype,grainsize,dustfrac,nucleation, &
@@ -925,15 +984,16 @@ contains
     real(dp), dimension(:), allocatable, intent(out) :: SPH_grainsizes ! mum
     real, dimension(:), allocatable, intent(out) :: extra_heating
 
-    type(star_type), dimension(:), allocatable :: star_old
     integer  :: i,j,k,itypei,alloc_status,i_star, n_stars_old, ifile,n_skip,nsinkproperties
     real(dp) :: xi,yi,zi,hi,vxi,vyi,vzi,T_gasi,rhogasi,rhodusti,gasfraci,dustfraci,totlum,qtermi,pmassi
     real(dp) :: ulength_scaled, umass_scaled, utime_scaled,udens,uerg_per_s,uWatt,ulength_au,ulength_m,usolarmass,uvelocity
-    real(dp) :: vphi, vr, phi, cos_phi, sin_phi, r_cyl, r_cyl2, r_sph, G_phantom
+    real(dp) :: vphi, vr, phi, cos_phi, sin_phi, r_cyl, r_cyl2, r_sph, G_phantom, M_central
     real(dp), allocatable :: xyzmh_ptmass(:,:),vxyz_ptmass(:,:)
 
     logical :: use_dust_particles = .false. ! 2-fluid: choose to use dust
     logical :: lupdate_photosphere
+
+    lstar_from_phantom = .false.
 
     ! We check the units by recomputing G
     G_phantom = ulength**3 / (utime**2 * umass)
@@ -1173,6 +1233,11 @@ contains
        endif
 
        if (lVphi_kep) then
+          ! central mass: first sink, plus the second one if any (binary)
+          if (n_stars < 1) call error("Keplerian velocities (lVphi_kep) need a central sink particle")
+          M_central = xyzmh_ptmass(4,1)
+          if (n_stars > 1) M_central = M_central + xyzmh_ptmass(4,2)
+          M_central = M_central * usolarmass ! Msun (scale_mass_units_factor assumed umass = Msun)
           do i=1, n_SPH
              r_cyl2 = x(i)**2 + y(i)**2
              r_cyl = sqrt(r_cyl2)
@@ -1187,7 +1252,7 @@ contains
              !vphi = - vx(i) * sin_phi + vy(i) * cos_phi
 
              ! Keplerian vphi
-             vphi = sqrt(Ggrav *  (xyzmh_ptmass(4,1) + xyzmh_ptmass(4,2)) * scale_mass_units_factor * Msun_to_kg  &
+             vphi = sqrt(Ggrav * M_central * Msun_to_kg  &
                   * (r_cyl * AU_to_m)**2 /  (r_sph * AU_to_m)**3 )
 
              vx(i) = vr * cos_phi - vphi * sin_phi
@@ -1201,9 +1266,13 @@ contains
              ! the atomic transfer and the ionisation state, at the moment
              ! we just assume everything is fully ionised to compute Tgas
              !
-             rhogasi = rhogasi*g_to_kg/cm_to_m**3
-             T_gas(j) = get_temp_from_u(rhogasi,vxyzu(4,i)*uvelocity**2,0.6_dp,ieos)
-             if (mod(j,100000).eq.0) print*,i,T_gas(j),'vel=',vxi*uvelocity,vyi*uvelocity,vzi*uvelocity,'m/s'
+             ! for each particle (was done once, with indices and density left over from the
+             ! previous loops)
+             do j=1, n_SPH
+                rhogasi = rhogas(j)*g_to_kg/cm_to_m**3
+                T_gas(j) = get_temp_from_u(rhogasi,vxyzu(4,particle_id(j))*uvelocity**2,0.6_dp,ieos)
+                if (mod(j,100000).eq.0) print*,j,T_gas(j)
+             enddo
           endif
        endif
     endif
@@ -1260,23 +1329,8 @@ contains
        write(*,*) "Updating the stellar properties:"
        write(*,*) "There are now", n_stars, "stars in the model"
 
-       ! Saving if the accretion rate was forced
-       allocate(star_old(n_stars_old))
-       if (allocated(star)) then
-          star_old(:) = star(:)
-          deallocate(star)
-       endif
-       allocate(star(n_stars))
-       do i=1, min(n_stars, n_stars_old)
-          star(i)%force_Mdot = star_old(i)%force_Mdot
-          star(i)%Mdot = star_old(i)%Mdot
-       enddo
-       ! If we have new stars
-       do i=n_stars_old+1,n_stars
-          star(i)%force_Mdot = .false.
-          star(i)%Mdot = 0.
-       enddo
-       deallocate(star_old)
+       ! Keeping the forced accretion rates, new stars with the default values
+       call resize_stars(n_stars)
 
        if (n_stars > 0) then
          do i=1,n_stars
@@ -1312,8 +1366,9 @@ contains
                 star(i)%r = xyzmh_ptmass(14,i) * ulength_m / Rsun
                 star(i)%T =  Teff_Sun * (xyzmh_ptmass(12,i) * uWatt / Lsun)**0.25 / sqrt(star(i)%r)
              else if (xyzmh_ptmass(12,i) > tiny_real) then
-                ! We use the luminosity and a radius estimate
-                write(*,*) "Using Lum from phantom + effective radius from sink:"
+                ! We use the luminosity and a radius estimate. Only kept if a sink has Teff or Reff
+                ! (lupdate_photosphere): otherwise the stellar parameters come from the isochrones
+                write(*,*) "Using Lum from phantom + effective radius from sink (isochrones if no sink has Teff or Reff):"
                 star(i)%T = 100.
                 star(i)%r = 0.001
                 if (xyzmh_ptmass(12,i) > tiny_real) then
@@ -1329,7 +1384,7 @@ contains
           enddo
 
           if (lupdate_photosphere) then
-             lfix_star = .true.
+             lstar_from_phantom = .true.
              do i=1,n_stars
                 write(*,*) "Star #",i,"  Teff=", star(i)%T, "K, r=", real(star(i)%r), "Rsun"
              enddo

@@ -133,13 +133,12 @@ contains
     integer :: i, iblock, il, jl, kl, iu, ju, ku, j, jj, phik, icell
 
     real(dp) :: Ggrav_athena, umass, usolarmass, ulength, utime, udens, uvelocity, ulength_au, mass, factor
-    type(star_type), dimension(:), allocatable :: star_old
 
     ! Planet properties hard coded for now
     real, parameter :: Mp = 1e-3
     real, parameter :: Omega_p = 1.0
     real, parameter :: x = 1.0, y=0.0, z=0.0
-    real, parameter :: vx=0.0, vy=1.0, vz=1.0
+    real, parameter :: vx=0.0, vy=1.0, vz=0.0 ! circular orbit in the midplane (vz was 1)
 
     usolarmass = 1.0_dp
     ulength_au = 1.0_dp
@@ -177,23 +176,8 @@ contains
        write(*,*) "Updating the stellar properties:"
        write(*,*) "There are now", n_stars, "stars in the model"
 
-       ! Saving if the accretion rate was forced
-       allocate(star_old(n_stars_old))
-       if (allocated(star)) then
-          star_old(:) = star(:)
-          deallocate(star)
-       endif
-       allocate(star(n_stars))
-       do i=1, min(n_stars, n_stars_old)
-          star(i)%force_Mdot = star_old(i)%force_Mdot
-          star(i)%Mdot = star_old(i)%Mdot
-       enddo
-       ! If we have new stars
-       do i=n_stars_old,n_stars
-          star(i)%force_Mdot = .false.
-          star(i)%Mdot = 0.
-       enddo
-       deallocate(star_old)
+       ! Keeping the forced accretion rates, new stars with the default values
+       call resize_stars(n_stars)
        star(:)%find_spectrum = .true.
     endif
 

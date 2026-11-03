@@ -468,6 +468,7 @@ module Voronoi_grid
        alloc_status = 0
        allocate(V_tmp(n_cells), was_cell_cut_tmp(n_cells), star_neighb_tmp(n_cells), stat=alloc_status)
        if (alloc_status /=0) call error("Allocation error before voro++ call")
+       star_neighb_tmp = .false. ! only set to true by voro++ (uninitialised cells were flagged at random)
 
        call voro(n_cells,max_neighbours,limits,x_tmp,y_tmp,z_tmp,h_tmp, threshold, PS%n_faces, &
             PS%vectors, PS%cutting_distance_o_h, icell_start-1,icell_end-1, id-1,nb_proc_voro,n_cells_per_cpu, &

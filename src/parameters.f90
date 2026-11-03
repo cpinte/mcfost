@@ -235,12 +235,14 @@ module parameters
   ! Stars
   type star_type
      ! todo : indicate all units
-     real :: T, M, fUV, slope_UV, othin_sublimation_radius
-     real :: Mdot ! Msun
-     real(kind=dp) :: r, x,y,z, vx,vy,vz
-     logical :: lb_body, out_model, find_spectrum, force_Mdot
-     character(len=512) :: spectrum
-     integer :: icell
+     ! Default values: the hydro readers reallocate star at each dump and only set some
+     ! of the fields (e.g. fUV was undefined when Teff and r came from phantom's sinks)
+     real :: T = 0., M = 0., fUV = 0., slope_UV = 0., othin_sublimation_radius = 0.
+     real :: Mdot = 0. ! Msun
+     real(kind=dp) :: r = 0., x = 0., y = 0., z = 0., vx = 0., vy = 0., vz = 0.
+     logical :: lb_body = .false., out_model = .false., find_spectrum = .true., force_Mdot = .false.
+     character(len=512) :: spectrum = ""
+     integer :: icell = 0
   end type star_type
   logical :: laccretion_shock
 
@@ -355,5 +357,39 @@ module parameters
   end type symspheric_model
 
   type(symspheric_model) :: atmos_1d
+
+contains
+
+  subroutine resize_stars(n_stars_new, lkeep_all)
+    ! Reallocates star for n_stars_new stars and updates n_stars, for the hydro readers.
+    ! The existing stars keep their forced accretion rate (force_Mdot, Mdot), or all their
+    ! properties with lkeep_all; the other stars get the default values of star_type.
+
+    integer, intent(in) :: n_stars_new
+    logical, intent(in), optional :: lkeep_all
+
+    type(star_type), dimension(:), allocatable :: star_old
+    integer :: i
+    logical :: lall
+
+    lall = .false.
+    if (present(lkeep_all)) lall = lkeep_all
+
+    if (allocated(star)) call move_alloc(star, star_old)
+    allocate(star(n_stars_new))
+    if (allocated(star_old)) then
+       do i=1, min(n_stars_new, size(star_old))
+          if (lall) then
+             star(i) = star_old(i)
+          else
+             star(i)%force_Mdot = star_old(i)%force_Mdot
+             star(i)%Mdot = star_old(i)%Mdot
+          endif
+       enddo
+       deallocate(star_old)
+    endif
+    n_stars = n_stars_new
+
+  end subroutine resize_stars
 
 end module parameters

@@ -556,6 +556,77 @@ def test_mathis_field_option():
     assert "-Mathis_field can only be used with -benchmark_SHG" in result.stdout
 
 
+def test_phantom_avg():
+    # -phantom-avg: several phantom dumps read together and averaged (here the same dump
+    # twice). The particles of all the files are kept with their mass divided by the
+    # number of files, and the sinks are those of the first file. Reading several dumps
+    # with sinks stopped with an allocation error
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    root_dir = "discF_00500_avg"
+    clean_results(root_dir)
+    dump = "test_data/discF_00500/discF_00500"
+    stdout = run_mcfost("test_data/discF_00500/discF_00500.para", root_dir,
+                        "-phantom-avg 2 "+dump+" "+dump+" -not_random_Voronoi -disk_struct", timeout=600)
+    assert "There are now           2 stars in the model" in stdout
+    # gas mass of the model: half of the gas mass of the particles of the 2 files
+    m_particles = [float(l.split()[-2]) for l in stdout.splitlines() if "SPH gas mass is" in l][0]
+    m_model = [float(l.split()[-2]) for l in stdout.splitlines() if "Total  gas mass in model" in l][-1]
+    assert abs(m_model / (0.5 * m_particles) - 1.0) < 0.01
+
+
+def write_gadget2_test_file(filename):
+    # Synthetic Gadget-2 binary dump (format of read_gadget_binary_file): 2000 gas particles
+    # with individual masses (0.01 Msun in total), 10 particles of type 1 with a mass in the
+    # header (not stars), and 1 star of type 5 (1 Msun) with an individual mass
+    import struct
+
+    def record(f, data):
+        b = data if isinstance(data, bytes) else data.tobytes()
+        f.write(struct.pack("<i", len(b)) + b + struct.pack("<i", len(b)))
+
+    ulength, udens = 3.29120e12, 2.00932e-04 # units of the reader
+    au, Msun = 1.495978707e13, 1.988409870698051e33
+    umass = udens * ulength**3
+    rng = np.random.default_rng(1)
+    ngas, ndm = 2000, 10
+    npart = np.array([ngas, ndm, 0, 0, 0, 1], dtype="<i4")
+    massarr = np.array([0.0, 1e-6, 0.0, 0.0, 0.0, 0.0], dtype="<f8") # 0: individual masses
+    r = rng.uniform(10, 100, ngas) * au / ulength
+    phi = rng.uniform(0, 2 * np.pi, ngas)
+    pos = np.zeros((npart.sum(), 3), dtype="<f4")
+    pos[:ngas] = np.c_[r * np.cos(phi), r * np.sin(phi), rng.normal(0, 0.05, ngas) * r]
+    pos[ngas:ngas + ndm] = rng.uniform(-50, 50, (ndm, 3)) * au / ulength
+    pos[-1] = [5 * au / ulength, 0, 0]
+    masses = np.r_[np.full(ngas, 1e-2 * Msun / umass / ngas), [Msun / umass]].astype("<f4")
+    zeros = np.zeros(ngas, "<f4")
+    with open(filename, "wb") as f:
+        record(f, b"HEAD" + struct.pack("<i", 264))
+        header = npart.tobytes() + massarr.tobytes() + np.zeros(2, "<f8").tobytes() \
+            + np.zeros(2, "<i4").tobytes() + npart.tobytes() + np.zeros(34, "<i4").tobytes()
+        record(f, header[:256])
+        for tag, arr in [(b"POS ", pos), (b"VEL ", np.zeros_like(pos)), (b"ID  ", np.arange(1, npart.sum() + 1, dtype="<i4")),
+                         (b"MASS", masses), (b"U   ", zeros + 1e-3), (b"RHO ", zeros), (b"NE  ", zeros),
+                         (b"NH  ", zeros), (b"HSML", (0.2 * r).astype("<f4"))]:
+            record(f, tag + struct.pack("<i", arr.nbytes + 8))
+            record(f, arr)
+
+
+def test_gadget2_binary():
+    # Gadget-2 reader: gas with individual masses (MASS block) was counted as stars, with a
+    # zero gas mass; stars are the non-gas particles with individual masses
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    root_dir = "gadget2_test"
+    clean_results(root_dir)
+    os.makedirs(root_dir)
+    write_gadget2_test_file(root_dir+"/gadget_test")
+    stdout = run_mcfost("unit/mcfost2phantom.para", root_dir, "-gadget "+root_dir+"/gadget_test -disk_struct", timeout=300)
+    assert "Found           1 stars in the Gadget-2 file" in stdout
+    m_gas = [float(l.split()[-2]) for l in stdout.splitlines() if "Total  gas mass in model" in l][-1]
+    assert abs(m_gas / 1e-2 - 1.0) < 0.01
+
+
 # Pascucci et al. 2004 benchmark: SEDs and midplane temperatures compared with the
 # RADMC and RADICAL results of the paper (distributed with the MCFOST utils).
 # Optically thin cases run for every pull request, optically thick ones only locally (slow).

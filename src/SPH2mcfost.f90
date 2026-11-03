@@ -6,7 +6,7 @@ module SPH2mcfost
   use messages
   use sort, only : find_kth_smallest_inplace
   use density, only : normalize_dust_density, reduce_density, read_Voronoi_fits_file, find_non_empty_cell
-  use read_phantom, only : read_phantom_bin_files, read_phantom_hdf_files
+  use read_phantom, only : read_phantom_bin_files, read_phantom_hdf_files, lstar_from_phantom
   use sort, only : index_quicksort
   use stars, only : compute_stellar_parameters
 
@@ -102,7 +102,7 @@ contains
        if (allocated(massdust)) deallocate(massdust)
     endif
 
-    if (.not.lfix_star) call compute_stellar_parameters()
+    if (.not.(lfix_star .or. lstar_from_phantom)) call compute_stellar_parameters()
 
     ! Model limits
     call read_SPH_limits_file(limits_file, SPH_limits)
@@ -423,6 +423,7 @@ contains
           enddo !l
           mass = mass * volume(icell)
 
+          mdust = 0.0_dp ! star cells (iSPH == 0) have no dust
           if (iSPH > 0) mdust =  massgas(iSPH) * dust_moments(3,iSPH) * 12.*amu/mass_per_H
           mdust_tot = mdust_tot + mdust
 
@@ -539,8 +540,15 @@ contains
                    else if (r_grain(k) > a_SPH(ndusttypes+1)) then ! large grains
                       dust_density_o_n_grains(k,icell) = rho_dust(ndusttypes+1) / n_grains(k)
                    else ! interpolation
-                      if (r_grain(k) > a_sph(l+1)) l = l+1
+                      ! a grain size can skip several hydro sizes: advance until it is bracketed
+                      ! (a single step extrapolated, f > 1, possibly to negative densities).
+                      ! r_grain is only sorted within a dust population: restart at the next one
+                      if (r_grain(k) < a_sph(l)) l = 1
+                      do while ((r_grain(k) > a_sph(l+1)) .and. (l < ndusttypes))
+                         l = l+1
+                      enddo
                       f = (log(r_grain(k))-log_a_sph(l))/(log_a_sph(l+1)-log_a_sph(l))
+                      f = min(max(f, 0.0_dp), 1.0_dp)
                       dust_density_o_n_grains(k,icell) = (rho_dust(l) + f * (rho_dust(l+1)  - rho_dust(l))) / n_grains(k)
                    endif
                 else
@@ -786,10 +794,14 @@ contains
     nkill = 0
     do i=1, n_SPH
        ii = order(i)
+       ! a ghost is removed from the mesh: it cannot be the main particle of other ghosts
+       ! (their mass would be lost, and they would get no temperature)
+       if (is_ghost(ii) > 0) cycle
        loop2 : do j=i+1, n_SPH
           jj = order(j)
           dr2 = (x(ii)-x(jj))**2 + (y(ii)-y(jj))**2 + (z(ii)-z(jj))**2
           if (dr2 < prec * x2(ii)) then
+             if (is_ghost(jj) > 0) cycle loop2 ! already merged into a main particle
              is_ghost(jj) = particle_id(ii)
              nkill = nkill+1
 
