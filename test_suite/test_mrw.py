@@ -1,4 +1,5 @@
 import os
+import re
 import shutil
 import subprocess
 import numpy as np
@@ -18,7 +19,9 @@ def MC_similar(x, y, threshold=0.03, mask_threshold=1e-24):
     return p75 < threshold
 
 
-def run_mcfost_cmd(args, timeout=120, env=None):
+def run_mcfost_cmd(args, timeout=None, env=None):
+    # No time limit by default, as run_mcfost in test_mcfost.py: the ref3.0 temperature runs
+    # take more than 120 s on the macOS Intel runners
     cmd = [_mcfost_bin] + args
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env)
     return result
@@ -43,7 +46,9 @@ def test_mrw_cli_flags(tmp_path):
     dir_test = str(tmp_path / "test_cli")
     res_gamma = run_mcfost_cmd([_ref3_para, "-root_dir", dir_test, "-op", "0.81", "-mrw", "3.0"])
     assert res_gamma.returncode == 0
-    assert "MRW enabled with gamma =   3.0000000000000000" in res_gamma.stdout
+    # list-directed output: the number of digits depends on the compiler (gfortran, ifort)
+    m = re.search(r"MRW enabled with gamma =\s*([0-9.Ee+-]+)", res_gamma.stdout)
+    assert m is not None and float(m.group(1)) == 3.0
 
 
 def test_mrw_temperature_and_sed(tmp_path):

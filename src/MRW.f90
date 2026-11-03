@@ -160,6 +160,18 @@ contains
 
   !----------------------------------------------
 
+  pure real(dp) function exit_peak_fraction(gam) result(f)
+    ! Fraction of 9 mu^8 in the exit law of the walks that interact in a sphere of gam transport
+    ! mean free paths, fitted to <mu> of the exact walk for gam = 2-20 (mrw_study: <mu> within
+    ! 0.0015, <mu^2> within 0.005); tends to 1.06 / gam
+    real(dp), intent(in) :: gam
+
+    f = min(1.063_dp * gam / (gam * gam - 1.284_dp * gam + 2.702_dp), 1.0_dp)
+
+  end function exit_peak_fraction
+
+  !----------------------------------------------
+
   subroutine sample_exit_direction(id, un, vn, wn, u, v, w, gam)
     ! Sample the direction of a packet leaving the MRW sphere, around the unit outward normal
     ! (un, vn, wn), phi = 2*pi*xi_2. Large spheres: mu = cos(psi) from p(mu) = mu (1 + 1.5 mu)
@@ -167,9 +179,8 @@ contains
     ! (limb darkening, <mu> = 0.71). A Lambertian exit (p = 2 mu, <mu> = 2/3, Min et al. 2009) is
     ! too oblique. Sphere of gam transport mean free paths (optional): the exact walk also
     ! escapes without interaction (probability exp(-gam), mu = 1), and its diffuse part is more
-    ! forward-peaked: mu (1 + 1.5 mu) mixed with 9 mu^8 in proportion 1.16 / (gam + 0.24),
-    ! fitted to <mu> of the exact walk for gam = 2-15 (<mu> = 0.83 at gam 2, 0.76 at 5; <mu^2>
-    ! then within 0.005)
+    ! forward-peaked: mu (1 + 1.5 mu) mixed with 9 mu^8 in proportion exit_peak_fraction(gam)
+    ! (<mu> = 0.83 at gam 2, 0.76 at 5, 0.73 at 10)
     use naleat, only : stream
 #include "sprng_f.h"
 
@@ -190,7 +201,7 @@ contains
     if (present(gam)) then
        rand3 = real(sprng(stream(id)), kind=dp)
        p_ball = exp(-gam)
-       p_peak = p_ball + (1.0_dp - p_ball) * min(1.16_dp / (gam + 0.24_dp), 1.0_dp)
+       p_peak = p_ball + (1.0_dp - p_ball) * exit_peak_fraction(gam)
     endif
 
     if (rand3 < p_ball) then

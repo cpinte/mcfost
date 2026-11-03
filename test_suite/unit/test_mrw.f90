@@ -29,7 +29,7 @@ program test_mrw
   use naleat, only : init_random_streams
   use MRW, only : n, zeta, y_MRW, gamma_MRW, cumulative_zeta_from_y, &
        initialize_cumulative_zeta, interp_y_from_zeta, make_MRW_step, &
-       sample_exit_direction, z_extrap_MRW, mrw_wall_safety, n_min_interactions_MRW, n_mrw_step_max
+       sample_exit_direction, exit_peak_fraction, z_extrap_MRW, mrw_wall_safety, n_min_interactions_MRW, n_mrw_step_max
   use cylindrical_grid, only : build_cylindrical_cell_mapping, define_cylindrical_grid, &
        cross_cylindrical_cell, index_cell_cyl, distance_to_closest_wall_cyl, &
        cell2cylindrical, cell_map, cell_map_i, cell_map_j, cell_map_k, lexit_cell, &
@@ -86,7 +86,12 @@ contains
   end subroutine check
 
   subroutine init_rng()
+    !$ use omp_lib, only : omp_set_num_threads
     nb_proc = 1
+    ! The per-thread work arrays (e.g. xT_ech(:,nb_proc)) are sized with nb_proc: the OpenMP
+    ! regions of the library (init_reemission) must run on a single thread, otherwise threads
+    ! with id > 1 write past the end of the arrays (intermittent heap corruption)
+    !$ call omp_set_num_threads(1)
     call init_random_streams(1)
   end subroutine init_rng
 
@@ -189,8 +194,8 @@ contains
 
     ! Monte Carlo verification of make_MRW_step (catches A11 y-coordinate overwrite,
     ! verifies <ct> = 0.5 * (R0 + z_extrap/chi)^2 * chi, isotropic sphere displacement, exit
-    ! direction moments: gamma = R0 chi = 240, fraction 1.16 / 240.24 of 9 mu^8 (<mu> = 0.9,
-    ! <mu^2> = 9/11), the rest from mu (1 + 1.5 mu) (<mu> = 17/24, <mu^2> = 0.55))
+    ! direction moments: gamma = R0 chi = 240, fraction exit_peak_fraction(240) of 9 mu^8
+    ! (<mu> = 0.9, <mu^2> = 9/11), the rest from mu (1 + 1.5 mu) (<mu> = 17/24, <mu^2> = 0.55))
     x0 = 1.5_dp ; y0 = -7.25_dp ; z0 = 3.1_dp
     R0 = 2.4_dp ; chi = 100.0_dp
 
@@ -235,7 +240,7 @@ contains
     call check("MRW step isotropic <dr> ~ 0", &
          max(abs(sum_dx), abs(sum_dy), abs(sum_dz)) / (n_mc * R0) < 0.015_dp)
     write(msg,'(a,f7.4,a,f7.4)') "<mu> = ", sum_mu / n_mc, " <mu^2> = ", sum_mu2 / n_mc
-    f_peak = 1.16_dp / (R0 * chi + 0.24_dp)
+    f_peak = exit_peak_fraction(R0 * chi)
     call check("MRW step exit direction <mu> and <mu^2> (large sphere)", &
          (abs(sum_mu / n_mc - (f_peak * 0.9_dp + (1.0_dp - f_peak) * 17.0_dp/24.0_dp)) < 0.005_dp) .and. &
          (abs(sum_mu2 / n_mc - (f_peak * 9.0_dp/11.0_dp + (1.0_dp - f_peak) * 0.55_dp)) < 0.005_dp), trim(msg))
@@ -583,7 +588,8 @@ contains
     real(dp) :: f1, f2, f3, r, th, phi, dphi, rcyl, x, y, z, d_wall, d_ray_min
     real(dp) :: xr, yr, zr, x1, y1, z1, l_step, l_contrib, l_void, l_tot
     real(dp) :: u, v, w
-    logical :: ok_contain, ok_upper, ok_tight, ok_bounds
+    logical :: ok_contain, ok_upper, ok_tight, ok_bounds, ok_mid
+    integer :: n_mid
     character(len=128) :: msg
 
     call init_structured_grid(.false., is_3d, nr, n_vert, naz, reg_theta)
@@ -595,6 +601,8 @@ contains
     ok_contain = .true.
     ok_upper   = .true.
     ok_tight   = .true.
+    ok_mid     = .true.
+    n_mid = 0
     n_pts = 0
     msg = ""
 
@@ -648,6 +656,12 @@ contains
           do hop = 1, 4
              call cross_spherical_cell(xr, yr, zr, u, v, w, icell, 0, &
                   x1, y1, z1, next_c, l_step, l_contrib, l_void)
+             ! 3D midplane crossing (z1 = 0 up to rounding): the next cell must be in the
+             ! hemisphere of the direction of the ray, and z1 on that side
+             if (l3D .and. (hop == 1) .and. (abs(z1) < 1.0e-10_dp * r)) then
+                n_mid = n_mid + 1
+                if ((cell_map_j(next_c) * w <= 0.0_dp) .or. (z1 * w <= 0.0_dp)) ok_mid = .false.
+             endif
              l_tot = l_tot + l_step
              if (next_c /= icell) exit
              xr = x1 ; yr = y1 ; zr = z1
@@ -671,6 +685,10 @@ contains
     call check(label // " sphere contained in cell", ok_contain .and. (n_pts == n_cells))
     call check(label // " d_wall <= min ray exit distance", ok_upper, trim(msg))
     call check(label // " d_wall tight against min ray distance", ok_tight, trim(msg))
+    if (l3D) then
+       write(msg,'(i0,a)') n_mid, " midplane crossings"
+       call check(label // " midplane crossing changes hemisphere", ok_mid .and. (n_mid > 0), trim(msg))
+    endif
 
     if (is_3d .and. (naz == 4)) then
        icell = cell_map(2, -3, 3)

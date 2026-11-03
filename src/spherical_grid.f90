@@ -199,6 +199,7 @@ end subroutine indice_cellule_sph_theta
 
     real(kind=dp) :: a_theta, b_theta, c_theta, tan2, tan_angle_lim1, tan_angle_lim2, t1, t2
     real(kind=dp) :: t1_1, t1_2, t2_1, t2_2, a_theta_m1
+    logical :: lmidplane
 
     ! Todo : can be calculated outside
 
@@ -209,6 +210,7 @@ end subroutine indice_cellule_sph_theta
     precision = 1.0e-15_dp ! for g95
 
     uv = sqrt(u*u + v*v)
+    lmidplane = .false.
     ! end     ! Todo : can be calculated outside
 
     ! 3D cell indices
@@ -337,7 +339,10 @@ end subroutine indice_cellule_sph_theta
        else
           t=t2
           delta_theta = -1
-          if (abs(thetaj0) == 1) delta_theta = 0
+          if (abs(thetaj0) == 1) then
+             delta_theta = 0
+             lmidplane = l3D
+          endif
        endif
 
        ! 3) azimuthal interface position
@@ -415,7 +420,17 @@ end subroutine indice_cellule_sph_theta
        ri1=ri0
        thetaj1=abs(thetaj0)+delta_theta
        if (l3D) then
-          if (z1<0) thetaj1 = -thetaj1
+          if (lmidplane) then
+             ! Midplane crossing: the boundary is the cone tan_theta_lim(0) = 1e-10, i.e. z = 0 in
+             ! double precision, so z1 = 0 up to rounding and its sign cannot give the
+             ! hemisphere (the packet could stay indexed in its cell while moving out of it).
+             ! The direction does; z1 is put on that side
+             if (w < 0.0_dp) thetaj1 = -thetaj1
+             if (z1 * w <= 0.0_dp) z1 = sign(grid_prec, w)
+          else
+             ! Other theta walls: same hemisphere
+             if (thetaj0 < 0) thetaj1 = -thetaj1
+          endif
        endif
        phik1=phik0
     else
