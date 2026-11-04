@@ -44,7 +44,6 @@ subroutine init_dust_transfer()
 ! Added the case where Mueller matrices are given as inputs
 ! 20/04/2023
 
-  use MRW, only : initialize_cumulative_zeta
   use utils
   implicit none
 
@@ -58,9 +57,6 @@ subroutine init_dust_transfer()
 
   ! Packet energy mise a 1
   E_paquet = 1.0_dp
-
-  ! Compute equation (7) of Min et al (2009) for Modified Random Walk
-  call initialize_cumulative_zeta()
 
   ! Building the wavelength & basic dust properties grid
   call init_lambda()
@@ -1519,7 +1515,10 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
   ! - separate 1st scattering and the rest
   ! - lom deleted !
 
-  use MRW, only : make_MRW_step, gamma_MRW
+  use MRW, only : make_MRW_step, gamma_MRW, mrw_wall_safety, n_min_interactions_MRW, n_mrw_step_max, &
+       mrw_chain_mode, z_extrap_MRW, lmrw_after_abs
+  use thermal_emission, only : compute_MRW_opacities, im_reemission_LTE
+  use radiation_field, only : xKJ_abs, xN_abs
 
   integer, intent(in) :: id
   integer, intent(inout) :: lambda, p_lambda
@@ -1532,7 +1531,9 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
 
   real(kind=dp), dimension(4,4) :: M
   real(kind=dp) :: u1,v1,w1, phi, cospsi
-  !real(kind=dp) :: Planck_opacity, rec_Planck_opacity, d, diff_coeff
+  real(kind=dp) :: d, d_step, chi_trans_cell, kappa_abs_ref, ct
+  logical :: lmrw_done
+  integer :: step_count
   integer :: igrain, itheta
   integer :: n_iteractions_in_cell, icell_old
   integer, pointer :: p_icell
@@ -1576,24 +1577,81 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
      !   if (.not.flag_star) Stokes=0.
      !endif
 
-     ! Do we need to perform a MRW ?
-     !if ((n_iteractions_in_cell > 5)) then
-     !   d = distance_to_closest_wall(icell,x,y,z)
-     !   call compute_Planck_opacities(icell, Planck_opacity,rec_Planck_opacity)
-     !
-     !   !write(*,*) icell, d, rec_Planck_opacity,  d * rec_Planck_opacity, gamma_MRW
-     !   !read(*,*)
-     !
-     !   do while  (d * rec_Planck_opacity > gamma_MRW )
-     !      write(*,*) "MRW"
-     !      call make_MRW_step(id,icell, x,y,z,Stokes(1), d, rec_Planck_opacity)
-     !      d = distance_to_closest_wall(icell,x,y,z)
-     !      ! todo : do we update the rec_plack_opacity ???
-     !      !call compute_Planck_opacities(icell, Planck_opacity,rec_Planck_opacity)
-     !   enddo
-     !
-     !   ! MRW is finished, we choose wl and direction
-     !endif
+     ! Modified Random Walk (MRW, Min et al. 2009; Robitaille 2010):
+     ! Accelerate photon diffusion in optically thick cells during thermal equilibrium calculation
+     if (lMRW .and. letape_th .and. lonly_LTE .and. (.not. lmono) .and. (.not. lxJ_abs_step1) .and. &
+          (.not. flag_star) .and. (.not. flag_ISM) .and. (n_iteractions_in_cell >= n_min_interactions_MRW) .and. &
+          (.not. (lmrw_after_abs .and. flag_scatt)) .and. (icell > 0) .and. (icell <= n_cells)) then
+        ! flag_scatt: the last event was a scattering (cleared by an absorption and after a walk)
+        ! chi_max_MRW: upper bound of chi_trans in the cell (0 if the MRW cannot trigger): the
+        ! temperature and the MRW opacities are only computed if d * chi_max_MRW can exceed gamma
+        if (associated(distance_to_closest_wall) .and. (chi_max_MRW(icell) > 0.0_dp)) then
+           d = distance_to_closest_wall(icell, x, y, z)
+           if (d * chi_max_MRW(icell) > gamma_MRW) then
+              call compute_MRW_opacities(id, icell, chi_trans_cell, kappa_abs_ref)
+              if (d * chi_trans_cell > gamma_MRW) then
+                 lmrw_done = .false.
+                 step_count = 0
+                 do while (d * chi_trans_cell > gamma_MRW)
+                    step_count = step_count + 1
+                    if (step_count > n_mrw_step_max) exit
+
+                    d_step = (1.0_dp - mrw_wall_safety) * d
+                    if ((mrw_chain_mode == 2) .and. (step_count > 1)) then
+                       call make_MRW_step(id, x, y, z, u, v, w, d_step, chi_trans_cell, ct, 0.0_dp)
+                    else
+                       call make_MRW_step(id, x, y, z, u, v, w, d_step, chi_trans_cell, ct, z_extrap_MRW)
+                    endif
+
+                    ! Continuous path-length absorption deposition (matching save_radiation_field)
+                    xKJ_abs(icell, id) = xKJ_abs(icell, id) + kappa_abs_ref * ct * Stokes(1)
+                    if (lsave_n_packet_per_cell) xN_abs(icell, 1, id) = xN_abs(icell, 1, id) + 1.0_dp
+
+                    lmrw_done = .true.
+                    ! One step per walk: the next walk starts after n_min_interactions_MRW real
+                    ! interactions, with a fresh direction (see mrw_chain_mode)
+                    if (mrw_chain_mode == 0) exit
+
+                    ! Distance from the new sphere boundary point
+                    d = distance_to_closest_wall(icell, x, y, z)
+                    if (d <= 0.0_dp) exit
+
+                    ! Live update of opacities for the next MRW step
+                    call compute_MRW_opacities(id, icell, chi_trans_cell, kappa_abs_ref)
+                 enddo
+
+                 if (lmrw_done) then
+                    ! Resample exit wavelength from LTE emission at local updated dust temperature
+                    rand = sprng(stream(id)) ; rand2 = sprng(stream(id))
+                    call im_reemission_LTE(id, icell, p_icell, rand, rand2, lambda)
+                    p_lambda = merge(lambda, 1, l_p_lambda_is_lambda)
+
+                    ! Thermal dust emission is unpolarized
+                    Stokes(2) = 0.0_dp
+                    Stokes(3) = 0.0_dp
+                    Stokes(4) = 0.0_dp
+
+                    ! Reset interaction flags and in-cell counter
+                    flag_star = .false.
+                    flag_direct_star = .false.
+                    flag_scatt = .false.
+                    flag_ISM = .false.
+                    n_iteractions_in_cell = 0
+
+                    ! Draw fresh optical depth for the newly re-emitted packet
+                    rand = sprng(stream(id))
+                    if (rand == 1.0) then
+                       tau = 1.0e30
+                    else if (rand > 1.0e-6) then
+                       tau = -log(1.0 - rand)
+                    else
+                       tau = rand
+                    endif
+                 endif
+              endif
+           endif
+        endif
+     endif
 
      ! now that MRW is done, we perform the normal propagation
      icell_old = icell

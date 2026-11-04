@@ -9,9 +9,9 @@ module cylindrical_grid
   public :: cell2cylindrical, cross_cylindrical_cell, pos_em_cell_cyl, index_cell_cyl, test_exit_grid_cyl, &
        move_to_grid_cyl, define_cylindrical_grid, build_cylindrical_cell_mapping,  cell_map, cell_map_i, cell_map_j,&
        cell_map_k, lexit_cell, r_lim, r_lim_2, r_lim_3, cell_height, r_grid, z_grid, phi_grid, region_map, &
-       z_lim, w_lim, theta_lim, tan_theta_lim, tan_phi_lim, cos_phi_lim, sin_phi_lim, volume, l_dark_zone, zmax, &
+       z_lim, w_lim, theta_lim, tan_theta_lim, cos_theta_lim, tan_phi_lim, cos_phi_lim, sin_phi_lim, volume, l_dark_zone, zmax, &
        delta_cell_dark_zone, ri_in_dark_zone, ri_out_dark_zone, zj_sup_dark_zone, zj_inf_dark_zone, l_is_dark_zone, &
-       distance_to_closest_wall_cyl
+       distance_to_phi_walls, distance_to_closest_wall_cyl
 
   real(kind=dp), parameter, public :: grid_prec=1.0e-14_dp
 
@@ -591,11 +591,11 @@ subroutine define_cylindrical_grid()
         if (abs(modulo(phi-0.5*pi,pi)) < 1.0e-6) then
            tan_phi_lim(k) = 1.0d300
            cos_phi_lim(k) = 0.0_dp
-           sin_phi_lim(k) = 1.0d300
+           sin_phi_lim(k) = sign(1.0_dp, sin(real(phi, kind=dp)))
         else
            tan_phi_lim(k) = tan(phi)
-           cos_phi_lim(k) = cos(phi)
-           sin_phi_lim(k) = sin(phi)
+           cos_phi_lim(k) = cos(real(phi, kind=dp))
+           sin_phi_lim(k) = sin(real(phi, kind=dp))
         endif
      enddo !k
 
@@ -614,11 +614,11 @@ subroutine define_cylindrical_grid()
          where (abs(modulo(pluto%x3(2:n_az+1)-0.5*pi,pi)) < 1.0e-6)
             tan_phi_lim = 1.0d300
             cos_phi_lim = 0.0_dp
-            sin_phi_lim = 1.0d300
+            sin_phi_lim = sign(1.0_dp, sin(real(pluto%x3(2:n_az+1), kind=dp)))
          elsewhere
             tan_phi_lim = tan(pluto%x3(2:n_az+1))
-            cos_phi_lim = cos(pluto%x3(2:n_az+1))
-            sin_phi_lim = sin(pluto%x3(2:n_az+1))
+            cos_phi_lim = cos(real(pluto%x3(2:n_az+1), kind=dp))
+            sin_phi_lim = sin(real(pluto%x3(2:n_az+1), kind=dp))
          endwhere
       endif
 
@@ -1176,50 +1176,109 @@ end subroutine define_cylindrical_grid
 
   !***********************************************************
 
+  pure real(dp) function distance_to_phi_walls(x, y, rcyl, k0) result(s_phi)
+    ! Exact 3D Euclidean distance from (x, y, z) to the two azimuthal half-planes
+    ! bounding sector k0 (requires l3D and n_az > 1).
+    real(kind=dp), intent(in) :: x, y, rcyl
+    integer, intent(in) :: k0
+
+    integer :: k0m1
+    real(kind=dp) :: c_hi, s_hi, c_lo, s_lo
+    real(kind=dp) :: d_hi, d_lo, s5, s6, sin_dphi
+
+    k0m1 = k0 - 1
+    if (k0m1 == 0) k0m1 = n_az
+
+    c_hi = cos_phi_lim(k0)   ; s_hi = sin_phi_lim(k0)
+    c_lo = cos_phi_lim(k0m1) ; s_lo = sin_phi_lim(k0m1)
+
+    ! Signed inward distances to upper (phi_hi) and lower (phi_lo) half-planes
+    d_hi =  x * s_hi - y * c_hi
+    d_lo = -x * s_lo + y * c_lo
+
+    sin_dphi = s_hi * c_lo - c_hi * s_lo
+    if (sin_dphi >= -1.0e-5_dp) then
+       ! Convex or pi wedge (delta_phi <= pi)
+       if ((d_hi <= 0.0_dp) .or. (d_lo <= 0.0_dp)) then
+          s_phi = 0.0_dp
+          return
+       endif
+    else
+       ! Reflex wedge (delta_phi > pi on non-uniform azimuthal grids)
+       if ((d_hi <= 0.0_dp) .and. (d_lo <= 0.0_dp)) then
+          s_phi = 0.0_dp
+          return
+       endif
+    endif
+
+    if (x * c_hi + y * s_hi >= 0.0_dp) then
+       s5 = abs(d_hi)
+    else
+       s5 = rcyl
+    endif
+
+    if (x * c_lo + y * s_lo >= 0.0_dp) then
+       s6 = abs(d_lo)
+    else
+       s6 = rcyl
+    endif
+
+    s_phi = min(s5, s6)
+
+  end function distance_to_phi_walls
+
+  !***********************************************************
+
   real(dp) function distance_to_closest_wall_cyl(icell,x,y,z) result(s)
 
     integer, intent(in) :: icell
     real(kind=dp), intent(in) :: x,y,z
 
-    real(dp) :: r,s1,s2,s3,s4,s5,s6,z0
-    integer :: ri0,zj0,k0
+    real(dp) :: r,s1,s2,s3,s4,s_phi,z0
+    integer :: ri0,zj0,ja,k0
+
+    if ((icell <= 0) .or. (icell > n_cells)) then
+       s = 0.0_dp
+       return
+    endif
 
     ! 3D cell indices
     call cell2cylindrical(icell, ri0,zj0,k0)
+    ja = abs(zj0)
 
-    ! cyclindrical walls
+    if ((ri0 < 1) .or. (ri0 > n_rad) .or. (ja < 1) .or. (ja > nz)) then
+       s = 0.0_dp
+       return
+    endif
+
+    if (l3D .and. (z * real(zj0, kind=dp) < 0.0_dp)) then
+       s = 0.0_dp
+       return
+    endif
+
+    ! Cylindrical radial walls
     r = sqrt(x*x+y*y)
-    s1 = r_lim(ri0)-r
+    s1 = r_lim(ri0) - r
     s2 = r - r_lim(ri0-1)
 
-    ! z walls
+    ! Vertical z walls
     z0 = abs(z)
-    zj0 = abs(zj0)
-    s3 = z_lim(ri0,abs(zj0)+1) - z0
-    s4 = z0 - z_lim(ri0,abs(zj0))
-
-    if (l3D) then
-       ! phi walls
-       !
-       ! Distance between a line with equation a*x+by+c=0, ie y=-a/b*x-c/b and point (x0,y0) is:
-       !
-       ! d = |a*x0+b*y0+c|/sqrt(a**2+b**2)
-       !
-       ! In case of phi walls, we have y = x * tan(phi) so:
-       !
-       ! a = -sin(phi)
-       ! b = cos(phi)
-       ! c = 0
-       !
-       ! and therefore
-       !
-       ! d = |x0*sin(phi) - y0*cos(theta)| / sqrt[cos^2 + sin^2]
-       s5 = abs(x*sin_phi_lim(k0) - y*cos_phi_lim(k0))
-       s6 = abs(x*sin_phi_lim(k0-1) - y*cos_phi_lim(k0-1))
-       s = min(s1,s2,s3,s4,s5,s6)
+    s3 = z_lim(ri0, ja+1) - z0
+    if ((.not. l3D) .and. (ja == 1)) then
+       ! In 2D, cell j=1 spans [-z_lim(ri0,2), +z_lim(ri0,2)] across the midplane
+       s4 = huge(1.0_dp)
     else
-       s = min(s1,s2,s3,s4)
+       s4 = z0 - z_lim(ri0, ja)
     endif
+
+    if (l3D .and. (n_az > 1)) then
+       s_phi = distance_to_phi_walls(x, y, r, k0)
+       s = min(s1, s2, s3, s4, s_phi)
+    else
+       s = min(s1, s2, s3, s4)
+    endif
+
+    s = max(0.0_dp, s)
 
     return
 

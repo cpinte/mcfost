@@ -19,7 +19,7 @@ module thermal_emission
 
   public :: prob_E_cell, E_totale, nbre_reemission, frac_E_stars, frac_E_disk, L_packet_th, E_abs_nRE, E_abs_nRE_id, &
        correct_E_emission, &
-       DensE, DensE_m1, Dcoeff
+       DensE, DensE_m1, Dcoeff, chi_Rosseland_MRW, kappa_abs_MRW, chi_max_MRW
 
   public :: allocate_temperature, deallocate_temperature_calculation, realloc_emitting_fractions, &
        allocate_thermal_emission, deallocate_thermal_emission, allocate_weight_proba_emission, &
@@ -27,7 +27,8 @@ module thermal_emission
        im_reemission_qre, init_emissivite_nre, init_reemission, select_wl_em, &
        select_cellule, temp_finale, temp_finale_nlte, temp_nre, update_proba_abs_nre, &
        repartition_wl_em, repartition_energie, allocate_thermal_energy, set_min_temperature, &
-       reset_temperature, reset_thermal_state
+       reset_temperature, reset_thermal_state, &
+       init_MRW_opacities, compute_MRW_opacities, eval_MRW_opacities_at_T
 
   private
 
@@ -38,6 +39,14 @@ module thermal_emission
   ! fraction of energy re-emitted over star energy
   ! (average Planck opacity * coeff)
   real(kind=dp), dimension(:,:), allocatable :: log_Qcool_minus_extra_heating ! 0:n_T, n_cells
+  ! Pre-tabulated Modified Random Walk mean opacities for Bjorkman & Wood LTE transport [AU^-1, without kappa_factor]:
+  !   chi_Rosseland_MRW(T, p_icell) = [int (dB/dT) / (kappa_abs + (1-g)*kappa_sca) dlambda]^(-1) * [int (dB/dT) dlambda]
+  !   kappa_abs_MRW(T, p_icell)     = [int kappa_abs * (dB/dT) dlambda] / [int (dB/dT) dlambda]
+  real(kind=dp), dimension(:,:), allocatable :: chi_Rosseland_MRW, kappa_abs_MRW ! n_T, p_Nc
+  ! Upper bound of the MRW transport opacity of each cell over the temperature grid, with
+  ! kappa_factor [AU^-1]; 0 if the MRW cannot trigger in the cell (d_max * chi_max <= gamma_MRW).
+  ! The MRW opacities are only computed when d * chi_max_MRW(icell) > gamma_MRW
+  real(kind=dp), dimension(:), allocatable :: chi_max_MRW ! n_cells
   real(kind=dp), dimension(:,:), allocatable :: log_E_em_1grain  !n_grains,0:n_T
   real(kind=dp), dimension(:,:), allocatable :: E_em_1grain_nRE, log_E_em_1grain_nRE !n_grains,0:n_T
   ! enthalpy of non equilibrium grains, at the temperature bin centers [Hz] and edges [J]
@@ -111,6 +120,15 @@ subroutine allocate_thermal_emission(Nc,p_Nc)
   allocate(log_Qcool_minus_extra_heating(n_T,p_Nc), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error log_E_em')
   log_Qcool_minus_extra_heating = 0.0
+
+  if (lRE_LTE .and. lMRW) then
+     if (allocated(chi_Rosseland_MRW)) deallocate(chi_Rosseland_MRW)
+     if (allocated(kappa_abs_MRW)) deallocate(kappa_abs_MRW)
+     allocate(chi_Rosseland_MRW(n_T,p_Nc), kappa_abs_MRW(n_T,p_Nc), stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error MRW opacities')
+     chi_Rosseland_MRW = 0.0_dp
+     kappa_abs_MRW = 0.0_dp
+  endif
 
   allocate(DensE(n_rad,0:nz,n_az), DensE_m1(n_rad,0:nz,n_az), Dcoeff(n_rad,0:nz,n_az), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error kappa_abs_1grain')
@@ -223,13 +241,19 @@ subroutine deallocate_thermal_emission()
 
   use radiation_field, only : deallocate_radiation_field
 
-  deallocate(tab_Temp)
+  if (allocated(spectre_emission_cumul)) deallocate(spectre_emission_cumul)
+  if (allocated(tab_Temp)) deallocate(tab_Temp)
+  if (allocated(chi_Rosseland_MRW)) deallocate(chi_Rosseland_MRW)
+  if (allocated(kappa_abs_MRW)) deallocate(kappa_abs_MRW)
+  if (allocated(chi_max_MRW)) deallocate(chi_max_MRW)
   if (lsed_complete) then
-     deallocate(log_Qcool_minus_extra_heating)
-     deallocate(DensE, DensE_m1, Dcoeff)
+     if (allocated(log_Qcool_minus_extra_heating)) deallocate(log_Qcool_minus_extra_heating)
+     if (allocated(DensE)) deallocate(DensE, DensE_m1, Dcoeff)
      call deallocate_radiation_field()
      if (allocated(nbre_reemission)) deallocate(nbre_reemission)
-     if (allocated(kdB_dT_CDF)) deallocate(xT_ech,kdB_dT_CDF)
+     if (allocated(kdB_dT_CDF)) deallocate(kdB_dT_CDF)
+     if (allocated(kdB_dT_1grain_LTE_CDF)) deallocate(kdB_dT_1grain_LTE_CDF)
+     if (allocated(xT_ech)) deallocate(xT_ech)
   endif
 
   return
@@ -245,6 +269,9 @@ subroutine deallocate_temperature_calculation()
   if (lRE_LTE) then
      if (allocated(kdB_dT_CDF)) deallocate(xT_ech,kdB_dT_CDF)
      deallocate(log_Qcool_minus_extra_heating)
+     if (allocated(chi_Rosseland_MRW)) deallocate(chi_Rosseland_MRW)
+     if (allocated(kappa_abs_MRW)) deallocate(kappa_abs_MRW)
+     if (allocated(chi_max_MRW)) deallocate(chi_max_MRW)
   endif
   if (lRE_nLTE) deallocate(kabs_nLTE_CDF, kdB_dT_1grain_nLTE_CDF, log_E_em_1grain,xT_ech_1grain)
   if (lreemission_stats) deallocate(nbre_reemission)
@@ -661,10 +688,287 @@ subroutine init_reemission(lheating,dudt)
      enddo
   endif
 
+  if (lRE_LTE .and. allocated(chi_Rosseland_MRW) .and. allocated(kappa_abs_MRW)) then
+     call init_MRW_opacities(dB_dT)
+     call init_MRW_cells()
+  endif
+
   write(*,*) "Done"
   return
 
 end subroutine init_reemission
+
+!********************************************************************
+
+subroutine init_MRW_opacities(dB_dT)
+  ! Pre-tabulate the Bjorkman & Wood (2001) Modified Random Walk mean opacities
+  ! on (1:n_T, 1:p_n_cells) [in AU^-1, without kappa_factor(icell)]:
+  !   1) chi_Rosseland_MRW(T, icell): Rosseland transport mean extinction
+  !        [ Sum_l (dB_l/dT) / (kappa_abs_l + (1 - g_l) * kappa_sca_l) ]^-1 * [ Sum_l (dB_l/dT) ]
+  !      governing D(T) = 1 / (3 * chi_Rosseland_MRW * kappa_factor) and E[ct] = 0.5 * R0^2 * chi_trans.
+  !   2) kappa_abs_MRW(T, icell): dB/dT-weighted mean absorption opacity
+  !        [ Sum_l kappa_abs_l * (dB_l/dT) ] / [ Sum_l (dB_l/dT) ]
+  !      governing continuous path-length absorption deposition Delta(xKJ_abs) = kappa_abs_MRW * ct * I.
+
+  real(kind=dp), dimension(n_lambda, n_T), intent(in) :: dB_dT
+
+  integer :: icell, T, lambda
+  real(kind=dp) :: w, k_abs, k_sca, g_val, chi_trans_wl
+  real(kind=dp) :: sum_dBdT, sum_inv_chi, sum_kabs_dBdT
+  logical :: lhas_g, ltransparent
+
+  if ((.not. allocated(chi_Rosseland_MRW)) .or. (.not. allocated(kappa_abs_MRW))) return
+
+  lhas_g = allocated(tab_g_pos)
+
+  !$omp parallel do collapse(2) default(none) &
+  !$omp private(icell, T, lambda, w, k_abs, k_sca, g_val, chi_trans_wl, &
+  !$omp         sum_dBdT, sum_inv_chi, sum_kabs_dBdT, ltransparent) &
+  !$omp shared(p_n_cells, n_T, n_lambda, dB_dT, kappa, kappa_abs_LTE, &
+  !$omp        tab_albedo_pos, tab_g_pos, lhas_g, chi_Rosseland_MRW, kappa_abs_MRW) &
+  !$omp schedule(static)
+  do icell = 1, p_n_cells
+     do T = 1, n_T
+        sum_dBdT      = 0.0_dp
+        sum_inv_chi   = 0.0_dp
+        sum_kabs_dBdT = 0.0_dp
+        ltransparent  = .false.
+
+        do lambda = 1, n_lambda
+           w = dB_dT(lambda, T)
+           if (w <= 0.0_dp) cycle
+
+           sum_dBdT = sum_dBdT + w
+           k_abs = kappa_abs_LTE(icell, lambda)
+           sum_kabs_dBdT = sum_kabs_dBdT + w * k_abs
+
+           k_sca = kappa(icell, lambda) * real(tab_albedo_pos(icell, lambda), kind=dp)
+           if (lhas_g) then
+              g_val = min(max(real(tab_g_pos(icell, lambda), kind=dp), -1.0_dp), 1.0_dp)
+           else
+              g_val = 0.0_dp
+           endif
+
+           chi_trans_wl = k_abs + (1.0_dp - g_val) * k_sca
+           if (chi_trans_wl > tiny_dp) then
+              sum_inv_chi = sum_inv_chi + w / chi_trans_wl
+           else
+              ltransparent = .true.
+           endif
+        enddo
+
+        if (sum_dBdT > tiny_dp) then
+           kappa_abs_MRW(T, icell) = sum_kabs_dBdT / sum_dBdT
+           if ((.not. ltransparent) .and. (sum_inv_chi > tiny_dp) .and. (sum_kabs_dBdT > tiny_dp)) then
+              chi_Rosseland_MRW(T, icell) = sum_dBdT / sum_inv_chi
+           else
+              chi_Rosseland_MRW(T, icell) = 0.0_dp
+           endif
+        else
+           kappa_abs_MRW(T, icell)     = 0.0_dp
+           chi_Rosseland_MRW(T, icell) = 0.0_dp
+        endif
+     enddo
+  enddo
+  !$omp end parallel do
+
+end subroutine init_MRW_opacities
+
+!********************************************************************
+
+pure subroutine interp_MRW_pair(T1, T2, frac, p_icell, icell, chi_trans_cell, kappa_abs_ref)
+  integer, intent(in) :: T1, T2, p_icell, icell
+  real(kind=dp), intent(in) :: frac
+  real(kind=dp), intent(out) :: chi_trans_cell, kappa_abs_ref
+
+  real(kind=dp) :: wc, kfac, c1, c2, k1, k2, chi_ref
+
+  if ((.not. allocated(chi_Rosseland_MRW)) .or. (.not. allocated(kappa_abs_MRW)) .or. &
+       (.not. allocated(kappa_factor))) then
+     chi_trans_cell = 0.0_dp
+     kappa_abs_ref  = 0.0_dp
+     return
+  endif
+
+  if ((icell < 1) .or. (icell > size(kappa_factor)) .or. &
+       (p_icell < 1) .or. (p_icell > size(chi_Rosseland_MRW, 2))) then
+     chi_trans_cell = 0.0_dp
+     kappa_abs_ref  = 0.0_dp
+     return
+  endif
+
+  kfac = kappa_factor(icell)
+  if (kfac <= 0.0_dp) then
+     chi_trans_cell = 0.0_dp
+     kappa_abs_ref  = 0.0_dp
+     return
+  endif
+
+  wc = min(max(frac, 0.0_dp), 1.0_dp)
+  c1 = chi_Rosseland_MRW(T1, p_icell)
+  c2 = chi_Rosseland_MRW(T2, p_icell)
+  k1 = kappa_abs_MRW(T1, p_icell)
+  k2 = kappa_abs_MRW(T2, p_icell)
+
+  if (wc <= 0.0_dp) then
+     chi_ref       = c1
+     kappa_abs_ref = k1
+  else if (wc >= 1.0_dp) then
+     chi_ref       = c2
+     kappa_abs_ref = k2
+  else
+     if ((c1 > 0.0_dp) .and. (c2 > 0.0_dp)) then
+        chi_ref = exp((1.0_dp - wc) * log(c1) + wc * log(c2))
+     else
+        chi_ref = 0.0_dp
+     endif
+     if ((k1 > 0.0_dp) .and. (k2 > 0.0_dp)) then
+        kappa_abs_ref = exp((1.0_dp - wc) * log(k1) + wc * log(k2))
+     else
+        kappa_abs_ref = (1.0_dp - wc) * k1 + wc * k2
+     endif
+  endif
+
+  chi_trans_cell = chi_ref * kfac
+
+end subroutine interp_MRW_pair
+
+!********************************************************************
+
+subroutine init_MRW_cells()
+  ! Cells where the MRW can trigger: the distance to the closest wall is at most the radius
+  ! of a sphere of the cell volume, d_max = (3 V / 4 pi)^(1/3), for any cell shape, and the
+  ! transport opacity interpolated in temperature is at most its maximum over the
+  ! temperature grid. If d_max * chi_max <= gamma_MRW, the MRW never triggers in the cell.
+
+  use MRW, only : gamma_MRW, initialize_cumulative_zeta
+
+  integer :: icell, p_icell
+  real(kind=dp) :: d_max, chi_max
+
+  ! Table of equation (7) of Min et al (2009), used by sample_zeta: only initialised here
+  call initialize_cumulative_zeta()
+
+  if (allocated(chi_max_MRW)) deallocate(chi_max_MRW)
+  allocate(chi_max_MRW(n_cells))
+
+  do icell=1, n_cells
+     p_icell = merge(icell, icell1, lvariable_dust)
+     chi_max = maxval(chi_Rosseland_MRW(:,p_icell)) * kappa_factor(icell)
+     d_max = (3.0_dp * volume(icell) / (4.0_dp * pi))**(1.0_dp/3.0_dp)
+     if (d_max * chi_max > gamma_MRW) then
+        chi_max_MRW(icell) = chi_max
+     else
+        chi_max_MRW(icell) = 0.0_dp
+     endif
+  enddo
+  write(*,*) "MRW possible in", count(chi_max_MRW > 0.0_dp), "cells out of", n_cells
+
+end subroutine init_MRW_cells
+
+!********************************************************************
+
+subroutine compute_MRW_opacities(id, icell, chi_trans_cell, kappa_abs_ref)
+  ! Return the live MRW opacities in cell icell on thread id (id=0 sums all threads):
+  !   - chi_trans_cell [AU^-1]: local Rosseland transport extinction INCLUDING kappa_factor(icell),
+  !     for the MRW trigger (d * chi_trans_cell > gamma_MRW) and make_MRW_step.
+  !   - kappa_abs_ref  [AU^-1]: dB/dT-weighted mean absorption opacity WITHOUT kappa_factor(icell),
+  !     matching save_radiation_field's convention for xKJ_abs(icell, id).
+
+  integer, intent(in) :: id, icell
+  real(kind=dp), intent(out) :: chi_trans_cell, kappa_abs_ref
+
+  integer :: p_icell, Ti, T1, T2
+  real :: Temp
+  real(kind=dp) :: frac
+
+  if ((.not. allocated(chi_Rosseland_MRW)) .or. (.not. allocated(kappa_abs_MRW)) .or. &
+       (.not. allocated(kappa_factor))) then
+     chi_trans_cell = 0.0_dp
+     kappa_abs_ref  = 0.0_dp
+     return
+  endif
+
+  if ((icell < 1) .or. (icell > size(kappa_factor))) then
+     chi_trans_cell = 0.0_dp
+     kappa_abs_ref  = 0.0_dp
+     return
+  endif
+
+  if (kappa_factor(icell) <= 0.0_dp) then
+     chi_trans_cell = 0.0_dp
+     kappa_abs_ref  = 0.0_dp
+     return
+  endif
+
+  if (lvariable_dust) then
+     p_icell = icell
+  else
+     p_icell = icell1
+  endif
+
+  call Temp_LTE(id, icell, Ti, Temp, frac)
+  T2 = min(max(Ti, 2), n_T)
+  T1 = T2 - 1
+
+  call interp_MRW_pair(T1, T2, frac, p_icell, icell, chi_trans_cell, kappa_abs_ref)
+
+end subroutine compute_MRW_opacities
+
+!********************************************************************
+
+pure subroutine eval_MRW_opacities_at_T(Temp_in, icell, chi_trans_cell, kappa_abs_ref)
+  ! Evaluate the pre-tabulated MRW opacities at an explicit temperature Temp_in [K]
+  ! in cell icell using log-log interpolation on tab_Temp(1:n_T).
+
+  real(kind=dp), intent(in) :: Temp_in
+  integer, intent(in) :: icell
+  real(kind=dp), intent(out) :: chi_trans_cell, kappa_abs_ref
+
+  integer :: p_icell, lo, hi, mid, T1, T2
+  real(kind=dp) :: frac, T_lo, T_hi
+
+  if ((.not. allocated(tab_Temp)) .or. (n_T < 1)) then
+     chi_trans_cell = 0.0_dp
+     kappa_abs_ref  = 0.0_dp
+     return
+  endif
+
+  if (lvariable_dust) then
+     p_icell = icell
+  else
+     p_icell = icell1
+  endif
+
+  if (n_T == 1) then
+     call interp_MRW_pair(1, 1, 0.0_dp, p_icell, icell, chi_trans_cell, kappa_abs_ref)
+     return
+  endif
+
+  if (Temp_in <= real(tab_Temp(1), kind=dp)) then
+     call interp_MRW_pair(1, 1, 0.0_dp, p_icell, icell, chi_trans_cell, kappa_abs_ref)
+  else if (Temp_in >= real(tab_Temp(n_T), kind=dp)) then
+     call interp_MRW_pair(n_T, n_T, 1.0_dp, p_icell, icell, chi_trans_cell, kappa_abs_ref)
+  else
+     lo = 1
+     hi = n_T
+     do while (hi - lo > 1)
+        mid = (lo + hi) / 2
+        if (real(tab_Temp(mid), kind=dp) <= Temp_in) then
+           lo = mid
+        else
+           hi = mid
+        endif
+     enddo
+     T1 = lo
+     T2 = hi
+     T_lo = real(tab_Temp(T1), kind=dp)
+     T_hi = real(tab_Temp(T2), kind=dp)
+     frac = (log(Temp_in) - log(T_lo)) / (log(T_hi) - log(T_lo))
+     call interp_MRW_pair(T1, T2, frac, p_icell, icell, chi_trans_cell, kappa_abs_ref)
+  endif
+
+end subroutine eval_MRW_opacities_at_T
 
 
 !********************************************************************
@@ -694,12 +998,12 @@ subroutine Temp_LTE(id, icell, Ti, Temp, frac)
   endif
 
   if (Qheat < tiny_dp) then
-     Temp = T_min ; Ti = 2
+     Temp = T_min ; Ti = 2 ; frac = 0.0_dp
   else
      log_Qheat = log(Qheat)
 
      if (log_Qheat <  log_Qcool_minus_extra_heating(1,p_icell)) then
-        Temp = T_min ; Ti = 2
+        Temp = T_min ; Ti = 2 ; frac = 0.0_dp
      else
         ! Sampled temperature just above the cell temperature
         if (id==0) then
