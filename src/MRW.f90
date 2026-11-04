@@ -28,6 +28,12 @@ module MRW
   !   0: no chaining (default), 1: chained, z_extrap on every step,
   !   2: chained, z_extrap on the first step only (the chained steps are then consistent, D = 1/3)
   integer :: mrw_chain_mode = 0
+  ! Walk started only immediately after an absorption. The MRW step assumes an isotropic start
+  ! with the re-emission spectrum. After a scattering by forward-scattering dust, the packet
+  ! still carries the direction of the net flux over about one transport mean free path: an
+  ! isotropic restart then loses it, -10 % in energy (-2.4 % in T) at gamma 2 in an irradiated
+  ! slab with live temperatures, -0.2 % with this condition (mrw_study/test_slab_bw_afterabs.py)
+  logical :: lmrw_after_abs = .true.
   real(dp), parameter :: mrw_wall_safety = 1.0e-5_dp
   integer, parameter :: n_min_interactions_MRW = 3
   integer, parameter :: n_mrw_step_max = 100000

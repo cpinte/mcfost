@@ -1512,7 +1512,7 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
   ! - lom deleted !
 
   use MRW, only : make_MRW_step, gamma_MRW, mrw_wall_safety, n_min_interactions_MRW, n_mrw_step_max, &
-       mrw_chain_mode, z_extrap_MRW
+       mrw_chain_mode, z_extrap_MRW, lmrw_after_abs
   use thermal_emission, only : compute_MRW_opacities, im_reemission_LTE
   use radiation_field, only : xKJ_abs, xN_abs
 
@@ -1577,7 +1577,8 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
      ! Accelerate photon diffusion in optically thick cells during thermal equilibrium calculation
      if (lMRW .and. letape_th .and. lonly_LTE .and. (.not. lmono) .and. (.not. lxJ_abs_step1) .and. &
           (.not. flag_star) .and. (.not. flag_ISM) .and. (n_iteractions_in_cell >= n_min_interactions_MRW) .and. &
-          (icell > 0) .and. (icell <= n_cells)) then
+          (.not. (lmrw_after_abs .and. flag_scatt)) .and. (icell > 0) .and. (icell <= n_cells)) then
+        ! flag_scatt: the last event was a scattering (cleared by an absorption and after a walk)
         ! chi_max_MRW: upper bound of chi_trans in the cell (0 if the MRW cannot trigger): the
         ! temperature and the MRW opacities are only computed if d * chi_max_MRW can exceed gamma
         if (associated(distance_to_closest_wall) .and. (chi_max_MRW(icell) > 0.0_dp)) then

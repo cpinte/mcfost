@@ -36,6 +36,7 @@ def test_mrw_cli_flags(tmp_path):
     assert "-mrw" in res.stdout
     assert "-no_mrw" in res.stdout
     assert "-gamma_mrw" in res.stdout
+    assert "-mrw_after_scatt" in res.stdout
 
     # Test invalid gamma < 2.0 exits with error
     res_err = run_mcfost_cmd([_ref3_para, "-gamma_mrw", "1.5"])

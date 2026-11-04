@@ -19,7 +19,7 @@ module init_mcfost
   use read_pluto, only : read_pluto_parameters
   use read_spherical_grid, only : read_spherical_grid_parameters
   use read_phantom, only : check_phantom_file_variable_dust
-  use MRW, only : gamma_MRW, mrw_chain_mode
+  use MRW, only : gamma_MRW, mrw_chain_mode, lmrw_after_abs
 
   implicit none
 
@@ -733,6 +733,9 @@ subroutine initialisation_mcfost()
         read(s,*,iostat=ios) mrw_chain_mode
         if (ios /= 0 .or. mrw_chain_mode < 0 .or. mrw_chain_mode > 2) call error("mrw_chain must be 0, 1 or 2")
         i_arg = i_arg + 1
+     case("-mrw_after_scatt")
+        i_arg = i_arg + 1
+        lmrw_after_abs = .false.
      case("-gamma_mrw", "-mrw_gamma")
         i_arg = i_arg + 1
         if (i_arg > n_args) call error("gamma_MRW value needed")
@@ -2083,6 +2086,8 @@ subroutine display_help()
   write(*,*) "        : -no_mrw : disable Modified Random Walk (default)"
   write(*,*) "        : -mrw_chain <0|1|2> : MRW steps chained in a cell: 0 no (default), 1 yes, 2 yes with"
   write(*,*) "                       the extrapolation length on the first step only (testing)"
+  write(*,*) "        : -mrw_after_scatt : MRW walks may also start after a scattering (default: only"
+  write(*,*) "                       after an absorption, testing)"
   write(*,*) "        : -tau_dark_zone_obs <tau_dark_zone> (default : 100)"
   write(*,*) "        : -tau_dark_zone_eq_th <tau_dark_zone> (default : 1500)"
   write(*,*) "        : -origin : save origin of packets received the interest bin"
