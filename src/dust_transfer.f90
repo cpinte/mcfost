@@ -1534,6 +1534,7 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
   integer :: n_iteractions_in_cell, icell_old
   integer, pointer :: p_icell
   real :: rand, rand2, tau, dvol
+  real(kind=dp) :: rand_tau
 
   logical :: flag_direct_star, flag_sortie
 
@@ -1558,15 +1559,11 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
   n_iteractions_in_cell = 0
   infinie : do
 
-     ! Flight length
-     rand = sprng(stream(id))
-     if (rand == 1.0) then
-        tau=1.0e30
-     else if (rand > 1.0e-6) then
-        tau = -log(1.0-rand)
-     else
-        tau = rand
-     endif
+     ! Flight length, sampled in double precision: sprng returns a double in [0,1), which a
+     ! single-precision variable rounds to 1.0 for 3e-8 of the draws (>= 1 - 2**-25); the packet
+     ! then had tau = 1e30 and left the grid in a straight line through any optical depth
+     rand_tau = sprng(stream(id))
+     tau = real(-log(1.0_dp - rand_tau))
 
      ! Packet propagation until next interaction
      !if (.not.letape_th) then
@@ -1635,14 +1632,8 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
                     n_iteractions_in_cell = 0
 
                     ! Draw fresh optical depth for the newly re-emitted packet
-                    rand = sprng(stream(id))
-                    if (rand == 1.0) then
-                       tau = 1.0e30
-                    else if (rand > 1.0e-6) then
-                       tau = -log(1.0 - rand)
-                    else
-                       tau = rand
-                    endif
+                    rand_tau = sprng(stream(id))
+                    tau = real(-log(1.0_dp - rand_tau))
                  endif
               endif
            endif

@@ -865,7 +865,7 @@ end subroutine define_cylindrical_grid
        enddo
        ri_out=ri+1
 
-       zj_out = floor(min(real(abs(zin)/zmax(ri_out) * nz),max_int))+1
+       zj_out = floor(min(abs(zin)/zmax(ri_out) * nz, real(max_int,kind=dp)))+1
 
        if (l3D) then
           if (zj_out > nz) zj_out = nz+1
@@ -1113,7 +1113,7 @@ end subroutine define_cylindrical_grid
           if (ri1>n_rad) then
              zj1=zj0
           else
-             zj1= floor(min(real(abs(z1)/zmax(ri1)*nz),real(max_int))) + 1
+             zj1= floor(min(abs(z1)/zmax(ri1)*nz, real(max_int,kind=dp))) + 1
              if (zj1>nz) zj1=nz+1
              if (l3D.and.(z1 < 0.0)) zj1=-zj1
           endif
