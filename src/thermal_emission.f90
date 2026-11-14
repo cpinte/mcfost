@@ -1041,7 +1041,7 @@ subroutine im_reemission_LTE(id,icell,p_icell,rand1,rand2,lambda)
   implicit none
 
   integer, intent(in) :: id, icell, p_icell
-  real, intent(in) ::  rand1, rand2
+  real(kind=dp), intent(in) ::  rand1, rand2
   integer, intent(inout) :: lambda
 
   integer :: l, l1, l2, Ti, T1, T2, k, heating_method, p_k
@@ -1108,7 +1108,7 @@ subroutine im_reemission_NLTE(id,icell,p_icell,rand1,rand2,lambda)
   implicit none
 
   integer, intent(in) :: id,icell, p_icell
-  real, intent(in) :: rand1, rand2
+  real(kind=dp), intent(in) :: rand1, rand2
   integer, intent(inout) :: lambda
 
   integer :: l, l1, l2, T_int, T1, T2, k, kmin, kmax, lambda0, ilambda, heating_method, p_k
@@ -1801,7 +1801,7 @@ subroutine im_reemission_qRE(id,icell,p_icell,rand1,rand2,lambda)
   implicit none
 
   integer, intent(in) :: id, icell, p_icell ! p_icell usused
-  real, intent(in) :: rand1, rand2
+  real(kind=dp), intent(in) :: rand1, rand2
   integer, intent(inout) :: lambda
 
   integer :: l, l1, l2, T_int, T1, T2, k, lambda0, ilambda, p_k
@@ -2336,7 +2336,7 @@ integer function select_absorbing_grain(lambda,icell, rand, heating_method) resu
   implicit none
 
   integer, intent(in) :: lambda, heating_method, icell
-  real, intent(in) :: rand
+  real(kind=dp), intent(in) :: rand
   real(kind=dp) :: prob, CDF, norm
   integer :: p_icell, kstart, kend
   integer, target :: k, k1

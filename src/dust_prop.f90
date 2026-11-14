@@ -1342,8 +1342,8 @@ integer function select_grainsize_high_mem(lambda,rand, icell) result(k)
   implicit none
 
   integer, intent(in) :: lambda, icell
-  real, intent(in) :: rand
-  real :: prob
+  real(kind=dp), intent(in) :: rand
+  real(kind=dp) :: prob
   integer :: kmin, kmax
 
   prob = rand ! ksca_CDF(n_grains_tot,icell,lambda) est normalise a 1.0
@@ -1382,7 +1382,7 @@ integer function select_scattering_grain(lambda,icell, rand) result(l)
   implicit none
 
   integer, intent(in) :: lambda, icell
-  real, intent(in) :: rand
+  real(kind=dp), intent(in) :: rand
   real(kind=dp) :: prob, CDF, norm, density, d1
 
   integer :: p_k_val, k

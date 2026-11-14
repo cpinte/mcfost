@@ -1306,10 +1306,10 @@ end function scattering_plane_angle
 subroutine get_Mueller_matrix_per_grain(lambda,itheta,frac,igrain, M)
 
   integer, intent(in) :: lambda,itheta,igrain
-  real, intent(in) :: frac
+  real(kind=dp), intent(in) :: frac
   real(kind=dp), dimension(4,4), intent(out) :: M
 
-  real :: frac_m1
+  real(kind=dp) :: frac_m1
 
   frac_m1 = 1.0 - frac
 
@@ -1333,10 +1333,10 @@ end subroutine get_Mueller_matrix_per_grain
 subroutine get_Mueller_matrix_per_cell(lambda,itheta,frac,icell, M)
 
   integer, intent(in) :: lambda,itheta,icell
-  real, intent(in) :: frac
+  real(kind=dp), intent(in) :: frac
   real(kind=dp), dimension(4,4), intent(out) :: M
 
-  real :: frac_m1
+  real(kind=dp) :: frac_m1
 
   frac_m1 = 1.0 - frac
 
@@ -1370,13 +1370,14 @@ subroutine hg(g, rand, itheta, cospsi)
 
   implicit none
 
-  real, intent(in) :: g, rand
+  real, intent(in) :: g
+  real(kind=dp), intent(in) :: rand
   integer, intent(out) :: itheta
   real(kind=dp), intent(out) :: cospsi
 
   real(kind=dp) :: g1, g2, rand_dp
 
-  rand_dp = min(real(rand,kind=dp), 1.0_dp-1e-6_dp)
+  rand_dp = min(rand, 1.0_dp-1e-6_dp)
 
   if (abs(g) > tiny_real) then
      g1 = g ! dp
@@ -1406,7 +1407,7 @@ subroutine angle_diff_theta(lambda, igrain, rand, rand2, itheta, cospsi)
   implicit none
 
   integer, intent(in) :: lambda, igrain
-  real, intent(in) :: rand, rand2
+  real(kind=dp), intent(in) :: rand, rand2
   integer, intent(out) :: itheta
   real(kind=dp), intent(out) :: cospsi
 
@@ -1452,7 +1453,7 @@ subroutine angle_diff_theta_pos(lambda, icell, rand, rand2, itheta, cospsi)
   implicit none
 
   integer, intent(in) :: lambda,icell
-  real, intent(in) :: rand, rand2
+  real(kind=dp), intent(in) :: rand, rand2
   integer, intent(out) :: itheta
   real(kind=dp), intent(out) :: cospsi
 

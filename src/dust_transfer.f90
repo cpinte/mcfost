@@ -1533,8 +1533,10 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
   integer :: igrain, itheta
   integer :: n_iteractions_in_cell, icell_old
   integer, pointer :: p_icell
-  real :: rand, rand2, tau, dvol
-  real(kind=dp) :: rand_tau
+  real :: tau, dvol
+  ! Random numbers in double precision: sprng returns a double in [0,1), which a single-precision
+  ! variable rounds to 1.0 for 3e-8 of the draws (>= 1 - 2**-25)
+  real(kind=dp) :: rand, rand2, rand_tau
 
   logical :: flag_direct_star, flag_sortie
 
