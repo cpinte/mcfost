@@ -818,7 +818,9 @@ subroutine run_sed_mc()
 
      n_lambda_sed = n_lambda2
   else
-     if (.not.l_p_lambda_is_lambda .and. lscatt_ray_tracing) then
+     ! Ray-tracing needs per-cell Mueller matrices: switch to method 2 unless they are
+     ! already stored for every wavelength
+     if (lscatt_ray_tracing .and. (lscattering_method1 .or. .not.l_p_lambda_is_lambda)) then
         call realloc_ray_tracing_scattering_matrix()
      endif
 
@@ -1248,7 +1250,7 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
               ! propagation direction after scattering
               call cdapres(cospsi, phi, u, v, w, u1, v1, w1)
               if (lsepar_pola) then
-                 call get_Mueller_matrix_per_cell(lambda,itheta,rand2,p_icell, M)
+                 call get_Mueller_matrix_per_cell(p_lambda,itheta,rand2,p_icell, M)
                  call update_Stokes(Stokes,u,v,w,u1,v1,w1,M)
 	      endif
            else ! HG phase function
