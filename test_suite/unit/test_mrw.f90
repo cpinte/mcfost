@@ -1460,7 +1460,8 @@ contains
     real(dp) :: chi_trans_cell, kappa_abs_ref, sum_deposition
     real(dp) :: chi_after, kabs_after, mean_steps, mean_ct
     real(dp), dimension(4) :: stokes_pkt
-    real :: rand1, rand2, rand3, tau_pkt
+    real :: rand3, tau_pkt
+    real(dp) :: rand1, rand2
     logical :: ok_contain, ok_dist, ok_unit
     logical :: f_star, f_dir_star, f_scatt, f_ism
 
