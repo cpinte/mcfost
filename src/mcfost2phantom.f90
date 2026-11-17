@@ -2,10 +2,17 @@ module mcfost2phantom
 
   implicit none
 
+  ! The arrays sized by the number of cells and of stars are allocated once, on the first
+  ! call to run_mcfost_phantom, for the maximum number of particles (max_particles, given
+  ! to init_mcfost_phantom, phantom's maxp) and of sinks (size of xyzmh_ptmass).
+  integer, save, private :: n_particles_max = 0 ! 0: not given, the first call's number is used
+  integer, save, private :: n_cells_alloc = 0   ! 0: not allocated yet
+  integer, save, private :: n_stars_alloc = 0   ! number of stars the stellar arrays are allocated for
+
 contains
 
   subroutine init_mcfost_phantom(mcfost_para_filename, ndusttypes, use_SPH_limits_file, SPH_limits_file, SPH_limits, ierr, &
-       keep_particles, fix_star, turn_on_Lacc, turn_on_dust_subl, use_ISM_heating)
+       keep_particles, fix_star, turn_on_Lacc, turn_on_dust_subl, use_ISM_heating, max_particles)
 
     use parameters
     use init_mcfost, only : set_default_variables, get_mcfost_utils_dir
@@ -27,6 +34,7 @@ contains
     integer, intent(out) :: ierr
     real, intent(in), optional :: keep_particles
     logical, intent(in), optional :: fix_star, turn_on_Lacc, turn_on_dust_subl, use_ISM_heating
+    integer, intent(in), optional :: max_particles ! maximum number of particles (phantom's maxp)
     integer :: lambda
 
     write(*,*)
@@ -62,6 +70,10 @@ contains
           write(*,*) "WARNING: turning on accretion luminosity"
        endif
     endif
+
+    ! n_cells_alloc is not reset: the arrays stay allocated if the library is initialised again
+    n_particles_max = 0
+    if (present(max_particles)) n_particles_max = max_particles
 
     lISM_heating = .false.
     if (present(use_ISM_heating)) then
@@ -219,11 +231,9 @@ contains
     real(kind=dp) :: x,y,z, u,v,w, mass_per_H
     real :: rand, time, cpu_time_begin, cpu_time_end
     integer :: n_SPH, icell, n_photons2, ibar, id, n_photons1_cumul, i_SPH, i, lambda_threshold
-    integer :: itime, ieos, alloc_status
+    integer :: itime, ieos, alloc_status, n_sinks_max
     logical :: lpacket_alive, lintersect, laffichage, flag_star, flag_scatt, flag_ISM, ldust_moments
     integer :: lambda
-
-    logical, save :: lfirst_time = .true.
 
     integer, dimension(:), allocatable :: mask ! not allocated as we do not mask particle in live RT hydro
 
@@ -251,7 +261,7 @@ contains
          n_SPH,x_SPH,y_SPH,z_SPH,h_SPH,vx_SPH,vy_SPH,vz_SPH,Tgas_SPH,particle_id,&
          SPH_grainsizes,massgas,massdust,rhogas,rhodust,dust_moments,extra_heating,ieos,apr_level)
 
-    if (.not.lfix_star) call compute_stellar_parameters()
+    if (.not.(lfix_star .or. lstar_from_phantom)) call compute_stellar_parameters()
 
     ! Performing the Voronoi tesselation & defining density arrays
     call SPH_to_Voronoi(n_SPH, ndusttypes, particle_id, x_SPH,y_SPH,z_SPH,h_SPH,vx_SPH,vy_SPH,vz_SPH,Tgas_SPH, &
@@ -261,18 +271,39 @@ contains
     call setup_grid()
     call setup_scattering()
 
-    ! We allocate the total number of SPH cells as the number of Voronoi cells mays vary
-    if (lfirst_time) then
-       if (use_apr) then
-          call alloc_dynamique(n_cells_max = n_SPH*8 + n_stars) ! this is the value currently used
-       else                                                       ! in Phantom (config.F90)
-          call alloc_dynamique(n_cells_max = n_SPH + n_stars)
+    ! Arrays sized by the number of cells and of stars: allocated once, for the maximum
+    ! numbers of particles and of sinks
+    n_sinks_max = max(size(xyzmh_ptmass,2), n_stars)
+    if (n_cells_alloc == 0) then
+       if (n_particles_max > 0) then
+          n_cells_alloc = n_particles_max + n_sinks_max
+       else if (use_apr) then
+          ! factor 8: value used in phantom (config.F90) for the maximum number of particles with APR
+          n_cells_alloc = 8 * n_SPH + n_sinks_max
+          write(*,*) "WARNING: max_particles not given to init_mcfost_phantom,"
+          write(*,*) "allocating for", n_cells_alloc, "cells (8 x number of particles of this call, APR)"
+       else
+          n_cells_alloc = n_cells + n_sinks_max
+          write(*,*) "WARNING: max_particles not given to init_mcfost_phantom,"
+          write(*,*) "allocating for", n_cells_alloc, "cells (number of particles of this call)"
        endif
+       n_stars_alloc = n_sinks_max
+       call alloc_dynamique(n_cells_max = n_cells_alloc, n_stars_max = n_stars_alloc)
        alloc_status = 0
-       allocate(xN_abs(n_SPH + n_stars,1,nb_proc),  stat=alloc_status)
+       allocate(xN_abs(n_cells_alloc,1,nb_proc),  stat=alloc_status)
        if (alloc_status /= 0) call error("Allocation error xN_abs")
-       lfirst_time = .false.
     endif
+    if (n_cells > n_cells_alloc) then
+       write(*,*) "Number of cells =", n_cells, ", allocated for", n_cells_alloc
+       call error("mcfost2phantom: more particles than allocated by mcfost", &
+            msg2="give the maximum number of particles to init_mcfost_phantom (max_particles)")
+    endif
+    if (n_stars > n_stars_alloc) then
+       write(*,*) "Number of stars =", n_stars, ", allocated for", n_stars_alloc
+       call error("mcfost2phantom: more sinks than allocated by mcfost", &
+            msg2="pass the full xyzmh_ptmass array (maxptmass columns) to run_mcfost_phantom")
+    endif
+    xN_abs = 0.0 ! number of packets per cell for this call
     call no_dark_zone()
     lapprox_diffusion=.false.
 
@@ -326,6 +357,7 @@ contains
     endif
     ! SPH particles ignored by mcfost
     Tphantom = -1.
+    n_packets = 0.
 
     ! Remapping to phantom indices
     !radiation(ivorcl,:) = -1.
@@ -337,9 +369,12 @@ contains
           !radiation(ivorcl,i_SPH) = icell
        endif
     enddo
-    call set_ghost_particle_temperature(n_SPH, is_ghost, Tphantom)
+    call set_ghost_particle_temperature(np, n_SPH, particle_id, is_ghost, Tphantom, n_packets)
 
     ! Resetting memory state for next call
+    do i=1, nb_proc
+       if (free_sprng(stream(i)) < 0) call error("cannot free the random number stream")
+    enddo
     call reset_mcfost_phantom()
 
     ! Verifications et codes d'erreur
@@ -495,21 +530,25 @@ contains
 
   !*************************************************************************
 
-  subroutine set_ghost_particle_temperature(n_SPH, is_ghost, T_phantom)
+  subroutine set_ghost_particle_temperature(np, n_SPH, particle_id, is_ghost, T_phantom, n_packets)
     ! mcfost will detect particles on top of each other and flag them of ghost
-    ! Here we set the ghost tenperature == to the main particle temperature
+    ! Here we set the ghost tenperature == to the main particle temperature.
+    ! is_ghost and particle_id are indexed by the mcfost particle index (1:n_SPH),
+    ! is_ghost holds the phantom index of the main particle, T_phantom is indexed by the
+    ! phantom index
 
     use mcfost_env, only : sp
 
-    integer, intent(in) :: n_SPH
-    integer, dimension(n_SPH), intent(in) :: is_ghost
-    real(sp), dimension(n_SPH), intent(inout) :: T_phantom
+    integer, intent(in) :: np, n_SPH
+    integer, dimension(n_SPH), intent(in) :: particle_id, is_ghost
+    real(sp), dimension(np), intent(inout) :: T_phantom, n_packets
 
     integer :: i
 
     do i=1, n_SPH
        if (is_ghost(i) > 0) then
-          T_phantom(i) = T_phantom(is_ghost(i))
+          T_phantom(particle_id(i)) = T_phantom(is_ghost(i))
+          n_packets(particle_id(i)) = n_packets(is_ghost(i))
        endif
     end do
 

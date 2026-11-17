@@ -131,7 +131,8 @@ contains
     ! fargo3d data is ordered in x = phi, y = r, z = theta
 
     real(dp), dimension(:,:,:), allocatable  :: fargo3d_density, fargo3d_vx, fargo3d_vy, fargo3d_vz
-    integer :: ios, iunit, alloc_status, l, recl, i,j, jj, phik, icell, n_planets
+    integer :: ios, iunit, alloc_status, l, recl_dp, i,j, jj, phik, icell, n_planets
+    integer(kind=8) :: recl
 
     character(len=128) :: filename
     character(len=16), dimension(4) :: file_types
@@ -197,7 +198,10 @@ contains
     lvelocity_file = .true.
     vfield_coord = 3 ! spherical
 
-    recl = dp*fargo3d%nx*fargo3d%ny*fargo3d%nz
+    ! record length in the units of the compiler (bytes with gfortran, 4-byte words with
+    ! ifort), in 8 bytes: dp*n assumed bytes and overflowed above ~2.7e8 cells
+    inquire(iolength=recl_dp) 1.0_dp
+    recl = int(recl_dp,kind=8) * fargo3d%nx * fargo3d%ny * fargo3d%nz
 
     file_types(1) = "gasdens"
     file_types(2) = "gasvx"
@@ -350,7 +354,6 @@ contains
 
 
     integer :: n_stars_old, i
-    type(star_type), dimension(:), allocatable :: star_old
 
     if (n_planets > 0) then
        simu_time = time(n_planets) * utime
@@ -373,23 +376,8 @@ contains
        write(*,*) "Updating the stellar properties:"
        write(*,*) "There are now", n_stars, "stars in the model"
 
-       ! Saving if the accretion rate was forced
-       allocate(star_old(n_stars_old))
-       if (allocated(star)) then
-          star_old(:) = star(:)
-          deallocate(star)
-       endif
-       allocate(star(n_stars))
-       do i=1, min(n_stars, n_stars_old)
-          star(i)%force_Mdot = star_old(i)%force_Mdot
-          star(i)%Mdot = star_old(i)%Mdot
-       enddo
-       ! If we have new stars
-       do i=n_stars_old,n_stars
-          star(i)%force_Mdot = .false.
-          star(i)%Mdot = 0.
-       enddo
-       deallocate(star_old)
+       ! Keeping the forced accretion rates, new stars with the default values
+       call resize_stars(n_stars)
        star(:)%find_spectrum = .true.
     endif
 

@@ -72,14 +72,13 @@ contains
     integer, intent(out) :: ndusttypes,n_SPH,ierr
 
     integer(HID_T) :: file_id, header_id, group_id
-    integer :: npart(6), n_sinks, alloc_status, i, n_stars_old
+    integer :: npart(6), n_sinks, alloc_status, i
     real(dp) :: mass_table(6), unit_length_cgs, unit_mass_cgs, unit_vel_cgs
     real(dp) :: ulength_au, usolarmass, uvelocity, x0, y0, z0
     real(dp), allocatable :: coords(:,:), vels(:,:), sink_coords(:,:), sink_vels(:,:)
     real(dp), allocatable :: sink_mass(:)
     real(sp), allocatable :: hsml_sp(:), mass_sp(:)
     logical :: got, recentred
-    type(star_type), allocatable :: star_old(:)
 
     ierr = 0
     ndusttypes = 0
@@ -205,23 +204,9 @@ contains
        write(*,*) '  Recentring on first sink at code coords: ', real(x0), real(y0), real(z0)
 
        ! Update stellar positions / masses, preserving para-file T, radius, spectrum
-       n_stars_old = n_stars
-       n_stars = n_sinks
-       if (n_stars /= n_stars_old) then
-          write(*,*) '  Updating number of stars from', n_stars_old, 'to', n_stars
-          if (n_stars_old > 0) then
-             allocate(star_old(n_stars_old))
-             star_old(:) = star(:)
-             deallocate(star)
-             allocate(star(n_stars))
-             do i = 1, min(n_stars,n_stars_old)
-                star(i) = star_old(i)
-             enddo
-             deallocate(star_old)
-          else
-             if (allocated(star)) deallocate(star)
-             allocate(star(n_stars))
-          endif
+       if (n_sinks /= n_stars) then
+          write(*,*) '  Updating number of stars from', n_stars, 'to', n_sinks
+          call resize_stars(n_sinks, lkeep_all=.true.)
        endif
 
        do i = 1, n_stars
@@ -284,9 +269,9 @@ contains
     character*4 :: blockid
     ! npart(0) = SPH gas; npart(5) = N-body / sink particles
     integer :: npart(0:5), ntot, len, flag_sfr, flag_feedback, unused(33), nall(0:5)
-    integer :: n_stars, alloc_status
+    integer :: n_mass, n_sinks, alloc_status, i_star, i_mass, i_part, k
     double precision :: massarr(0:5), time, redshift
-    real, allocatable :: pos(:,:), vel(:,:), mass_stars(:), u(:), rho(:), hsml(:)
+    real, allocatable :: pos(:,:), vel(:,:), mass_block(:), u(:), rho(:), hsml(:)
     integer, allocatable :: id(:)
     real, allocatable :: nh(:), ne(:)
 
@@ -323,7 +308,11 @@ contains
     write(*,*) ''
     write(*,*) '        Total gas particles: ', npart(0)
     write(*,*) '          Gas particle mass: ', massarr(0)
-    write(*,*) "            Total gas mass : ", npart(0) * massarr(0) * usolarmass
+    if (massarr(0) == 0.) then
+       write(*,*) "            Total gas mass : individual masses (MASS block)"
+    else
+       write(*,*) "            Total gas mass : ", npart(0) * massarr(0) * usolarmass
+    endif
     write(*,*) '           particle #5 mass: ', massarr(:)
     write(*,*) '     Total N-body particles: ', npart(5)
     write(*,*) '             Time in orbits: ', time / (2. * pi)
@@ -332,13 +321,19 @@ contains
     n_SPH = npart(0)
     ntot = sum(npart)
 
-    ! Particles with zero MassTable entry store individual masses in MASS
-    n_stars = 0
+    ! Particles with zero MassTable entry store individual masses in the MASS block, in
+    ! the order of the types. Stars: the non-gas particles with individual masses (the
+    ! gas was counted as stars when it had individual masses)
+    n_mass = 0
     do j = 0, 5
-       if (massarr(j) == 0.) n_stars = n_stars + npart(j)
+       if (massarr(j) == 0.) n_mass = n_mass + npart(j)
+    end do
+    n_sinks = 0
+    do j = 1, 5
+       if (massarr(j) == 0.) n_sinks = n_sinks + npart(j)
     end do
 
-    allocate(pos(3,ntot), vel(3,ntot), id(ntot), mass_stars(n_stars), &
+    allocate(pos(3,ntot), vel(3,ntot), id(ntot), mass_block(n_mass), &
          u(npart(0)), ne(npart(0)), nh(npart(0)))
     allocate(hsml(npart(0)), rho(npart(0)))
 
@@ -369,12 +364,12 @@ contains
           read(iunit) id
           write(*,*) '                 Block read: ', blockid, '        (IDs)'
        else if (blockid == 'MASS') then
-          testlen = (4 * n_stars) + 8
+          testlen = (4 * n_mass) + 8
           if (len /= testlen) then
              ierr = 3
              exit loop
           end if
-          read(iunit) mass_stars
+          read(iunit) mass_block
           write(*,*) '                 Block read: ', blockid, '        (Masses)'
        else if (blockid == 'U   ') then
           testlen = (4 * npart(0)) + 8
@@ -448,29 +443,47 @@ contains
     vx(:) = vel(1,1:n_SPH) * uvelocity
     vy(:) = vel(2,1:n_SPH) * uvelocity
     vz(:) = vel(3,1:n_SPH) * uvelocity
-    massgas(:) = massarr(0) * usolarmass
+    if (massarr(0) == 0.) then ! gas particles with individual masses: first in the MASS block
+       massgas(:) = mass_block(1:n_SPH) * usolarmass
+    else
+       massgas(:) = massarr(0) * usolarmass
+    endif
     rhogas(:) = 0.0_dp
 
     do i = 1, n_SPH
        particle_id(i) = i
     enddo
 
-    write(*,*) "Found", n_stars, "stars in the Gadget-2 file"
-    if (n_stars > 0) then
-       write(*,*) "Updating the stellar properties"
+    ! As in the HDF5 reader: without star in the file, the stars of the parameter file are
+    ! used; otherwise only the positions, velocities and masses are updated (para-file T,
+    ! radius and spectrum preserved, as with -fix_star)
+    write(*,*) "Found", n_sinks, "stars in the Gadget-2 file"
+    if (n_sinks > 0) then
+       write(*,*) "Updating the stellar positions, velocities and masses"
+       if (n_sinks /= n_stars) then
+          write(*,*) '  Updating number of stars from', n_stars, 'to', n_sinks
+          call resize_stars(n_sinks, lkeep_all=.true.)
+       endif
 
-       if (allocated(star)) deallocate(star)
-       allocate(star(n_stars))
-
-       do i=1,n_stars
-          star(i)%x = pos(1,n_SPH + i) * ulength_au
-          star(i)%y = pos(2,n_SPH + i) * ulength_au
-          star(i)%z = pos(3,n_SPH + i) * ulength_au
-          star(i)%vx = vel(1,n_SPH + i) * uvelocity
-          star(i)%vy = vel(2,n_SPH + i) * uvelocity
-          star(i)%vz = vel(3,n_SPH + i) * uvelocity
-          star(i)%M =  mass_stars(i) * usolarmass
-          write(*,*) i, star(i)%M
+       ! particles in the order of the types (positions), masses in the MASS block for the
+       ! types with individual masses only (after the gas if it has individual masses)
+       i_star = 0 ; i_part = npart(0) ; i_mass = 0
+       if (massarr(0) == 0.) i_mass = npart(0)
+       do j=1, 5
+          do k=1, npart(j)
+             i_part = i_part + 1
+             if (massarr(j) == 0.) then
+                i_star = i_star + 1 ; i_mass = i_mass + 1
+                star(i_star)%x = pos(1,i_part) * ulength_au
+                star(i_star)%y = pos(2,i_part) * ulength_au
+                star(i_star)%z = pos(3,i_part) * ulength_au
+                star(i_star)%vx = vel(1,i_part) * uvelocity
+                star(i_star)%vy = vel(2,i_part) * uvelocity
+                star(i_star)%vz = vel(3,i_part) * uvelocity
+                star(i_star)%M =  mass_block(i_mass) * usolarmass
+                write(*,*) i_star, star(i_star)%M
+             endif
+          enddo
        enddo
     endif
 

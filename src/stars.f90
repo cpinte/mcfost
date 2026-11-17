@@ -37,12 +37,18 @@ module stars
 
   contains
 
-subroutine allocate_stellar_spectra(n_wl)
+subroutine allocate_stellar_spectra(n_wl, n_stars_max)
+  ! n_stars_max: number of stars the arrays are allocated for, if larger than n_stars
+  ! (mcfost2phantom: maximum number of sinks, the arrays are allocated once)
 
   integer, intent(in) :: n_wl
-  integer :: alloc_status
+  integer, intent(in), optional :: n_stars_max
+  integer :: alloc_status, n_st
 
-  allocate(CDF_E_star(n_wl,0:n_stars), prob_E_star(n_wl,n_stars), E_stars(n_wl),  &
+  n_st = n_stars
+  if (present(n_stars_max)) n_st = max(n_stars, n_stars_max)
+
+  allocate(CDF_E_star(n_wl,0:n_st), prob_E_star(n_wl,n_st), E_stars(n_wl),  &
        E_ISM(n_wl), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error CDF_E_star')
   CDF_E_star = 0.0

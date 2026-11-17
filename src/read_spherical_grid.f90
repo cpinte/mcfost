@@ -160,17 +160,26 @@ contains
     allocate(rho(pluto%nx1,pluto%nx2,pluto%nx3), ne_tmp(pluto%nx1,pluto%nx2,pluto%nx3), &
          T_tmp(pluto%nx1,pluto%nx2,pluto%nx3), vt_tmp(pluto%nx1,pluto%nx2,pluto%nx3), &
          dz(pluto%nx1,pluto%nx2,pluto%nx3),vtmp(pluto%nx1,pluto%nx2,pluto%nx3,3))
+    ! the status of each read is checked: a short or wrong file was read silently
     read(1, iostat=ios) T_tmp(:,:,:)
+    if (ios /= 0) call error("cannot read the temperature in "//trim(filename))
     read(1, iostat=ios) rho(:,:,:)
-    read(1, iostat=ios) ne_tmp(:,:,:)
+    if (ios /= 0) call error("cannot read the density in "//trim(filename))
+    read(1, iostat=ios) ne_tmp(:,:,:) ! not used: the electron density is computed (lcalc_ne)
+    if (ios /= 0) call error("cannot read the electron density in "//trim(filename))
     read(1, iostat=ios) vtmp(:,:,:,:)
+    if (ios /= 0) call error("cannot read the velocity in "//trim(filename))
     read(1, iostat=ios) vt_tmp(:,:,:)
+    if (ios /= 0) call error("cannot read the turbulent velocity in "//trim(filename))
     read(1, iostat=ios) dz(:,:,:)
+    if (ios /= 0) call error("cannot read dz in "//trim(filename))
     read(1, iostat=ios) disk_zone(1)%gas_to_dust
+    if (ios /= 0) call error("cannot read the gas-to-dust ratio in "//trim(filename))
     write(*,*) "Gas/Dust from model:", real(disk_zone(1)%gas_to_dust)
     !read total dust density
     allocate(rho_dust(pluto%nx1,pluto%nx2,pluto%nx3))
     read(1, iostat=ios) rho_dust(:,:,:)
+    if (ios /= 0) call error("cannot read the dust density in "//trim(filename))
     close(unit=1)
 
     dust_density_o_n_grains = 0.0_dp

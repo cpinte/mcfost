@@ -115,7 +115,8 @@ contains
     ! pluto data is ordered in x = r, y = theta, z = phi (like idefix and athena++)
 
     real(dp), dimension(:,:,:), allocatable  :: rho, vx1, vx2, vx3
-    integer :: ios, iunit, alloc_status, l, recl, i,j, jj, phik, icell, n_planets, i2, i3
+    integer :: ios, iunit, alloc_status, l, recl_dp, i,j, jj, phik, icell, n_planets, i2, i3
+    integer(kind=8) :: recl
 
     character(len=128) :: filename
     character(len=16), dimension(4) :: file_types
@@ -181,7 +182,10 @@ contains
     lvelocity_file = .true.
     vfield_coord = 3 ! spherical
 
-    recl = dp*pluto%nx1*pluto%nx2*pluto%nx3
+    ! record length in the units of the compiler (bytes with gfortran, 4-byte words with
+    ! ifort), in 8 bytes: dp*n assumed bytes and overflowed above ~2.7e8 cells
+    inquire(iolength=recl_dp) 1.0_dp
+    recl = int(recl_dp,kind=8) * pluto%nx1 * pluto%nx2 * pluto%nx3
 
     file_types(1) = "rho"
     file_types(2) = "vx1"
