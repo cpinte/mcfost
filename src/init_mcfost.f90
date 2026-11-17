@@ -1987,6 +1987,12 @@ subroutine initialisation_mcfost()
   if (lRE_LTE .and. .not.lRE_nLTE .and. .not. lnRE) lonly_LTE = .true.
   if (lRE_nLTE .and. .not.lRE_LTE .and. .not. lnRE) lonly_nLTE = .true.
 
+  ! The MRW is only implemented for grains in LTE (propagate_packet)
+  if (lMRW .and. ltemp .and. .not.lonly_LTE) then
+     call warning("MRW only implemented for grains in LTE: turning MRW off")
+     lMRW = .false.
+  endif
+
   ! Signal handler
   ! do i=1,17
   !    sig=signal(i,sig_handler,-1)

@@ -776,33 +776,27 @@ end subroutine init_MRW_opacities
 
 !********************************************************************
 
+pure logical function MRW_opacities_available(icell)
+  ! MRW tables allocated, cell in the grid and not empty (kappa_factor > 0): checked once by the
+  ! callers of interp_MRW_pair, which assumes valid inputs
+  integer, intent(in) :: icell
+
+  MRW_opacities_available = .false.
+  if (.not.(allocated(chi_Rosseland_MRW) .and. allocated(kappa_abs_MRW) .and. allocated(kappa_factor))) return
+  if ((icell < 1) .or. (icell > size(kappa_factor))) return
+  MRW_opacities_available = (kappa_factor(icell) > 0.0_dp)
+
+end function MRW_opacities_available
+
+!********************************************************************
+
 pure subroutine interp_MRW_pair(T1, T2, frac, p_icell, icell, chi_trans_cell, kappa_abs_ref)
+  ! Inputs assumed valid (MRW_opacities_available(icell) checked by the caller)
   integer, intent(in) :: T1, T2, p_icell, icell
   real(kind=dp), intent(in) :: frac
   real(kind=dp), intent(out) :: chi_trans_cell, kappa_abs_ref
 
-  real(kind=dp) :: wc, kfac, c1, c2, k1, k2, chi_ref
-
-  if ((.not. allocated(chi_Rosseland_MRW)) .or. (.not. allocated(kappa_abs_MRW)) .or. &
-       (.not. allocated(kappa_factor))) then
-     chi_trans_cell = 0.0_dp
-     kappa_abs_ref  = 0.0_dp
-     return
-  endif
-
-  if ((icell < 1) .or. (icell > size(kappa_factor)) .or. &
-       (p_icell < 1) .or. (p_icell > size(chi_Rosseland_MRW, 2))) then
-     chi_trans_cell = 0.0_dp
-     kappa_abs_ref  = 0.0_dp
-     return
-  endif
-
-  kfac = kappa_factor(icell)
-  if (kfac <= 0.0_dp) then
-     chi_trans_cell = 0.0_dp
-     kappa_abs_ref  = 0.0_dp
-     return
-  endif
+  real(kind=dp) :: wc, c1, c2, k1, k2, chi_ref
 
   wc = min(max(frac, 0.0_dp), 1.0_dp)
   c1 = chi_Rosseland_MRW(T1, p_icell)
@@ -829,7 +823,7 @@ pure subroutine interp_MRW_pair(T1, T2, frac, p_icell, icell, chi_trans_cell, ka
      endif
   endif
 
-  chi_trans_cell = chi_ref * kfac
+  chi_trans_cell = chi_ref * kappa_factor(icell)
 
 end subroutine interp_MRW_pair
 
@@ -882,20 +876,7 @@ subroutine compute_MRW_opacities(id, icell, chi_trans_cell, kappa_abs_ref)
   real :: Temp
   real(kind=dp) :: frac
 
-  if ((.not. allocated(chi_Rosseland_MRW)) .or. (.not. allocated(kappa_abs_MRW)) .or. &
-       (.not. allocated(kappa_factor))) then
-     chi_trans_cell = 0.0_dp
-     kappa_abs_ref  = 0.0_dp
-     return
-  endif
-
-  if ((icell < 1) .or. (icell > size(kappa_factor))) then
-     chi_trans_cell = 0.0_dp
-     kappa_abs_ref  = 0.0_dp
-     return
-  endif
-
-  if (kappa_factor(icell) <= 0.0_dp) then
+  if (.not.MRW_opacities_available(icell)) then
      chi_trans_cell = 0.0_dp
      kappa_abs_ref  = 0.0_dp
      return
@@ -928,7 +909,7 @@ pure subroutine eval_MRW_opacities_at_T(Temp_in, icell, chi_trans_cell, kappa_ab
   integer :: p_icell, lo, hi, mid, T1, T2
   real(kind=dp) :: frac, T_lo, T_hi
 
-  if ((.not. allocated(tab_Temp)) .or. (n_T < 1)) then
+  if ((.not. allocated(tab_Temp)) .or. (n_T < 1) .or. (.not.MRW_opacities_available(icell))) then
      chi_trans_cell = 0.0_dp
      kappa_abs_ref  = 0.0_dp
      return

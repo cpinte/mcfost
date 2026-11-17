@@ -1565,12 +1565,6 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
   n_iteractions_in_cell = 0
   infinie : do
 
-     ! Flight length, sampled in double precision: sprng returns a double in [0,1), which a
-     ! single-precision variable rounds to 1.0 for 3e-8 of the draws (>= 1 - 2**-25); the packet
-     ! then had tau = 1e30 and left the grid in a straight line through any optical depth
-     rand_tau = sprng(stream(id))
-     tau = real(-log(1.0_dp - rand_tau))
-
      ! Packet propagation until next interaction
      !if (.not.letape_th) then
      !   if (.not.flag_star) Stokes=0.
@@ -1636,15 +1630,18 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
                     flag_scatt = .false.
                     flag_ISM = .false.
                     n_iteractions_in_cell = 0
-
-                    ! Draw fresh optical depth for the newly re-emitted packet
-                    rand_tau = sprng(stream(id))
-                    tau = real(-log(1.0_dp - rand_tau))
                  endif
               endif
            endif
         endif
      endif
+
+     ! Flight length, drawn after a possible walk (one draw per iteration), in double precision:
+     ! sprng returns a double in [0,1), which a single-precision variable rounds to 1.0 for 3e-8
+     ! of the draws (>= 1 - 2**-25); the packet then had tau = 1e30 and left the grid in a
+     ! straight line through any optical depth
+     rand_tau = sprng(stream(id))
+     tau = real(-log(1.0_dp - rand_tau))
 
      ! now that MRW is done, we perform the normal propagation
      icell_old = icell

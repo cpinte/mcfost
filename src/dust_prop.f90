@@ -927,12 +927,21 @@ subroutine opacity(lambda, no_scatt)
      k_sca_tot = 0.0
      k_sca_g = 0.0
 
-     do  k=1,n_grains_tot ! Expensive when n_cells is large
-        density = dust_density_o_n_grains(p_k_arr(k),icell) * n_grains(k)
-        kappa(icell,lambda) = kappa(icell,lambda) + C_ext(k,lambda) * density
-        k_sca_tot = k_sca_tot + C_sca(k,lambda) * density
-        if (lhas_g_pos) k_sca_g = k_sca_g + C_sca(k,lambda) * density * tab_g(k,lambda)
-     enddo !k
+     ! Expensive when n_cells is large: the g accumulation (only with tab_g_pos) is in a separate loop
+     if (lhas_g_pos) then
+        do  k=1,n_grains_tot
+           density = dust_density_o_n_grains(p_k_arr(k),icell) * n_grains(k)
+           kappa(icell,lambda) = kappa(icell,lambda) + C_ext(k,lambda) * density
+           k_sca_tot = k_sca_tot + C_sca(k,lambda) * density
+           k_sca_g = k_sca_g + C_sca(k,lambda) * density * tab_g(k,lambda)
+        enddo !k
+     else
+        do  k=1,n_grains_tot
+           density = dust_density_o_n_grains(p_k_arr(k),icell) * n_grains(k)
+           kappa(icell,lambda) = kappa(icell,lambda) + C_ext(k,lambda) * density
+           k_sca_tot = k_sca_tot + C_sca(k,lambda) * density
+        enddo !k
+     endif
 
      if (kappa(icell,lambda) > tiny_real) then
         tab_albedo_pos(icell,lambda) = k_sca_tot/kappa(icell,lambda)
