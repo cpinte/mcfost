@@ -718,6 +718,10 @@ subroutine realloc_ray_tracing_scattering_matrix()
   l_p_lambda_is_lambda = .false.
   p_n_lambda_pos = p_n_lambda2_pos
 
+  ! Grain selection table of method 1 (n_grains x n_cells x n_lambda): not used by method 2
+  if (allocated(ksca_CDF)) deallocate(ksca_CDF)
+  low_mem_scattering = .false.
+
   if (allocated(tab_s11_pos)) deallocate(tab_s11_pos)
   allocate(tab_s11_pos(0:nang_scatt,p_n_cells,p_n_lambda2_pos), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error tab_s11_pos')

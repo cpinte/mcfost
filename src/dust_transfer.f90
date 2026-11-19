@@ -1223,13 +1223,20 @@ subroutine run_sed_mc()
 
      n_lambda_sed = n_lambda2
   else
-     ! Ray-tracing needs per-cell Mueller matrices: switch to method 2 unless they are
-     ! already stored for every wavelength
-     if (lscatt_ray_tracing .and. (lscattering_method1 .or. .not.l_p_lambda_is_lambda)) then
-        call realloc_ray_tracing_scattering_matrix()
-     endif
-
      n_lambda_sed = n_lambda
+  endif
+
+  ! Ray-tracing needs per-cell Mueller matrices: switch to method 2 unless they are
+  ! already stored for every wavelength (both wavelength grids: with a separate SED grid,
+  ! method 1 can still be forced in the parameter file)
+  if (lscatt_ray_tracing .and. (lscattering_method1 .or. .not.l_p_lambda_is_lambda)) then
+     call realloc_ray_tracing_scattering_matrix()
+     ! The per-grain Mueller matrices of method 1 are normalised to S11 = 1 (normalise_Mueller_matrix):
+     ! recompute them with the method 2 normalisation (S11 normalised to Qsca) used by
+     ! calc_local_scattering_matrices, otherwise the ray-traced scattered light is wrong
+     do lambda=1,n_lambda_sed
+        call prop_grains(lambda)
+     enddo
   endif
   call timer_stop(t_step2_setup)
 
