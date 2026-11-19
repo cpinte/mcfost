@@ -309,7 +309,20 @@ end subroutine indice_cellule_sph_theta
        c_theta = z0*z0 - tan2 * (x0*x0 + y0*y0)
 
        delta = b_theta * b_theta - a_theta * c_theta
-       if (delta < 0.0_dp) then ! No real solution
+       if (l3D .and. (abs(thetaj0) == 1)) then
+          ! 3D, lower theta wall of the first cell: the midplane (cone tan_theta_lim(0) = 1e-10).
+          ! For the cone, delta ~ 1e-20 is below the rounding error of b_theta**2 and
+          ! a_theta * c_theta: its sign is random and the crossing was missed for about a
+          ! quarter of the packets moving towards the midplane, which then stayed in the cell
+          ! of the other hemisphere. Exact plane intersection z = 0 (z1 is then put on the side
+          ! of w below). In 2D the cell is symmetric about the midplane and the crossing is not
+          ! needed: the quadratic of the other theta wall also gives its mirror
+          if (z0 * w < 0.0_dp) then
+             t2 = -z0 / w
+          else
+             t2 = 1.0e30_dp
+          endif
+       else if (delta < 0.0_dp) then ! No real solution
           t2 = 1.0e30_dp
        else ! At least one real solution
           rac = sqrt(delta)
