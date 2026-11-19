@@ -662,6 +662,13 @@ contains
                 n_mid = n_mid + 1
                 if ((cell_map_j(next_c) * w <= 0.0_dp) .or. (z1 * w <= 0.0_dp)) ok_mid = .false.
              endif
+             ! 3D: a ray that crossed the midplane in this step must not stay indexed in the
+             ! other hemisphere (the crossing was missed for random rays: cone discriminant
+             ! below rounding, depending on the compiler)
+             if (l3D .and. (hop == 1) .and. (z1 * z < 0.0_dp) .and. (abs(z1) > 1.0e-10_dp * r)) then
+                n_mid = n_mid + 1
+                if (cell_map_j(next_c) * z1 <= 0.0_dp) ok_mid = .false.
+             endif
              l_tot = l_tot + l_step
              if (next_c /= icell) exit
              xr = x1 ; yr = y1 ; zr = z1
