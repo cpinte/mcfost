@@ -714,6 +714,9 @@ subroutine realloc_ray_tracing_scattering_matrix()
   scattering_method = 2
   write(*,fmt='(" Using scattering method ",i1)') scattering_method
   lscattering_method1 = (scattering_method==1)
+  ! Single-wavelength scattering matrices, recomputed for each wavelength: p_lambda = 1
+  l_p_lambda_is_lambda = .false.
+  p_n_lambda_pos = p_n_lambda2_pos
 
   if (allocated(tab_s11_pos)) deallocate(tab_s11_pos)
   allocate(tab_s11_pos(0:nang_scatt,p_n_cells,p_n_lambda2_pos), stat=alloc_status)
