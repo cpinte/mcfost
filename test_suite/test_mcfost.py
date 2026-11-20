@@ -1334,3 +1334,32 @@ def test_hydrostatic_nlte():
 
     run_mcfost(para, root_dir, "-n_iter_physics 3")
     check_hydrostatic_temperature_stable(root_dir)
+
+
+@pytest.mark.parametrize("grid", ["default", "separate"])
+def test_sed_scattering_method1(grid):
+    # SED with ray-tracing and the scattering method forced to 1 (Mueller matrices per grain,
+    # chosen automatically for large grids, e.g. phantom dumps): the SED step switches to
+    # method 2 (per cell). It crashed (issue #198, and with a separate SED wavelength grid),
+    # then gave a wrong ray-traced scattered light (method 1 per-grain matrices normalised
+    # to S11 = 1, SED wrong by a factor up to 50 in the mm). Compared with method 2.
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    sed = {}
+    for method in ("1", "2"):
+        # own directory: no dust properties cached by other runs (_dust_prop_*.tmp)
+        run_dir = "ref3.0_scatt_method"+method+"_"+grid
+        clean_results(run_dir)
+        os.makedirs(run_dir)
+        edits = {"nbr_photons_eq_th": set_first_value("1.28e5"),
+                 "n_rad (log": set_first_values("30 20 1 5"),
+                 "0=auto, 1=grain prop": set_first_value(method)}
+        if grid == "separate": # SED on the wavelength grid of IMLup.lambda
+            edits["compute temperature?, compute sed?"] = set_first_values("T T F")
+        make_para("test_data/ref3.0/ref3.0.para", run_dir+"/ref3.0.para", edits)
+        run_mcfost("ref3.0.para", "results", cwd=run_dir, timeout=600)
+        sed[method] = fits.getdata(run_dir+"/results/data_th/sed_rt.fits.gz")[0].astype(float) # Stokes I
+    # Flux-weighted difference of the total SED: 2 % at 1.28e5 packets (seed noise),
+    # 177 % with the wrong normalisation
+    diff = np.abs(sed["1"] - sed["2"]).sum() / sed["2"].sum()
+    assert diff < 0.15, f"SED method 1 vs 2: flux-weighted difference {100*diff:.1f} %"
