@@ -16,6 +16,48 @@ pytest test suite; it uses the models of `test_suite/test_data`.
 | `fetch_ozstar.sh` | Shows the queued jobs and copies the results and logs back |
 | `ozstar.conf.example` | Settings of the OzSTAR scripts, to copy to `ozstar.conf` (not under version control) |
 | `results/` | Results files, one per job |
+| `record_history.py` | Appends a results file to the history of a node type, `history/<machine>.csv` |
+| `plot_history.py` | Time of each binary relative to the reference binary of the same job, over the jobs |
+| `scaling.sbatch`, `plot_scaling.py` | Thread scaling of one binary on a full node: speed-up and efficiency per workload |
+| `numa/` | NUMA test: the same binary with `numactl --interleave=all` and `OMP_PROC_BIND=spread` |
+| `history/` | One CSV per node type (e.g. `nt-milan.csv`), under version control |
+
+## History across jobs
+
+A shared node varies from job to job, so absolute times of different jobs are not
+compared. Every job also runs a fixed reference binary (e.g. the static binary of
+release v4.1.17, kept at a fixed path), and the history records the time of each
+binary relative to it in the same job:
+
+    sbatch --cpus-per-task=64 --export=ALL,REFERENCE_BIN=<path>/mcfost_v4.1.17 \
+        benchmark.sbatch -b main=<path>/mcfost -b new=<path>/mcfost -n 3
+    ./record_history.py results/<file>.tsv --machine nt-milan
+    ./plot_history.py --machine nt-milan [--phase mc_temperature]
+
+The reference is added last with the label `ref`, so `compare_benchmark.py` still
+compares the first two binaries. A line is added once per job, binary, workload
+and phase (running `record_history.py` twice on a file adds nothing). Use one
+`--machine` name per node type and keep the same reference binary for the whole
+history; with a new reference, start a new history file. The same binary measured
+against itself gives ratios within about 1.5 % for one repeat (laptop, W1 and W4),
+which sets the smallest change the history resolves.
+
+To measure an item of the performance review: one branch per item, a job with
+`main`, the branch and the reference on a full node, `compare_benchmark.py` for
+the gain, `record_history.py` to keep it, and the measured gain written next to
+the estimate in `performance_review_2026-10.md` and `review_tracker.md`.
+
+## Thread scaling
+
+    sbatch --cpus-per-task=64 --export=ALL,MCFOST_BIN=<path>/mcfost[,THREADS="1 2 4 8 16 32 64",WORKLOADS="W1 W4"] \
+        scaling.sbatch
+    ./plot_scaling.py results/scaling_<date>_<host>_<job>/
+
+One results file per thread count; the speed-up is relative to the smallest
+count. Threads are packed (`OMP_PROC_BIND=close`): the first socket fills first,
+so a drop of efficiency when the second socket starts is a sign of NUMA effects.
+With 2 repeats and W1 W4, the job takes about 30 minutes on 64 cores (the 1-thread
+runs dominate). On an Apple M3 Max: W1 89 % efficiency at 8 threads.
 
 The times come from `mcfost -timing`, which prints the wall-clock time of each
 phase (`TIMING <phase> <seconds> <calls>`). Phases can be nested: `init` and
@@ -49,9 +91,14 @@ Built from the models of the test suite (`test_suite/get_test_data.sh`).
 | W3 | `ref3.0`, 100 velocity channels | `-mol -no_SED` | `mol` |
 | W4 | `discF_00500` (Phantom, Voronoi mesh) | temperature, `-no_SED` | `init` (tessellation), `mc_temperature` |
 | W5 | `ref4.1_PAH`, 10 PAH sizes, 1.28e6 packets | temperature and SED | `temperature_nRE`, `source_fct` |
+| W1L | as W1, 1.28e8 packets | temperature, `-no_SED` | `mc_temperature` (full nodes: about 25 s of Monte Carlo on 64 cores) |
+| W4L | as W4, 1e8 packets | temperature, `-no_SED` | `mc_temperature` (full nodes: about 60 s of Monte Carlo on 64 cores) |
 
 On an Apple M3 Max with 8 threads: W1 8.5 s, W2 6 s, W3 2.5 s, W4 29 s, W5 6 s.
 A pass with 3 repeats of two binaries takes about 10 minutes there.
+On a full node (64 threads), W1 and W4 only have a few seconds of Monte Carlo: use W1L and W4L.
+Each results file also records the number of NUMA nodes (`# numa_nodes`) and keeps the full
+`lscpu` and `numactl --hardware` output in `<results>_logs/topology.txt`.
 
 ## Usage
 

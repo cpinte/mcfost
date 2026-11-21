@@ -13,6 +13,8 @@
 # Workloads (models from test_suite/test_data, see README.md):
 #   W1 disk temperature, W2 1 um image (after W1), W3 CO lines,
 #   W4 Phantom dump on a Voronoi mesh (temperature), W5 PAH temperature and SED
+#   W1L, W4L: W1 and W4 with 10 x the packets, for full nodes (64 threads and more),
+#   where the Monte Carlo part of W1 and W4 only lasts a few seconds
 
 set -e
 
@@ -31,7 +33,7 @@ while getopts "b:n:w:t:o:h" opt; do
         w) workloads=$OPTARG ;;
         t) export OMP_NUM_THREADS=$OPTARG ;;
         o) results=$OPTARG ;;
-        *) sed -n '2,18p' "$0" ; exit 1 ;;
+        *) sed -n '2,20p' "$0" ; exit 1 ;;
     esac
 done
 
@@ -69,6 +71,9 @@ sed -E -e 's/^[[:space:]]*[^[:space:]]+([[:space:]]+nbr_photons_eq_th)/  1.28e7\
 sed -E -e 's/^([[:space:]]*[^[:space:]]+[[:space:]]+)[0-9]+([[:space:]]+vmax \(km.s\^-1\), n_speed)/\1100\2/' \
        "$test_data/ref3.0/ref3.0.para" > "$work/mol.para"
 cp "$test_data/discF_00500/discF_00500.para" "$work/phantom.para"
+# 10 x the packets of W1 (1.28e8) and W4 (1e8), for full nodes
+sed -E -e 's/^[[:space:]]*[^[:space:]]+([[:space:]]+nbr_photons_eq_th)/  1.28e8\1/' "$work/disk.para" > "$work/disk_large.para"
+sed -E -e 's/^[[:space:]]*[^[:space:]]+([[:space:]]+nbr_photons_eq_th)/  1e8\1/' "$work/phantom.para" > "$work/phantom_large.para"
 # 10 PAH sizes instead of 1, so that the stochastic heating has a significant cost
 sed -E -e 's/^[[:space:]]*[^[:space:]]+([[:space:]]+nbr_photons_eq_th)/  1.28e6\1/' \
        -e 's/^[[:space:]]*5e-4[[:space:]]+5e-4[[:space:]]+3.5[[:space:]]+1([[:space:]]+amin)/  3.5e-4  1e-3 3.5 10\1/' \
@@ -85,6 +90,14 @@ cpu_model() {
     fi
 }
 
+numa_nodes() { # number of NUMA nodes of the machine
+    if command -v lscpu > /dev/null; then
+        lscpu | sed -n 's/^NUMA node(s):[[:space:]]*//p' | head -1
+    else
+        echo 1
+    fi
+}
+
 modules=""
 if type module > /dev/null 2>&1; then
     modules=$(module -t list 2>&1 | grep -v ":$" | tr '\n' ' ')
@@ -95,6 +108,7 @@ fi
     echo "# date: $date"
     echo "# host: $host"
     echo "# cpu: $(cpu_model)"
+    echo "# numa_nodes: $(numa_nodes)"
     echo "# omp_num_threads: $OMP_NUM_THREADS"
     echo "# omp_proc_bind: ${OMP_PROC_BIND:-unset}"
     echo "# omp_places: ${OMP_PLACES:-unset}"
@@ -110,6 +124,11 @@ fi
     done
     printf "label\tworkload\trepeat\tphase\tseconds\tcalls\n"
 } > "$results"
+
+# node topology next to the results (NUMA domains, distances, memory per domain)
+mkdir -p "${results%.tsv}_logs"
+{ command -v lscpu > /dev/null && lscpu ; command -v numactl > /dev/null && numactl --hardware ; } \
+    > "${results%.tsv}_logs/topology.txt" 2>&1 || true
 
 now() { # wall-clock time [s]
     if [ -n "$EPOCHREALTIME" ]; then echo "$EPOCHREALTIME" ; else python3 -c 'import time; print(time.time())' ; fi
@@ -159,6 +178,9 @@ for r in $(seq 1 "$n_repeats"); do
                     run "$label" "$bin" W2 "$r" "$d/disk" disk.para -img 1.0 ;;
                 W3) run "$label" "$bin" W3 "$r" "$d/mol" mol.para -mol -no_SED ;;
                 W4) run "$label" "$bin" W4 "$r" "$d/phantom" phantom.para \
+                        -phantom "$test_data/discF_00500/discF_00500" -not_random_Voronoi -no_SED ;;
+                W1L) run "$label" "$bin" W1L "$r" "$d/disk_large" disk_large.para -no_SED ;;
+                W4L) run "$label" "$bin" W4L "$r" "$d/phantom_large" phantom_large.para \
                         -phantom "$test_data/discF_00500/discF_00500" -not_random_Voronoi -no_SED ;;
                 W5) run "$label" "$bin" W5 "$r" "$d/pah" pah.para ;;
                 *) echo "ERROR: unknown workload $w" ; exit 1 ;;

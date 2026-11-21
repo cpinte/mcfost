@@ -3,7 +3,8 @@
 #   default    : OMP_PROC_BIND=close, OMP_PLACES=cores (as benchmark.sbatch)
 #   interleave : numactl --interleave=all (pages spread over the NUMA nodes)
 #   spread     : OMP_PROC_BIND=spread
-# with the repeats interleaved (run_benchmark.sh). If interleave is clearly faster, the shared
+# with the repeats interleaved (run_benchmark.sh). Workloads: WORKLOADS (default "W1L W2 W4L": W1 and W4 with
+# 10 x the packets, so that the Monte Carlo part lasts long enough on a full node). If interleave is clearly faster, the shared
 # arrays are bandwidth-limited and the per-thread accumulators should be first-touched in parallel
 # (performance review P-O10, P-S11; tracker R4).
 #
@@ -35,7 +36,7 @@ lscpu | grep -E "Model name|^CPU\(s\)|Socket|NUMA"
 numactl --hardware
 echo "OMP_NUM_THREADS=$OMP_NUM_THREADS"
 
-./run_benchmark.sh -n 3 -w "W1 W2 W4" \
+./run_benchmark.sh -n 3 -w "${WORKLOADS:-W1L W2 W4L}" \
     -b default="$MCFOST_BIN" \
     -b interleave="$PWD/numa/mcfost_interleave.sh" \
     -b spread="$PWD/numa/mcfost_spread.sh"
