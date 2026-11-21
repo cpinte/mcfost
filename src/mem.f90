@@ -30,7 +30,7 @@ subroutine allocate_densities(n_cells_max)
 
   allocate(dust_mass(Nc), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error dust_mass')
-  dust_mass = 0.0
+  call first_touch_dp(dust_mass, size(dust_mass,kind=int64), 0.0_dp)
 
   if (lvariable_dust) then
      allocate(dust_density_o_n_grains(n_grains_tot,Nc), stat=alloc_status)
@@ -38,11 +38,13 @@ subroutine allocate_densities(n_cells_max)
      allocate(dust_density_o_n_grains(n_zones,Nc), stat=alloc_status)
   endif
   if (alloc_status > 0) call error('Allocation error dust_density_o_n_grains')
-  dust_density_o_n_grains = 0.0
+  call first_touch_dp(dust_density_o_n_grains, size(dust_density_o_n_grains,kind=int64), 0.0_dp)
 
   allocate(gas_density(Nc), gas_density_midplane(n_rad,n_az), gas_mass(Nc), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error gas_density')
-  gas_density = 0.0 ; gas_density_midplane = 0.0 ; gas_mass = 0.0
+  call first_touch_dp(gas_density, size(gas_density,kind=int64), 0.0_dp)
+  gas_density_midplane = 0.0
+  call first_touch_dp(gas_mass, size(gas_mass,kind=int64), 0.0_dp)
 
 end subroutine allocate_densities
 
@@ -179,11 +181,15 @@ subroutine alloc_dynamique(n_cells_max, n_stars_max)
 
   ! Arrays related to cell optical properties
   allocate(kappa(p_Nc,n_lambda), kappa_abs_LTE(p_Nc,n_lambda), tab_albedo_pos(p_Nc,n_lambda), kappa_factor(Nc), stat=alloc_status)
-  kappa=0.0 ; kappa_abs_LTE=0.0 ; tab_albedo_pos = 0
   if (alloc_status > 0) then
      write(*,*) 'Allocation error kappa and albedo'
      stop
   endif
+  ! first touch in parallel: pages spread over the NUMA domains (parameters.f90)
+  call first_touch_dp(kappa, size(kappa,kind=int64), 0.0_dp)
+  call first_touch_dp(kappa_abs_LTE, size(kappa_abs_LTE,kind=int64), 0.0_dp)
+  call first_touch_sp(tab_albedo_pos, size(tab_albedo_pos,kind=int64), 0.0)
+  call first_touch_dp(kappa_factor, size(kappa_factor,kind=int64), 0.0_dp)
   if (lRE_nLTE)  then
      allocate(kappa_abs_nLTE(p_Nc,n_lambda), stat=alloc_status)
      kappa_abs_nLTE=0.0
@@ -207,7 +213,7 @@ subroutine alloc_dynamique(n_cells_max, n_stars_max)
   if ((aniso_method==2) .or. (lTemp .and. lMRW)) then
      allocate(tab_g_pos(p_Nc,n_lambda),stat=alloc_status)
      if (alloc_status > 0) call error('Allocation error tab_albedo_pos, tab_g_pos')
-     tab_g_pos = 0.0
+     call first_touch_sp(tab_g_pos, size(tab_g_pos,kind=int64), 0.0)
   endif
 
   ! **************************************************
@@ -223,11 +229,11 @@ subroutine alloc_dynamique(n_cells_max, n_stars_max)
 
      allocate(prob_s11_pos(0:nang_scatt, p_Nc, p_n_lambda_pos), stat=alloc_status)
      if (alloc_status > 0) call error('Allocation error prob_s11_pos')
-     prob_s11_pos = 0
+     call first_touch_sp(prob_s11_pos, size(prob_s11_pos,kind=int64), 0.0)
 
      allocate(tab_s11_pos(0:nang_scatt, p_Nc, p_n_lambda_pos), stat=alloc_status)
      if (alloc_status > 0) call error('Allocation error tab_s11_pos')
-     tab_s11_pos = 0
+     call first_touch_sp(tab_s11_pos, size(tab_s11_pos,kind=int64), 0.0)
 
      if (lsepar_pola) then
         allocate(tab_s12_o_s11_pos(0:nang_scatt, p_Nc, p_n_lambda_pos), &
@@ -237,11 +243,11 @@ subroutine alloc_dynamique(n_cells_max, n_stars_max)
              tab_s44_o_s11_pos(0:nang_scatt, p_Nc, p_n_lambda_pos), &
              stat=alloc_status)
         if (alloc_status > 0) call error('Allocation error tab_s12_o_s11_pos')
-        tab_s12_o_s11_pos = 0
-        tab_s33_o_s11_pos = 0
-        tab_s34_o_s11_pos = 0
-        tab_s22_o_s11_pos = 0
-        tab_s44_o_s11_pos = 0
+        call first_touch_sp(tab_s12_o_s11_pos, size(tab_s12_o_s11_pos,kind=int64), 0.0)
+        call first_touch_sp(tab_s33_o_s11_pos, size(tab_s33_o_s11_pos,kind=int64), 0.0)
+        call first_touch_sp(tab_s34_o_s11_pos, size(tab_s34_o_s11_pos,kind=int64), 0.0)
+        call first_touch_sp(tab_s22_o_s11_pos, size(tab_s22_o_s11_pos,kind=int64), 0.0)
+        call first_touch_sp(tab_s44_o_s11_pos, size(tab_s44_o_s11_pos,kind=int64), 0.0)
      endif
   else ! scattering method==1 --> prop par grains
      mem_size = (1.0 * n_grains_tot) * p_Nc * n_lambda * 4. / 1024.**3
@@ -252,7 +258,7 @@ subroutine alloc_dynamique(n_cells_max, n_stars_max)
         allocate(ksca_CDF(0:n_grains_tot,p_Nc,n_lambda), stat=alloc_status)
 
         if (alloc_status > 0) call error('Allocation error ksca_CDF')
-        ksca_CDF = 0
+        call first_touch_dp(ksca_CDF, size(ksca_CDF,kind=int64), 0.0_dp)
      else ! Array is to big, we will recompute ksca_CDF on the fly
         low_mem_scattering = .true.
         write(*,*) "Using low memory mode for scattering properties"
