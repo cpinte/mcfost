@@ -12,12 +12,14 @@ module timing
 
   integer, parameter, public :: t_total = 1, t_setup = 2, t_init = 3, t_dust_prop = 4, t_opacity = 5, &
        t_mc_temperature = 6, t_temperature = 7, t_temperature_nRE = 8, t_step2_setup = 9, &
-       t_mc_step2 = 10, t_source_fct = 11, t_ray_tracing = 12, t_output = 13, t_mol = 14, t_atom = 15
-  integer, parameter :: n_timers = 15
+       t_mc_step2 = 10, t_source_fct = 11, t_ray_tracing = 12, t_output = 13, t_mol = 14, t_atom = 15, &
+       t_mol_output = 16
+  integer, parameter :: n_timers = 16
 
   character(len=16), dimension(n_timers), parameter :: timer_name = [character(len=16) :: &
        "total", "setup", "init", "dust_prop", "opacity", "mc_temperature", "temperature", &
-       "temperature_nRE", "step2_setup", "mc_step2", "source_fct", "ray_tracing", "output", "mol", "atom"]
+       "temperature_nRE", "step2_setup", "mc_step2", "source_fct", "ray_tracing", "output", "mol", "atom", &
+       "mol_output"]
 
   logical, public :: ltiming = .false.
 

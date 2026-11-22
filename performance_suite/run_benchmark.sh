@@ -13,6 +13,10 @@
 # Workloads (models from test_suite/test_data, see README.md):
 #   W1 disk temperature, W2 1 um image (after W1), W3 CO lines,
 #   W4 Phantom dump on a Voronoi mesh (temperature), W5 PAH temperature and SED
+#   W1L, W4L: W1 and W4 with 10 x the packets, for full nodes (64 threads and more),
+#   where the Monte Carlo part of W1 and W4 only lasts a few seconds
+#   W6 Phantom dump 1 um images (after W4), W7 Phantom dump CO cubes (ray tracing and
+#   FITS output on a Voronoi mesh)
 
 set -e
 
@@ -31,13 +35,16 @@ while getopts "b:n:w:t:o:h" opt; do
         w) workloads=$OPTARG ;;
         t) export OMP_NUM_THREADS=$OPTARG ;;
         o) results=$OPTARG ;;
-        *) sed -n '2,18p' "$0" ; exit 1 ;;
+        *) sed -n '2,22p' "$0" ; exit 1 ;;
     esac
 done
 
 if [ ${#binaries[@]} -eq 0 ]; then
     echo "ERROR: at least one binary is needed: -b <label>=<mcfost binary>" ; exit 1
 fi
+for b in "${binaries[@]}"; do
+    [ -x "${b#*=}" ] || { echo "ERROR: binary ${b%%=*} (${b#*=}) not found or not executable" ; exit 1 ; }
+done
 if [ -z "$MCFOST_UTILS" ]; then
     echo "ERROR: MCFOST_UTILS is not set" ; exit 1
 fi
@@ -58,7 +65,9 @@ date=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 [ -z "$results" ] && results=$script_dir/results/$(date -u +%Y%m%d_%H%M%S)_${host}${SLURM_JOB_ID:+_$SLURM_JOB_ID}.tsv
 mkdir -p "$(dirname "$results")"
 
-work=$(mktemp -d "${TMPDIR:-/tmp}/mcfost_benchmark.XXXXXX")
+# working directory: the job-local disk ($JOBFS, requested with #SBATCH --tmp on OzSTAR/NT) when
+# available: /tmp can be too small for the cubes (W7), which cfitsio gzips in memory then copies
+work=$(mktemp -d "${JOBFS:-${TMPDIR:-/tmp}}/mcfost_benchmark.XXXXXX")
 trap 'rm -rf "$work"' EXIT
 
 # Parameter files of the workloads, from the test data
@@ -69,6 +78,9 @@ sed -E -e 's/^[[:space:]]*[^[:space:]]+([[:space:]]+nbr_photons_eq_th)/  1.28e7\
 sed -E -e 's/^([[:space:]]*[^[:space:]]+[[:space:]]+)[0-9]+([[:space:]]+vmax \(km.s\^-1\), n_speed)/\1100\2/' \
        "$test_data/ref3.0/ref3.0.para" > "$work/mol.para"
 cp "$test_data/discF_00500/discF_00500.para" "$work/phantom.para"
+# 10 x the packets of W1 (1.28e8) and W4 (1e8), for full nodes
+sed -E -e 's/^[[:space:]]*[^[:space:]]+([[:space:]]+nbr_photons_eq_th)/  1.28e8\1/' "$work/disk.para" > "$work/disk_large.para"
+sed -E -e 's/^[[:space:]]*[^[:space:]]+([[:space:]]+nbr_photons_eq_th)/  1e8\1/' "$work/phantom.para" > "$work/phantom_large.para"
 # 10 PAH sizes instead of 1, so that the stochastic heating has a significant cost
 sed -E -e 's/^[[:space:]]*[^[:space:]]+([[:space:]]+nbr_photons_eq_th)/  1.28e6\1/' \
        -e 's/^[[:space:]]*5e-4[[:space:]]+5e-4[[:space:]]+3.5[[:space:]]+1([[:space:]]+amin)/  3.5e-4  1e-3 3.5 10\1/' \
@@ -85,6 +97,14 @@ cpu_model() {
     fi
 }
 
+numa_nodes() { # number of NUMA nodes of the machine
+    if command -v lscpu > /dev/null; then
+        lscpu | sed -n 's/^NUMA node(s):[[:space:]]*//p' | head -1
+    else
+        echo 1
+    fi
+}
+
 modules=""
 if type module > /dev/null 2>&1; then
     modules=$(module -t list 2>&1 | grep -v ":$" | tr '\n' ' ')
@@ -95,9 +115,11 @@ fi
     echo "# date: $date"
     echo "# host: $host"
     echo "# cpu: $(cpu_model)"
+    echo "# numa_nodes: $(numa_nodes)"
     echo "# omp_num_threads: $OMP_NUM_THREADS"
     echo "# omp_proc_bind: ${OMP_PROC_BIND:-unset}"
     echo "# omp_places: ${OMP_PLACES:-unset}"
+    echo "# workdir: $work ($(df -h "$work" 2>/dev/null | awk 'NR==2 {print $4 " free"}'))"
     echo "# slurm_job: ${SLURM_JOB_ID:-none} ${SLURM_JOB_PARTITION:-}"
     echo "# modules: $modules"
     echo "# repeats: $n_repeats"
@@ -110,6 +132,11 @@ fi
     done
     printf "label\tworkload\trepeat\tphase\tseconds\tcalls\n"
 } > "$results"
+
+# node topology next to the results (NUMA domains, distances, memory per domain)
+mkdir -p "${results%.tsv}_logs"
+{ command -v lscpu > /dev/null && lscpu ; command -v numactl > /dev/null && numactl --hardware ; } \
+    > "${results%.tsv}_logs/topology.txt" 2>&1 || true
 
 now() { # wall-clock time [s]
     if [ -n "$EPOCHREALTIME" ]; then echo "$EPOCHREALTIME" ; else python3 -c 'import time; print(time.time())' ; fi
@@ -130,7 +157,11 @@ run() { # label binary workload repeat directory para options
     for f in "$work"/*.lambda; do [ -f "$f" ] && cp "$f" "$dir/" ; done
     t0=$(now)
     (cd "$dir" && "$bin" "$work/$para" -root_dir "$dir" $timing "$@" > "$dir.log" 2>&1) || \
-        { echo "ERROR: $label $w failed, see $dir.log" ; tail -20 "$dir.log" ; exit 1 ; }
+        { echo "ERROR: $label $w failed, see ${results%.tsv}_logs/FAILED_${label}_$w.log" ; tail -20 "$dir.log"
+          # the working directory is deleted on exit: keep the mcfost output next to the results
+          mkdir -p "${results%.tsv}_logs" ; cp "$dir.log" "${results%.tsv}_logs/FAILED_${label}_$w.log"
+          echo "# FAILED: $label $w repeat $r (${results%.tsv}_logs/FAILED_${label}_$w.log)" >> "$results"
+          exit 1 ; }
     t1=$(now)
     [ -z "$timing" ] && awk -v t0="$t0" -v t1="$t1" 'BEGIN {printf " TIMING total %.3f 1\n", t1-t0}' >> "$dir.log"
     # SHA compiled into the binary (MCFOST_GIT=1 builds): git may not be available on compute nodes
@@ -159,6 +190,15 @@ for r in $(seq 1 "$n_repeats"); do
                     run "$label" "$bin" W2 "$r" "$d/disk" disk.para -img 1.0 ;;
                 W3) run "$label" "$bin" W3 "$r" "$d/mol" mol.para -mol -no_SED ;;
                 W4) run "$label" "$bin" W4 "$r" "$d/phantom" phantom.para \
+                        -phantom "$test_data/discF_00500/discF_00500" -not_random_Voronoi -no_SED ;;
+                W1L) run "$label" "$bin" W1L "$r" "$d/disk_large" disk_large.para -no_SED ;;
+                W6) [ -d "$d/phantom/data_th" ] || run "$label" "$bin" W4 "$r" "$d/phantom" phantom.para \
+                        -phantom "$test_data/discF_00500/discF_00500" -not_random_Voronoi -no_SED
+                    run "$label" "$bin" W6 "$r" "$d/phantom" phantom.para \
+                        -phantom "$test_data/discF_00500/discF_00500" -not_random_Voronoi -img 1.0 ;;
+                W7) run "$label" "$bin" W7 "$r" "$d/phantom_mol" phantom.para \
+                        -phantom "$test_data/discF_00500/discF_00500" -not_random_Voronoi -mol -no_SED ;;
+                W4L) run "$label" "$bin" W4L "$r" "$d/phantom_large" phantom_large.para \
                         -phantom "$test_data/discF_00500/discF_00500" -not_random_Voronoi -no_SED ;;
                 W5) run "$label" "$bin" W5 "$r" "$d/pah" pah.para ;;
                 *) echo "ERROR: unknown workload $w" ; exit 1 ;;

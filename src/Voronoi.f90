@@ -3,6 +3,7 @@ module Voronoi_grid
   use constants
   use mcfost_env
   use parameters
+  use numa
   use utils, only : system_call, shell_quote, tmp_filename
   use sort, only : Knuth_shuffle, index_quicksort
   use naleat, only : seed, stream, gtype
@@ -379,14 +380,18 @@ module Voronoi_grid
     allocate(Voronoi(n_cells), Voronoi_xyz(3,n_cells), volume(n_cells), first_neighbours(n_cells),last_neighbours(n_cells), &
          was_cell_cut(n_cells), star_neighb(n_cells), stat=alloc_status)
     if (alloc_status /=0) call error("Allocation error Voronoi structure")
-    volume(:) = 0.0 ; first_neighbours(:) = 0 ; last_neighbours(:) = 0 ; was_cell_cut(:) = .false.
-    Voronoi(:)%exist = .true. ! we filter before, so all the cells should exist now
-    Voronoi(:)%first_neighbour = 0
-    Voronoi(:)%last_neighbour = 0
-    Voronoi(:)%is_star = .false.
+    first_neighbours(:) = 0 ; last_neighbours(:) = 0 ; was_cell_cut(:) = .false.
     star_neighb(:) = .false.
 
+    ! First touch in parallel (parameters.f90): the cells are read at random by every thread
+    ! during the transport, their pages are spread over the NUMA domains
+    call first_touch_dp(volume, size(volume,kind=int64), 0.0_dp)
+    !$omp parallel do schedule(static) default(shared) private(icell)
     do icell=1, n_cells
+       Voronoi(icell)%exist = .true. ! we filter before, so all the cells should exist now
+       Voronoi(icell)%first_neighbour = 0
+       Voronoi(icell)%last_neighbour = 0
+       Voronoi(icell)%is_star = .false.
        Voronoi(icell)%xyz(1) = x_tmp(icell)
        Voronoi(icell)%xyz(2) = y_tmp(icell)
        Voronoi(icell)%xyz(3) = z_tmp(icell)
@@ -395,6 +400,7 @@ module Voronoi_grid
        Voronoi(icell)%id     = SPH_id(icell) ! this is the id of the particles passed to mcfost
        Voronoi(icell)%original_id = SPH_original_id(icell) ! this is the particle id in phantom
     enddo
+    !$omp end parallel do
 
     !*************************
     ! Velocities
@@ -515,6 +521,8 @@ module Voronoi_grid
        write(*,*) "Trying to allocate", mem, unit//" for neighbours list"
        allocate(neighbours_list(n_neighbours_tot), stat=alloc_status)
        if (alloc_status /=0) call error("Allocation error neighbours list")
+       ! first touch in parallel: read at random by every thread during the transport
+       call first_touch_int(neighbours_list, size(neighbours_list,kind=int64), 0)
 
        row = n_cells_per_cpu * max_neighbours ;
        k = 0 ;
@@ -724,6 +732,8 @@ module Voronoi_grid
     write(*,*) "Trying to allocate", mem, unit//" for neighbours list"
     allocate(neighbours_list(n_neighbours_tot), stat=alloc_status)
     if (alloc_status /=0) call error("Allocating neighbours list in read_saved_tesselation")
+    ! first touch in parallel before the read (pages spread over the NUMA domains)
+    call first_touch_int(neighbours_list, size(neighbours_list,kind=int64), 0)
     read(1,iostat=ios) volume, first_neighbours,last_neighbours, neighbours_list, was_cell_cut, star_neighb
     close(unit=1)
 

@@ -1,6 +1,7 @@
 module radiation_field
 
   use parameters
+  use numa
   use mcfost_env
   use constants
   use dust_prop, only : kappa_abs_LTE, kappa_factor
@@ -144,7 +145,9 @@ subroutine allocate_radiation_field_step1(Nc)
   if (lRE_LTE) then
      allocate(xKJ_abs(Nc,nb_proc), E0(Nc), stat=alloc_status)
      if (alloc_status > 0) call error('Allocation error xKJ_abs')
-     xKJ_abs = 0.0 ; E0 = 0.0
+     ! first touch in parallel: each thread's slice xKJ_abs(:,id) stays on its NUMA domain
+     call first_touch_dp(xKJ_abs, size(xKJ_abs,kind=int64), 0.0_dp)
+     call first_touch_dp(E0, size(E0,kind=int64), 0.0_dp)
   endif
 
   lxJ_abs = lProDiMo.or.lML.or.loutput_UV_field.or.loutput_J
@@ -153,7 +156,8 @@ subroutine allocate_radiation_field_step1(Nc)
   if (lxJ_abs_step1 .or. (lxJ_abs.and.lsed)) then
      allocate(xJ_abs(Nc,n_lambda,nb_proc), J0(Nc,n_lambda), stat=alloc_status) ! BIG array
      if (alloc_status > 0) call error('Allocation error xJ_abs')
-     xJ_abs=0.0 ; J0 = 0.0
+     call first_touch_dp(xJ_abs, size(xJ_abs,kind=int64), 0.0_dp)
+     call first_touch_dp(J0, size(J0,kind=int64), 0.0_dp)
   endif
 
   ! In library mode, xN_abs is allocated (and sized) by mcfost2phantom itself, on the
@@ -161,7 +165,7 @@ subroutine allocate_radiation_field_step1(Nc)
   if (lsave_n_packet_per_cell .and. .not. lmcfost_lib) then
      allocate(xN_abs(Nc,1,nb_proc), stat=alloc_status)
      if (alloc_status > 0) call error('Allocation error xN_abs')
-     xN_abs = 0.0
+     call first_touch_sp(xN_abs, size(xN_abs,kind=int64), 0.0)
   endif
 
   return

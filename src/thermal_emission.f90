@@ -1,6 +1,7 @@
 module thermal_emission
 
   use parameters
+  use numa
   use constants
   use grains
   use dust_prop
@@ -119,15 +120,15 @@ subroutine allocate_thermal_emission(Nc,p_Nc)
 
   allocate(log_Qcool_minus_extra_heating(n_T,p_Nc), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error log_E_em')
-  log_Qcool_minus_extra_heating = 0.0
+  call first_touch_dp(log_Qcool_minus_extra_heating, size(log_Qcool_minus_extra_heating,kind=int64), 0.0_dp)
 
   if (lRE_LTE .and. lMRW) then
      if (allocated(chi_Rosseland_MRW)) deallocate(chi_Rosseland_MRW)
      if (allocated(kappa_abs_MRW)) deallocate(kappa_abs_MRW)
      allocate(chi_Rosseland_MRW(n_T,p_Nc), kappa_abs_MRW(n_T,p_Nc), stat=alloc_status)
      if (alloc_status > 0) call error('Allocation error MRW opacities')
-     chi_Rosseland_MRW = 0.0_dp
-     kappa_abs_MRW = 0.0_dp
+     call first_touch_dp(chi_Rosseland_MRW, size(chi_Rosseland_MRW,kind=int64), 0.0_dp)
+     call first_touch_dp(kappa_abs_MRW, size(kappa_abs_MRW,kind=int64), 0.0_dp)
   endif
 
   allocate(DensE(n_rad,0:nz,n_az), DensE_m1(n_rad,0:nz,n_az), Dcoeff(n_rad,0:nz,n_az), stat=alloc_status)
@@ -136,7 +137,8 @@ subroutine allocate_thermal_emission(Nc,p_Nc)
 
   allocate(xT_ech(Nc,nb_proc), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error xT_ech')
-  xT_ech = 2
+  ! first touch in parallel: each thread's slice xT_ech(:,id) stays on its NUMA domain
+  call first_touch_int(xT_ech, size(xT_ech,kind=int64), 2)
 
   if (lreemission_stats) then
      allocate(nbre_reemission(Nc,nb_proc), stat=alloc_status)
@@ -150,7 +152,8 @@ subroutine allocate_thermal_emission(Nc,p_Nc)
      if (mem_size > 1) write(*,*) "Trying to allocate", mem_size, "GB for temperature calculation"
      allocate(kdB_dT_CDF(n_lambda,n_T,p_Nc), stat=alloc_status)
      if (alloc_status > 0) call error('Allocation error kdB_dT_CDF')
-     kdB_dT_CDF = 0
+     ! read at random cells by every thread: first touch in parallel spreads it over the NUMA domains
+     call first_touch_dp(kdB_dT_CDF, size(kdB_dT_CDF,kind=int64), 0.0_dp)
   else
      low_mem_th_emission = .true.
      write(*,*) "Using low memory mode for thermal emission"

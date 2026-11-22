@@ -8,6 +8,8 @@
 # it, --exclusive are given on the sbatch command line (SBATCH_OPTIONS in
 # ozstar.conf). OzSTAR does not allow --exclusive: request all the cores of a
 # node with --cpus-per-task to avoid sharing it with other jobs.
+# REFERENCE_BIN (e.g. --export=ALL,REFERENCE_BIN=<path>/mcfost): a fixed reference binary
+# added to the job with the label "ref", for the history across jobs (record_history.py).
 #
 #SBATCH --job-name=mcfost-benchmark
 #SBATCH --nodes=1
@@ -16,6 +18,7 @@
 #SBATCH --cpus-per-task=16
 #SBATCH --mem-per-cpu=4g
 #SBATCH --time=1:00:00
+#SBATCH --tmp=20G
 
 # run-time environment of the binaries (e.g. LD_LIBRARY_PATH), written by submit_ozstar.sh
 [ -n "$JOB_SETUP_FILE" ] && source "$JOB_SETUP_FILE"
@@ -29,4 +32,5 @@ export OMP_PLACES=cores
 export OMP_STACKSIZE=1024m
 
 cd "${SLURM_SUBMIT_DIR:-.}"
-./run_benchmark.sh "$@"
+# the reference binary last: compare_benchmark.py compares the first two binaries by default
+./run_benchmark.sh "$@" ${REFERENCE_BIN:+-b ref=$REFERENCE_BIN}
