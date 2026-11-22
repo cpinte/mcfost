@@ -15,6 +15,8 @@
 #   W4 Phantom dump on a Voronoi mesh (temperature), W5 PAH temperature and SED
 #   W1L, W4L: W1 and W4 with 10 x the packets, for full nodes (64 threads and more),
 #   where the Monte Carlo part of W1 and W4 only lasts a few seconds
+#   W6 Phantom dump 1 um images (after W4), W7 Phantom dump CO cubes (ray tracing and
+#   FITS output on a Voronoi mesh)
 
 set -e
 
@@ -33,7 +35,7 @@ while getopts "b:n:w:t:o:h" opt; do
         w) workloads=$OPTARG ;;
         t) export OMP_NUM_THREADS=$OPTARG ;;
         o) results=$OPTARG ;;
-        *) sed -n '2,20p' "$0" ; exit 1 ;;
+        *) sed -n '2,22p' "$0" ; exit 1 ;;
     esac
 done
 
@@ -187,6 +189,12 @@ for r in $(seq 1 "$n_repeats"); do
                 W4) run "$label" "$bin" W4 "$r" "$d/phantom" phantom.para \
                         -phantom "$test_data/discF_00500/discF_00500" -not_random_Voronoi -no_SED ;;
                 W1L) run "$label" "$bin" W1L "$r" "$d/disk_large" disk_large.para -no_SED ;;
+                W6) [ -d "$d/phantom/data_th" ] || run "$label" "$bin" W4 "$r" "$d/phantom" phantom.para \
+                        -phantom "$test_data/discF_00500/discF_00500" -not_random_Voronoi -no_SED
+                    run "$label" "$bin" W6 "$r" "$d/phantom" phantom.para \
+                        -phantom "$test_data/discF_00500/discF_00500" -not_random_Voronoi -img 1.0 ;;
+                W7) run "$label" "$bin" W7 "$r" "$d/phantom_mol" phantom.para \
+                        -phantom "$test_data/discF_00500/discF_00500" -not_random_Voronoi -mol -no_SED ;;
                 W4L) run "$label" "$bin" W4L "$r" "$d/phantom_large" phantom_large.para \
                         -phantom "$test_data/discF_00500/discF_00500" -not_random_Voronoi -no_SED ;;
                 W5) run "$label" "$bin" W5 "$r" "$d/pah" pah.para ;;

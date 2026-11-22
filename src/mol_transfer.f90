@@ -1,5 +1,6 @@
 module mol_transfer
 
+  use timing, only : timer_start, timer_stop, t_mol_output
   use parameters
   use naleat
   use utils
@@ -129,7 +130,10 @@ subroutine mol_line_transfer()
            enddo
         enddo
 
+        ! writing of the cubes (gzip on close): nested in the mol phase
+        call timer_start(t_mol_output)
         call ecriture_spectre(imol)
+        call timer_stop(t_mol_output)
         if (ltau_surface .or. lflux_fraction_surface) call write_tau_surface(imol)
 
      endif ! lline
