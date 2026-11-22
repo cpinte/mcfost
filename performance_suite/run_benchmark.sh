@@ -65,7 +65,9 @@ date=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 [ -z "$results" ] && results=$script_dir/results/$(date -u +%Y%m%d_%H%M%S)_${host}${SLURM_JOB_ID:+_$SLURM_JOB_ID}.tsv
 mkdir -p "$(dirname "$results")"
 
-work=$(mktemp -d "${TMPDIR:-/tmp}/mcfost_benchmark.XXXXXX")
+# working directory: the job-local disk ($JOBFS, requested with #SBATCH --tmp on OzSTAR/NT) when
+# available: /tmp can be too small for the cubes (W7), which cfitsio gzips in memory then copies
+work=$(mktemp -d "${JOBFS:-${TMPDIR:-/tmp}}/mcfost_benchmark.XXXXXX")
 trap 'rm -rf "$work"' EXIT
 
 # Parameter files of the workloads, from the test data
@@ -117,6 +119,7 @@ fi
     echo "# omp_num_threads: $OMP_NUM_THREADS"
     echo "# omp_proc_bind: ${OMP_PROC_BIND:-unset}"
     echo "# omp_places: ${OMP_PLACES:-unset}"
+    echo "# workdir: $work ($(df -h "$work" 2>/dev/null | awk 'NR==2 {print $4 " free"}'))"
     echo "# slurm_job: ${SLURM_JOB_ID:-none} ${SLURM_JOB_PARTITION:-}"
     echo "# modules: $modules"
     echo "# repeats: $n_repeats"

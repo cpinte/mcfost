@@ -1,4 +1,5 @@
 ozstar.conf
+results/
 results/logs/
 results/*_logs/
 # editor files
@@ -6,3 +7,4 @@ results/*_logs/
 .#*
 *~
 __pycache__/
+*.log

@@ -18,6 +18,7 @@
 #SBATCH --cpus-per-task=16
 #SBATCH --mem-per-cpu=4g
 #SBATCH --time=1:00:00
+#SBATCH --tmp=20G
 
 # run-time environment of the binaries (e.g. LD_LIBRARY_PATH), written by submit_ozstar.sh
 [ -n "$JOB_SETUP_FILE" ] && source "$JOB_SETUP_FILE"

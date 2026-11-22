@@ -13,6 +13,7 @@
 #SBATCH --output=mcfost-scaling_%j.log
 #SBATCH --mem-per-cpu=2g
 #SBATCH --time=3:00:00
+#SBATCH --tmp=20G
 
 ulimit -s unlimited 2>/dev/null || ulimit -s hard
 export MCFOST_UTILS=${MCFOST_UTILS:-$HOME/mcfost/utils}
