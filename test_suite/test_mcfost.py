@@ -1402,3 +1402,23 @@ def test_sed_separate_grid_scattering(variant):
         ratio[grid] = sed[5, :18] / sed[4, :18]   # scattered / direct starlight, 0.1-2 um
     err = np.median(np.abs(ratio["file"] / ratio["default"] - 1))
     assert err < 0.05, f"scattered / direct starlight, wavelength file vs default grid: median difference {100*err:.1f} %"
+
+
+def test_dust_prop_cache():
+    # Dust properties cached in the working directory (_dust_prop_th.tmp) are reused by the next
+    # run only if they were computed with the same settings: a run with another phase function
+    # (HG vs Mie) reused them and stopped with the normalisation error or used wrong Mueller
+    # matrices (review X110)
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    run_dir = "ref3.0_dust_prop_cache"
+    clean_results(run_dir)
+    os.makedirs(run_dir)
+    edits = {"nbr_photons_eq_th": set_first_value("1.28e4"), "n_rad (log": set_first_values("30 20 1 5")}
+    make_para("test_data/ref3.0/ref3.0.para", run_dir + "/mie.para", edits)
+    make_para("test_data/ref3.0/ref3.0.para", run_dir + "/hg.para", dict(edits, **{"1=Mie, 2=hg": set_first_value("2")}))
+    out = {}
+    for i, para in enumerate(("hg", "mie", "mie")):
+        out[i] = run_mcfost(para + ".para", "r" + str(i), "-no_SED", cwd=run_dir, timeout=300)
+    assert "Reading dust properties from previous run" not in out[1], "Mie run reused the HG dust properties"
+    assert "Reading dust properties from previous run" in out[2], "identical run did not reuse the dust properties"
