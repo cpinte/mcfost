@@ -40,6 +40,9 @@ done
 if [ ${#binaries[@]} -eq 0 ]; then
     echo "ERROR: at least one binary is needed: -b <label>=<mcfost binary>" ; exit 1
 fi
+for b in "${binaries[@]}"; do
+    [ -x "${b#*=}" ] || { echo "ERROR: binary ${b%%=*} (${b#*=}) not found or not executable" ; exit 1 ; }
+done
 if [ -z "$MCFOST_UTILS" ]; then
     echo "ERROR: MCFOST_UTILS is not set" ; exit 1
 fi
@@ -149,7 +152,11 @@ run() { # label binary workload repeat directory para options
     for f in "$work"/*.lambda; do [ -f "$f" ] && cp "$f" "$dir/" ; done
     t0=$(now)
     (cd "$dir" && "$bin" "$work/$para" -root_dir "$dir" $timing "$@" > "$dir.log" 2>&1) || \
-        { echo "ERROR: $label $w failed, see $dir.log" ; tail -20 "$dir.log" ; exit 1 ; }
+        { echo "ERROR: $label $w failed, see ${results%.tsv}_logs/FAILED_${label}_$w.log" ; tail -20 "$dir.log"
+          # the working directory is deleted on exit: keep the mcfost output next to the results
+          mkdir -p "${results%.tsv}_logs" ; cp "$dir.log" "${results%.tsv}_logs/FAILED_${label}_$w.log"
+          echo "# FAILED: $label $w repeat $r (${results%.tsv}_logs/FAILED_${label}_$w.log)" >> "$results"
+          exit 1 ; }
     t1=$(now)
     [ -z "$timing" ] && awk -v t0="$t0" -v t1="$t1" 'BEGIN {printf " TIMING total %.3f 1\n", t1-t0}' >> "$dir.log"
     # SHA compiled into the binary (MCFOST_GIT=1 builds): git may not be available on compute nodes
