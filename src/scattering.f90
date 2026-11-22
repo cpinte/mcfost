@@ -522,7 +522,10 @@ subroutine normalise_Mueller_matrix(lambda,igrain, s11,s12,s22,s33,s34,s44, norm
         if (normalization > prob_s11(lambda,igrain,nang_scatt)) then
            prob_s11(lambda,igrain,1:nang_scatt) = prob_s11(lambda,igrain,1:nang_scatt) + &
                 normalization - prob_s11(lambda,igrain,nang_scatt)
-        else
+        else if (normalization < (1.0_dp - 1.0e-3_dp) * prob_s11(lambda,igrain,nang_scatt)) then
+           ! The sum over the 180 angles can exceed the exact value by ~1e-4 for small grains
+           ! (smooth phase function, no missing diffraction peak): accepted, nothing is missing.
+           ! Larger excesses mean wrong Mie results
            call error("normalise_Mueller_matrix: exact normalization is smaller than numerical integration")
         endif
      endif

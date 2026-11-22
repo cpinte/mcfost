@@ -1281,7 +1281,7 @@ subroutine calc_local_scattering_matrices(lambda)
            ! Normalization : we want the total energy scattered over [0,pi] in theta and [0,2pi] in phi = 1
            ! (for ray-tracing)
            do l=0,nang_scatt
-              g = tab_g_pos(icell,p_lambda) ; g2 = g**2
+              g = tab_g_pos(icell,lambda) ; g2 = g**2 ! tab_g_pos is stored for every wavelength
               mu = cos((real(l))/real(nang_scatt)*pi) ! cos(theta)
               tab_s11_pos(l,icell,p_lambda) = 1.0/four_pi * (1-g2) * (1+g2-2*g*mu)**(-1.5) * dtheta
            enddo
@@ -1421,7 +1421,8 @@ integer function select_scattering_grain(lambda,icell, rand) result(l)
      endif
      l = k
   else
-     l = select_grainsize_high_mem(lambda,rand, icell) ! is this ever used ?
+     ! ksca_CDF is stored at p_lambda (opacity): a single slot with a separate SED wavelength grid
+     l = select_grainsize_high_mem(merge(lambda, 1, l_p_lambda_is_lambda), rand, icell)
   endif
 
   return

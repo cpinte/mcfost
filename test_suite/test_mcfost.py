@@ -1363,3 +1363,42 @@ def test_sed_scattering_method1(grid):
     # 177 % with the wrong normalisation
     diff = np.abs(sed["1"] - sed["2"]).sum() / sed["2"].sum()
     assert diff < 0.15, f"SED method 1 vs 2: flux-weighted difference {100*diff:.1f} %"
+
+
+@pytest.mark.parametrize("variant", ["mie", "method1", "hg"])
+def test_sed_separate_grid_scattering(variant):
+    # SED Monte Carlo without ray tracing on a separate wavelength grid (wavelength file) that
+    # holds the same wavelengths as the default grid: the scattering data stored for a single
+    # wavelength (p_lambda = 1) were only recomputed per wavelength with ray tracing, so every
+    # wavelength scattered with the phase function of the last one (review A4: scattered /
+    # direct starlight 21 % off); method 1 read ksca_CDF out of the single slot, HG used the g
+    # of the first wavelength. Compared through the ratio of scattered to direct starlight,
+    # which does not depend on the bin edges of the stellar spectrum (they differ between a
+    # wavelength file and the default grid).
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    n, lmin, lmax = 50, 0.1, 3000.0   # default grid of ref3.0.para
+    d = np.exp(np.log(lmax / lmin) / n)
+    lam = lmin * np.sqrt(d) * d ** np.arange(n)
+    edits = {"nbr_photons_eq_th": set_first_value("1.28e5"), "nbr_photons_lambda": set_first_value("1.28e4"),
+             "n_rad (log": set_first_values("30 20 1 5")}
+    if variant == "method1":
+        edits["0=auto, 1=grain prop"] = set_first_value("1")
+    if variant == "hg":
+        edits["1=Mie, 2=hg"] = set_first_value("2")
+    ratio = {}
+    for grid in ("default", "file"):
+        run_dir = "ref3.0_sed_grid_" + variant + "_" + grid
+        clean_results(run_dir)
+        os.makedirs(run_dir)
+        e = dict(edits)
+        if grid == "file":
+            np.savetxt(run_dir + "/same.lambda", lam, fmt="%.8e")
+            e["compute temperature?, compute sed?"] = set_first_values("T T F")
+            e["wavelength file"] = set_first_value("same.lambda")
+        make_para("test_data/ref3.0/ref3.0.para", run_dir + "/ref3.0.para", e)
+        run_mcfost("ref3.0.para", "results", "-no-rt", cwd=run_dir, timeout=600)
+        sed = fits.getdata(run_dir + "/results/data_th/sed_mc.fits.gz")[:, 0].sum(axis=1).astype(float)
+        ratio[grid] = sed[5, :18] / sed[4, :18]   # scattered / direct starlight, 0.1-2 um
+    err = np.median(np.abs(ratio["file"] / ratio["default"] - 1))
+    assert err < 0.05, f"scattered / direct starlight, wavelength file vs default grid: median difference {100*err:.1f} %"
