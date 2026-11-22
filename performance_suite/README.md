@@ -79,6 +79,7 @@ phase (`TIMING <phase> <seconds> <calls>`). Phases can be nested: `init` and
 | `ray_tracing` | Ray tracing of the images and SEDs (`dust_map`) |
 | `output` | Writing the temperature, SED and image files of the dust transfer |
 | `mol`, `atom` | Molecular and atomic line transfer |
+| `mol_output` | Writing of the line cubes (gzip on close), within `mol` |
 
 ## Workloads
 
@@ -93,6 +94,8 @@ Built from the models of the test suite (`test_suite/get_test_data.sh`).
 | W5 | `ref4.1_PAH`, 10 PAH sizes, 1.28e6 packets | temperature and SED | `temperature_nRE`, `source_fct` |
 | W1L | as W1, 1.28e8 packets | temperature, `-no_SED` | `mc_temperature` (full nodes: about 25 s of Monte Carlo on 64 cores) |
 | W4L | as W4, 1e8 packets | temperature, `-no_SED` | `mc_temperature` (full nodes: about 60 s of Monte Carlo on 64 cores) |
+| W6 | `discF_00500` (Phantom), 301 x 301 pixels, 4 views | 1 um images (after W4) | `mc_step2`, `ray_tracing` |
+| W7 | `discF_00500` (Phantom), CO, 51 channels | temperature and line cubes, `-mol -no_SED` | `mc_temperature`, `mol`, `mol_output` |
 
 On an Apple M3 Max with 8 threads: W1 8.5 s, W2 6 s, W3 2.5 s, W4 29 s, W5 6 s.
 A pass with 3 repeats of two binaries takes about 10 minutes there.

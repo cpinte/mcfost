@@ -1,6 +1,7 @@
 module thermal_emission
 
   use parameters
+  use numa
   use constants
   use grains
   use dust_prop

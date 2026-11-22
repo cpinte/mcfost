@@ -1,6 +1,7 @@
 module mem
 
   use parameters
+  use numa
   use grains
   use dust_prop
   use naleat

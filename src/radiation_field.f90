@@ -1,6 +1,7 @@
 module radiation_field
 
   use parameters
+  use numa
   use mcfost_env
   use constants
   use dust_prop, only : kappa_abs_LTE, kappa_factor

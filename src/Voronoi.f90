@@ -3,6 +3,7 @@ module Voronoi_grid
   use constants
   use mcfost_env
   use parameters
+  use numa
   use utils, only : system_call, shell_quote, tmp_filename
   use sort, only : Knuth_shuffle, index_quicksort
   use naleat, only : seed, stream, gtype
