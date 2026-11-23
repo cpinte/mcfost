@@ -12,6 +12,9 @@ module parameters
   real(kind=dp) :: simu_time = 0.0
 
   logical :: lpara, lstop_after_init
+  ! images and line cubes written as .fits.gz (default) or .fits (-no_gzip): cfitsio compresses the whole
+  ! file on close, in one thread and in memory (40-60 % of the line phase for large inclined cubes)
+  logical :: lgzip_cubes = .true.
   integer :: step_index
 
   ! Number of photons launched

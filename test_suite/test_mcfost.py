@@ -1422,3 +1422,25 @@ def test_dust_prop_cache():
         out[i] = run_mcfost(para + ".para", "r" + str(i), "-no_SED", cwd=run_dir, timeout=300)
     assert "Reading dust properties from previous run" not in out[1], "Mie run reused the HG dust properties"
     assert "Reading dust properties from previous run" in out[2], "identical run did not reuse the dust properties"
+
+
+def test_no_gzip():
+    # -no_gzip: images and line cubes written uncompressed (.fits): same data as the default .fits.gz
+    # (gzip is serial and done in memory on close: 40-60 % of the line phase for large cubes)
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    run_dir = "ref3.0_no_gzip"
+    clean_results(run_dir)
+    os.makedirs(run_dir)
+    make_para("test_data/ref3.0/ref3.0.para", run_dir + "/ref3.0.para",
+              {"nbr_photons_eq_th": set_first_value("1.28e4"), "n_rad (log": set_first_values("30 20 1 5")})
+    run_mcfost("ref3.0.para", "results", "-no_SED", cwd=run_dir, timeout=300)
+    cube = {}
+    for ext, opt in ((".fits.gz", ""), (".fits", "-no_gzip")):
+        # 1 thread: the populations use random rays, identical runs only on one thread
+        run_mcfost("ref3.0.para", "results", "-mol -no_T " + opt, cwd=run_dir, threads=1, timeout=300)
+        files = os.listdir(run_dir + "/results/data_CO")
+        assert "lines" + ext in files and ("lines.fits" if ext == ".fits.gz" else "lines.fits.gz") not in files
+        cube[ext] = fits.getdata(run_dir + "/results/data_CO/lines" + ext)
+        shutil.rmtree(run_dir + "/results/data_CO")
+    assert np.array_equal(cube[".fits"], cube[".fits.gz"])
