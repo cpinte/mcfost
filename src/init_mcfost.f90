@@ -11,6 +11,7 @@ module init_mcfost
   use input, only : Tfile, lect_lambda, read_phase_function, read_molecules_names
   use ProdiMo
   use utils
+  use sha, only : sha_id
   use timing, only : ltiming
   use read_fargo3d, only : read_fargo3d_parameters
   use read_athena, only : read_athena_parameters

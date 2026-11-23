@@ -3,7 +3,6 @@ module utils
   use mcfost_env
   use naleat, only : stream
   use constants
-  use sha
   use messages
 
   implicit none

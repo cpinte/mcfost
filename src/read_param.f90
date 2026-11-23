@@ -5,7 +5,6 @@ module read_params
   use molecular_emission
   use wavelengths
   use constants
-  use sha
   use messages
   use atom_type
 
