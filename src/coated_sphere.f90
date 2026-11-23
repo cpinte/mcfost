@@ -119,6 +119,10 @@ contains
           tab_s12(j,igrain,lambda) = s12(j) / norm
           tab_s33(j,igrain,lambda) = s33(j) / norm
           tab_s34(j,igrain,lambda) = s34(j) / norm
+          ! spheres (coated or hollow): S22 = S11 and S44 = S33. They were never set here, so the
+          ! polarised transfer had M(2,2) = M(4,4) = 0 (as set in mueller_Mie, normalise_Mueller_matrix)
+          tab_s22(j,igrain,lambda) = tab_s11(j,igrain,lambda)
+          tab_s44(j,igrain,lambda) = tab_s33(j,igrain,lambda)
        enddo
 
     endif ! aniso_method ==1
@@ -146,7 +150,7 @@ contains
     integer :: i,j, nang, ipop
 
     real :: Qext_HS, Qsca_HS, Qabs_HS, gqsc_HS, gsca_HS ! for one hollow sphere
-    complex, dimension(nang_scatt+1) :: s1,s2, s1_HS, s2_HS
+    complex, dimension(nang_scatt+1) :: s1_HS, s2_HS
 
     real :: a, rcore, rshell, wvno, factor, Cext, Csca
     real :: vi1, vi2, norm, somme_prob, theta, dtheta, x
@@ -183,7 +187,7 @@ contains
     call Gauss_Legendre_quadrature(0.0_dp,real(dust_pop(ipop)%dhs_maxf,kind=dp),N_vf, f, wf) ; wf = wf/sum(wf)
     ! todo: only need to do this for 1 grain size and 1 wavelength, unless n_vf changes
 
-    Cext=0 ; Csca=0 ; gsca=0 ; s1=0 ; s2=0
+    Cext=0 ; Csca=0 ; gsca=0 ; S11=0 ; S12=0 ; S33=0 ; S34=0
     do i=1,N_vf
        rshell = a/((1.-f(i))**one_third)
        rcore = rshell * f(i)**one_third
@@ -199,8 +203,20 @@ contains
        Csca = Csca + factor * Qsca_HS
        gsca = gsca + factor * gqsc_HS ! gqsc_HS == gsca_HS * qsca_HS
 
-       s1 = s1 + s1_HS * wf(i)
-       s2 = s2 + s2_HS * wf(i)
+       ! The hollow spheres of the distribution scatter incoherently: their Mueller matrices are
+       ! added (same weights as Csca, so that the integral of S11 stays 0.5 x**2 qsca). Adding the
+       ! complex amplitudes s1, s2 before forming the matrix (as before) added interference terms
+       ! between different spheres: S11 integrated to 0.7-0.8 of qsca (review B6 / MM1)
+       if (aniso_method==1) then
+          do j=0,nang_scatt
+             vi1 = cabs(s2_HS(j+1))*cabs(s2_HS(j+1))
+             vi2 = cabs(s1_HS(j+1))*cabs(s1_HS(j+1))
+             S11(j) = S11(j) + 0.5*(vi1 + vi2) * wf(i)
+             S12(j) = S12(j) + 0.5*(vi1 - vi2) * wf(i)
+             S33(j) = S33(j) + real(s2_HS(j+1)*conjg(s1_HS(j+1))) * wf(i)
+             S34(j) = S34(j) + aimag(s2_HS(j+1)*conjg(s1_HS(j+1))) * wf(i)
+          enddo
+       endif
     enddo
     if (Csca > 0.) gsca = gsca/Csca
 
@@ -212,18 +228,6 @@ contains
 
     ! Store values in the mcfost arrays
     if (aniso_method==1) then
-
-       ! QABS=QEXT-QSCA
-       ! Compute the scattering matrix elements
-       ! indices offset by 1 relative to bhmie
-       do J=0,nang_scatt
-          vi1 = cabs(s2(j+1))*cabs(s2(j+1))
-          vi2 = cabs(s1(j+1))*cabs(s1(j+1))
-          s11(j) = 0.5*(vi1 + vi2)
-          s12(j) = 0.5*(vi1 - vi2)
-          s33(j)=real(s2(j+1)*conjg(s1(j+1)))
-          s34(j)=aimag(s2(j+1)*conjg(s1(j+1)))
-       enddo !j
 
        prob_s11(lambda,igrain,0)=0.0
        dtheta = pi/real(nang_scatt)
@@ -255,6 +259,10 @@ contains
           tab_s12(j,igrain,lambda) = s12(j) / norm
           tab_s33(j,igrain,lambda) = s33(j) / norm
           tab_s34(j,igrain,lambda) = s34(j) / norm
+          ! spheres (coated or hollow): S22 = S11 and S44 = S33. They were never set here, so the
+          ! polarised transfer had M(2,2) = M(4,4) = 0 (as set in mueller_Mie, normalise_Mueller_matrix)
+          tab_s22(j,igrain,lambda) = tab_s11(j,igrain,lambda)
+          tab_s44(j,igrain,lambda) = tab_s33(j,igrain,lambda)
        enddo
 
     endif ! aniso_method ==1

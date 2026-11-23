@@ -1422,3 +1422,57 @@ def test_dust_prop_cache():
         out[i] = run_mcfost(para + ".para", "r" + str(i), "-no_SED", cwd=run_dir, timeout=300)
     assert "Reading dust properties from previous run" not in out[1], "Mie run reused the HG dust properties"
     assert "Reading dust properties from previous run" in out[2], "identical run did not reuse the dust properties"
+
+
+def dhs_edit(vmax):
+    # ref3.0 grain line: Mie -> DHS with the given maximum vacuum fraction
+    return {"Grain type (Mie or DHS)": lambda line: line.replace("  Mie  1 2  0.0  1.0  0.9", f"  DHS  1 2  0.0  1.0  {vmax}")}
+
+
+def test_dhs_phase_function():
+    # DHS grains: the hollow spheres of the distribution scatter incoherently. Their complex
+    # amplitudes were added before forming the Mueller matrix (review B6 / MM1): the phase function
+    # then integrated to 0.7-0.8 of the scattering cross section, instead of 1 (Mie, and DHS since
+    # the fix) at the wavelengths where the 1 degree sampling resolves the diffraction peak
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    phase = {}
+    for name, edits in (("mie", {}), ("dhs08", dhs_edit("0.8")), ("dhs001", dhs_edit("0.01"))):
+        run_dir = "ref3.0_dhs_" + name
+        clean_results(run_dir)
+        os.makedirs(run_dir)
+        make_para("test_data/ref3.0/ref3.0.para", run_dir + "/ref3.0.para",
+                  dict(edits, **{"n_rad (log": set_first_values("30 20 1 5")}))
+        run_mcfost("ref3.0.para", "results", "-dust_prop", cwd=run_dir, timeout=300)
+        phase[name] = fits.getdata(run_dir + "/results/data_dust/phase_function.fits.gz").astype(float).T  # lambda, theta
+        lam = fits.getdata(run_dir + "/results/data_dust/lambda.fits.gz")
+    theta = np.radians(np.arange(phase["mie"].shape[1]))
+    integral = {k: 2 * np.pi * (v * np.sin(theta)).sum(axis=1) for k, v in phase.items()}
+    long = lam > 100   # diffraction peak resolved
+    assert np.all(abs(integral["mie"][long] - 1) < 0.01)
+    assert np.all(abs(integral["dhs08"][long] - 1) < 0.01), f"DHS phase function integral {integral['dhs08'][long]}"
+    # nearly solid hollow spheres: Mie
+    assert np.median(abs(phase["dhs001"] / phase["mie"] - 1)) < 0.02
+
+
+def test_dhs_polarisation():
+    # DHS and coated grains: S22 and S44 were never set (left at 0), so the polarised transfer used
+    # M(2,2) = M(4,4) = 0. Nearly solid hollow spheres must polarise as Mie spheres: polarised flux of
+    # the 1 um image 10-14 % low before the fix, within 2 % after
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    pol = {}
+    for name, edits in (("mie", {}), ("dhs001", dhs_edit("0.01"))):
+        run_dir = "ref3.0_dhs_pola_" + name
+        clean_results(run_dir)
+        os.makedirs(run_dir)
+        make_para("test_data/ref3.0/ref3.0.para", run_dir + "/ref3.0.para",
+                  dict(edits, **{"n_rad (log": set_first_values("30 20 1 5"),
+                                 "nbr_photons_eq_th": set_first_value("1.28e5")}))
+        run_mcfost("ref3.0.para", "results", "-no_SED -seed 1", cwd=run_dir, timeout=300)
+        run_mcfost("ref3.0.para", "results", "-img 1.0 -seed 1", cwd=run_dir, timeout=300)
+        rt = fits.getdata(run_dir + "/results/seed=1/data_1.0/RT.fits.gz").astype(float)[:, 0]  # Stokes, incl, y, x
+        pol[name] = np.sqrt(rt[1] ** 2 + rt[2] ** 2).sum(axis=(-1, -2)) / rt[0].sum(axis=(-1, -2))
+    ok = pol["mie"] > 0.01   # inclined views, where the polarised flux is significant
+    rel = pol["dhs001"][ok] / pol["mie"][ok] - 1
+    assert np.all(abs(rel) < 0.05), f"polarised fraction DHS (vacuum 0.01) vs Mie: {rel}"
