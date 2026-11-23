@@ -1476,3 +1476,61 @@ def test_dhs_polarisation():
     ok = pol["mie"] > 0.01   # inclined views, where the polarised flux is significant
     rel = pol["dhs001"][ok] / pol["mie"][ok] - 1
     assert np.all(abs(rel) < 0.05), f"polarised fraction DHS (vacuum 0.01) vs Mie: {rel}"
+
+
+def read_optool_scatmat(path):
+    # optool dustkapscatmat.dat: nlam, nang; lam, kabs, ksca, g; angles; F11 F12 F22 F33 F34 F44
+    lines = [l for l in open(path) if not l.startswith("#") and l.strip()]
+    nlam, nang = int(lines[1]), int(lines[2])
+    tab = np.array([[float(x) for x in lines[3 + i].split()] for i in range(nlam)])
+    ang = np.array([float(lines[3 + nlam + i]) for i in range(nang)])
+    F = np.loadtxt(lines[3 + nlam + nang:]).reshape(nlam, nang, 6)
+    return tab, ang, F
+
+
+@pytest.mark.parametrize("grain", ["mie", "dhs"])
+def test_dust_prop_vs_optool(grain):
+    # Albedo, asymmetry parameter, phase function and polarisation of a single 1 um silicate grain
+    # (Mie, and DHS with fmax = 0.8) against optool (reference and commands in
+    # $MCFOST_UTILS/benchmarks/optools, see its README). Before the fix of review B6, mcfost added the
+    # complex amplitudes of the hollow spheres: DHS g 0.97 instead of 0.88 at 0.71 um, phase function
+    # 75-95 % off, P(90 deg) -0.98 instead of +0.40 at 1.3 um
+    if not compute_models:
+        pytest.skip("Only run when computing models")
+    ref_dir = os.path.join(os.environ.get("MCFOST_UTILS", os.path.join("..", "utils")), "benchmarks", "optools")
+    ref = os.path.join(ref_dir, {"mie": "mie_1um", "dhs": "dhs08_1um"}[grain], "dustkapscatmat.dat")
+    if not os.path.isfile(ref):
+        pytest.skip("optool reference not found in the MCFOST utils (benchmarks/optools)")
+    tab, ang, F = read_optool_scatmat(ref)
+
+    run_dir = "ref3.0_optool_" + grain
+    clean_results(run_dir)
+    os.makedirs(run_dir)
+    edits = {"n_rad (log": set_first_values("30 20 1 5"), "amin, amax": set_first_values("1.0 1.0 3.5 1")}
+    if grain == "dhs":
+        edits.update(dhs_edit("0.8"))
+    make_para("test_data/ref3.0/ref3.0.para", run_dir + "/ref3.0.para", edits)
+    run_mcfost("ref3.0.para", "results", "-dust_prop", cwd=run_dir, timeout=300)
+    d = run_dir + "/results/data_dust/"
+    lam = fits.getdata(d + "lambda.fits.gz")
+    albedo = fits.getdata(d + "albedo.fits.gz")
+    S11 = fits.getdata(d + "phase_function.fits.gz").astype(float).T   # lambda, theta (integer degrees)
+    P = fits.getdata(d + "polarizability.fits.gz").astype(float).T     # -S12/S11
+    assert np.allclose(lam, tab[:, 0], rtol=1e-5)
+
+    theta = np.arange(S11.shape[1]); rad = np.radians(theta); w = np.sin(rad)
+    g = (S11 * w * np.cos(rad)).sum(1) / (S11 * w).sum(1)
+    assert np.max(abs(albedo - tab[:, 2] / (tab[:, 1] + tab[:, 2]))) < 0.005
+    assert np.max(abs(g - tab[:, 3])) < 0.01, f"g: {g} vs {tab[:, 3]}"
+    for i in np.nonzero(lam > 0.35)[0]:   # size parameter <= 18: angular sampling adequate
+        f11 = np.interp(theta, ang, F[i, :, 0])
+        p_opt = -np.interp(theta, ang, F[i, :, 1]) / f11
+        shape = (S11[i] / (S11[i] * w).sum()) / (f11 / (f11 * w).sum()) - 1
+        assert np.median(abs(shape[theta >= 2])) < 0.03, f"phase function at {lam[i]:.3f} um"
+        assert abs(P[i, 90] - p_opt[90]) < 0.03, f"P(90 deg) at {lam[i]:.3f} um: {P[i, 90]:.3f} vs {p_opt[90]:.3f}"
+        if lam[i] > 0.7:                  # size parameter <= 9
+            # weighted by the scattered intensity: the deep minima of the single-size Mie phase
+            # function (1e-3 of the peak) are sampled differently by the two angle grids
+            dp = abs(P[i] - p_opt)
+            assert (dp * S11[i] * w).sum() / (S11[i] * w).sum() < 0.02, f"polarisation at {lam[i]:.3f} um"
+            assert np.max(dp) < 0.1, f"polarisation at {lam[i]:.3f} um: max difference {np.max(dp):.3f}"
