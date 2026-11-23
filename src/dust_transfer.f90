@@ -1245,8 +1245,15 @@ subroutine run_sed_mc()
      call timer_start(t_step2_setup)
      p_lambda = merge(lambda, 1, l_p_lambda_is_lambda)
 
-     if (.not.l_p_lambda_is_lambda .and. lscatt_ray_tracing) then
-        call calc_local_scattering_matrices(lambda)
+     ! Scattering data stored for a single wavelength (p_lambda = 1, separate SED wavelength
+     ! grid or after the switch to method 2): recomputed for each wavelength, with or without
+     ! ray tracing, as the Monte Carlo scattering also reads them (they held the last wavelength)
+     if (.not.l_p_lambda_is_lambda) then
+        if (lscattering_method1) then
+           call opacity(lambda) ! ksca_CDF(:,:,1)
+        else
+           call calc_local_scattering_matrices(lambda)
+        endif
      endif
 
      if (lspherical.or.l3D) then

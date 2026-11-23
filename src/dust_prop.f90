@@ -760,8 +760,9 @@ subroutine save_dust_prop(letape_th)
   endif
 
   open(1,file=filename,status='replace',form='unformatted')
-  write(1) para_version, scattering_method, dust_pop, grain, &
-       n_lambda, lambda_min, lambda_max, tab_wavelength, &
+  ! the phase-function settings change the saved Mueller matrices and g
+  write(1) para_version, scattering_method, aniso_method, lisotropic, lforce_HG, forced_g, &
+       dust_pop, grain, n_lambda, lambda_min, lambda_max, tab_wavelength, &
        C_ext, C_sca, C_abs, C_abs_norm, tab_g, tab_albedo, &
        prob_s11, tab_s11, tab_s12, tab_s22, tab_s33, tab_s34, tab_s44
   close(unit=1)
@@ -782,8 +783,9 @@ subroutine read_saved_dust_prop(letape_th, lcompute)
   type(dust_pop_type), dimension(n_pop) :: dust_pop_save
   type(dust_grain_type), dimension(n_grains_tot) :: grain_save
   character(len=512) :: filename, tab_wavelength_save
-  integer :: n_lambda_save, scattering_method_save
-  real :: lambda_min_save, lambda_max_save, para_version_save
+  integer :: n_lambda_save, scattering_method_save, aniso_method_save
+  real :: lambda_min_save, lambda_max_save, para_version_save, forced_g_save
+  logical :: lisotropic_save, lforce_HG_save
 
   integer :: i, pop, ios
   logical :: ok
@@ -794,7 +796,7 @@ subroutine read_saved_dust_prop(letape_th, lcompute)
   if (letape_th) then
      filename=trim(tmp_dir)//"/_dust_prop_th.tmp" ;
   else
-     filename=trim(tmp_dir)//"_dust_prop_SED.tmp" ;
+     filename=trim(tmp_dir)//"/_dust_prop_SED.tmp" ;
   endif
 
   ! check if there is a dust population file
@@ -807,8 +809,9 @@ subroutine read_saved_dust_prop(letape_th, lcompute)
 
   ok = .true.
   ! read the saved dust properties
-  read(1,iostat=ios) para_version_save, scattering_method_save, dust_pop_save, grain_save, &
-       n_lambda_save, lambda_min_save, lambda_max_save, tab_wavelength_save, &
+  read(1,iostat=ios) para_version_save, scattering_method_save, aniso_method_save, lisotropic_save, &
+       lforce_HG_save, forced_g_save, &
+       dust_pop_save, grain_save, n_lambda_save, lambda_min_save, lambda_max_save, tab_wavelength_save, &
        C_ext, C_sca, C_abs, C_abs_norm, tab_g, tab_albedo, &
        prob_s11, tab_s11, tab_s12, tab_s22, tab_s33, tab_s34, tab_s44
   close(unit=1)
@@ -820,6 +823,11 @@ subroutine read_saved_dust_prop(letape_th, lcompute)
 
   ! If the scattering method changed, the normalization is off
   if ( scattering_method /=  scattering_method_save) return
+
+  ! Phase function (Mie or HG, isotropic, forced g): other Mueller matrices and g
+  if (aniso_method /= aniso_method_save) return
+  if ((lisotropic .neqv. lisotropic_save) .or. (lforce_HG .neqv. lforce_HG_save)) return
+  if (lforce_HG .and. .not.real_equality(forced_g, forced_g_save)) return
 
   ! check if the dust population has changed
   ok = (n_lambda == n_lambda_save) .and. (real_equality(lambda_min,lambda_min_save)) .and. &
@@ -1281,7 +1289,7 @@ subroutine calc_local_scattering_matrices(lambda)
            ! Normalization : we want the total energy scattered over [0,pi] in theta and [0,2pi] in phi = 1
            ! (for ray-tracing)
            do l=0,nang_scatt
-              g = tab_g_pos(icell,p_lambda) ; g2 = g**2
+              g = tab_g_pos(icell,lambda) ; g2 = g**2 ! tab_g_pos is stored for every wavelength
               mu = cos((real(l))/real(nang_scatt)*pi) ! cos(theta)
               tab_s11_pos(l,icell,p_lambda) = 1.0/four_pi * (1-g2) * (1+g2-2*g*mu)**(-1.5) * dtheta
            enddo
@@ -1421,7 +1429,8 @@ integer function select_scattering_grain(lambda,icell, rand) result(l)
      endif
      l = k
   else
-     l = select_grainsize_high_mem(lambda,rand, icell) ! is this ever used ?
+     ! ksca_CDF is stored at p_lambda (opacity): a single slot with a separate SED wavelength grid
+     l = select_grainsize_high_mem(merge(lambda, 1, l_p_lambda_is_lambda), rand, icell)
   endif
 
   return
