@@ -2107,10 +2107,16 @@ subroutine compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix, dx_map, dy_ma
      dx_screen(:) = delta * dx_map(:)/norm2(dx_map(:))
      dy_screen(:) = delta * dy_map(:)/norm2(dy_map(:))
 
-     ! Todo : this could be made parallel, but it is very fast so far
-     id = 1
+     ! One independent ray per point of the screen, in parallel: it was serial, about 0.9 s per star and
+     ! view for a Phantom dump (441 rays through the Voronoi mesh), the floor of the image and line
+     ! ray tracing beyond ~16 threads (review X113)
+     !$omp parallel do schedule(dynamic,1) collapse(2) default(none) &
+     !$omp shared(istar,star,dx_screen,dy_screen,lambda,u,v,w,tau_screen,index_cell) &
+     !$omp private(i,j,id,x,y,z,icell,Stokes,tau,lmin,lmax)
      do j=-nx_screen, nx_screen
         do i=-nx_screen, nx_screen
+           id = 1
+           !$ id = omp_get_thread_num() + 1
            x = star(istar)%x + dx_screen(1) * i +  dy_screen(1) * j
            y = star(istar)%y + dx_screen(2) * i +  dy_screen(2) * j
            z = star(istar)%z + dx_screen(3) * i +  dy_screen(3) * j
@@ -2124,6 +2130,7 @@ subroutine compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix, dx_map, dy_ma
            tau_screen(i,j) = tau
         enddo ! j
      enddo ! i
+     !$omp end parallel do
 
      map_1star(:,:,:) = 0.0
      if (lpola) then
