@@ -328,20 +328,29 @@ $(XGBOOST_WRAPPER).o :  $(XGBOOST_WRAPPER).cpp
 
 io_prodimo.o : sha.f90
 
-utils.o : sha.f90
+init_mcfost.o : sha.f90
 
 Voronoi.o : voro++_wrapper.o
 
 ifeq ($(MCFOST_GIT),1)
-sha.f90 : mcfost_env.o
-	printf "module sha\n  implicit none\n" > sha.f90
-	git rev-parse HEAD | awk \
+# Checked at every make (FORCE): after a commit or a branch switch the SHA printed by the binary
+# was the one of the first build (the rule only depended on mcfost_env.o). sha.f90 is rewritten,
+# and its users recompiled, only when the commit changed
+sha.f90 : mcfost_env.o FORCE
+	@printf "module sha\n  implicit none\n" > sha.f90.tmp
+	@git rev-parse HEAD | awk \
 		'{print "  character(len=40), parameter :: sha_id = \""$$1"\""}' \
-		>> sha.f90
-	printf "end module sha\n" >> sha.f90
+		>> sha.f90.tmp
+	@printf "end module sha\n" >> sha.f90.tmp
+	@if cmp -s sha.f90.tmp sha.f90 ; then rm -f sha.f90.tmp ; else mv sha.f90.tmp sha.f90 ; echo "sha.f90: $$(git rev-parse --short HEAD)" ; fi
 endif
 
-operating_system.f90 : sha.o
+.PHONY : FORCE
+FORCE :
+
+# generated once (uname), after mcfost_env.o like sha.f90; it used to depend on sha.o, which
+# regenerated it, and recompiled its users (utils, Voronoi and all the code using utils), at every commit
+operating_system.f90 : mcfost_env.o
 	printf "module os\n  implicit none\n" > operating_system.f90
 	uname -s | awk \
 		'{print "  character(len=7), parameter :: operating_system = \""$$1"\""}' \
