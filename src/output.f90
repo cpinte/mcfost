@@ -50,7 +50,7 @@ module output
 !**********************************************************************
 
 function cube_ext()
-  ! Extension of the images and line cubes: .fits.gz, or .fits with -no_gzip (lgzip_cubes)
+  ! Extension of the images and line cubes: .fits (default), or .fits.gz with -gzip (lgzip_cubes)
   character(len=8) :: cube_ext
 
   if (lgzip_cubes) then

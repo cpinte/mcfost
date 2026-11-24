@@ -48,6 +48,16 @@ def all_almost_equal(x,y,threshold=0.01):
     # test if all the values of two arrays are almost equal
     return (abs((x-y)) < threshold * x).all()
 
+def output_file(name):
+    # Images and line cubes (RT, MC, lines) are written as .fits by default, as .fits.gz with
+    # -gzip (and in reference data computed before): returns the one that exists
+    if name.endswith(".fits.gz") and not os.path.isfile(name) and os.path.isfile(name[:-3]):
+        return name[:-3]
+    if name.endswith(".fits") and not os.path.isfile(name) and os.path.isfile(name + ".gz"):
+        return name + ".gz"
+    return name
+
+
 def MC_similar(x,y,threshold=0.01,mask_threshold=1e-24):
     # test if two arrays have the same at the 75% percentile
     # ignoring values that are very small as they are very noisy
@@ -165,8 +175,8 @@ def test_mol_map(model_name):
 
     # Read the results
     image_name = model_name+"/data_CO/lines.fits.gz"
-    image = fits.getdata(test_dir+"/"+image_name)
-    image_ref = fits.getdata("test_data/"+image_name)
+    image = fits.getdata(output_file(test_dir+"/"+image_name))
+    image_ref = fits.getdata(output_file("test_data/"+image_name))
 
     print("Maximum mol map difference", (abs(image-image_ref)/(image_ref+1e-30)).max())
     print("Mean mol map difference   ", (abs(image-image_ref)/(image_ref+1e-30)).mean())
@@ -195,7 +205,7 @@ def test_image(model_name, wl):
     # Read the results
     image_name = model_name+"/data_"+wl+"/RT.fits.gz"
 
-    hdr = fits.getheader("test_data/"+image_name)
+    hdr = fits.getheader(output_file("test_data/"+image_name))
     n_incl = hdr['NAXIS3']
 
     threshold=0.1
@@ -213,8 +223,8 @@ def test_image(model_name, wl):
 
     # We just keep intensity
     for i in range(n_incl):
-        image = np.nan_to_num(fits.getdata(test_dir+"/"+image_name))
-        image_ref = fits.getdata("test_data/"+image_name)
+        image = np.nan_to_num(fits.getdata(output_file(test_dir+"/"+image_name)))
+        image_ref = fits.getdata(output_file("test_data/"+image_name))
 
         print(model_name, " wl=", wl)
         print("-- i=", i)
@@ -234,8 +244,8 @@ def test_image(model_name, wl):
         print("MC similar", MC_similar(image_ref,image,threshold=threshold))
         print("-------------")
 
-    image = fits.getdata(test_dir+"/"+image_name)
-    image_ref = fits.getdata("test_data/"+image_name)
+    image = fits.getdata(output_file(test_dir+"/"+image_name))
+    image_ref = fits.getdata(output_file("test_data/"+image_name))
 
     image = image[0,:,:,:,:]
     image_ref = image_ref[0,:,:,:,:]
@@ -258,10 +268,10 @@ def test_pola(model_name, wl):
 
     # Read the results
     image_name = model_name+"/data_"+wl+"/RT.fits.gz"
-    image = fits.getdata(test_dir+"/"+image_name)
+    image = fits.getdata(output_file(test_dir+"/"+image_name))
     if ((image.shape[0] != 4) & (image.shape[0] != 8)):
         pytest.skip("No polarisation found")
-    image_ref = fits.getdata("test_data/"+image_name)
+    image_ref = fits.getdata(output_file("test_data/"+image_name))
 
     # We just keep Stokes Q, U
     image = image[[1,2],:,:,:,:]
@@ -300,10 +310,10 @@ def test_contrib(model_name, wl):
 
     # Read the results
     image_name = model_name+"/data_"+wl+"/RT.fits.gz"
-    image = fits.getdata(test_dir+"/"+image_name)
+    image = fits.getdata(output_file(test_dir+"/"+image_name))
     if ((image.shape[0] != 5) & (image.shape[0] != 8)):
         pytest.skip("No contrib found")
-    image_ref = fits.getdata("test_data/"+image_name)
+    image_ref = fits.getdata(output_file("test_data/"+image_name))
 
     # We just keep separate contributions
     image = image[[4,5,6,7],:,:,:,:]
@@ -383,7 +393,7 @@ def test_mol_spectrum_circular_pixels():
         os.makedirs(run_dir+"/data_th")
         shutil.copy("test_data/ref3.0/data_th/Temperature.fits.gz", run_dir+"/data_th")
         run_mcfost(para, run_dir, "-mol -no_T", threads=threads)
-        spectra.append(fits.getdata(run_dir+"/data_CO/lines.fits.gz").astype(float))
+        spectra.append(fits.getdata(output_file(run_dir+"/data_CO/lines.fits.gz")).astype(float))
 
     s1, sN = spectra
     assert np.all(np.isfinite(s1)) and np.all(s1 > 0)
@@ -455,7 +465,7 @@ def test_mol_nlte():
         assert n_iter <= 10, f"step {step}: {n_iter} iterations"
         assert diff < threshold, f"step {step}: relative difference {diff}"
 
-    lines = fits.getdata(root_dir+"/data_CO/lines.fits.gz")
+    lines = fits.getdata(output_file(root_dir+"/data_CO/lines.fits.gz"))
     assert np.all(np.isfinite(lines)) and lines.max() > 0
 
 
@@ -475,7 +485,7 @@ def test_seed_image():
 
     stdout = run_mcfost(para, root_dir, "-seed 7 -img 1.0", timeout=300)
     assert "seed=7/data_th/Temperature.fits.gz" in stdout
-    assert os.path.isfile(root_dir+"/seed=7/data_1.0/RT.fits.gz")
+    assert os.path.isfile(output_file(root_dir+"/seed=7/data_1.0/RT.fits.gz"))
 
 
 @pytest.mark.parametrize("args", ["0 1e-8", "150 1e-8", "2 1e-8", "x 1e-8", "1 abc"])
@@ -847,7 +857,7 @@ def _check_pinte2009_images(root_dir, results, opt, median_tol, flux_tol):
     # relative to the average of MCFOST 2009, MCMax and Pinball. Stellar pixels excluded.
     shutil.rmtree(root_dir+"/data_1.0", ignore_errors=True)
     run_mcfost("benchmarks/Pinte2009/Pinte2009_tau=1e6.para", root_dir, "-star_bb -img 1.0 "+opt, timeout=3600)
-    image = fits.getdata(root_dir+"/data_1.0/RT.fits.gz").astype(np.float64) # (Stokes, az, incl, y, x)
+    image = fits.getdata(output_file(root_dir+"/data_1.0/RT.fits.gz")).astype(np.float64) # (Stokes, az, incl, y, x)
     c = image.shape[-1] // 2
     star = (slice(c-3, c+4), slice(c-3, c+4))
 
@@ -993,7 +1003,7 @@ def test_sublimation_image():
     rmin_img = float(rmin_img[0].split()[-2])
     assert rmin_th > 0.0
     assert abs(rmin_img - rmin_th) < 1e-6 * rmin_th
-    assert os.path.isfile(root_dir+"/data_1.0/RT.fits.gz")
+    assert os.path.isfile(output_file(root_dir+"/data_1.0/RT.fits.gz"))
 
     # The radial grid must follow the inner radius moved by sublimation: otherwise the
     # first radial cell spans from the sublimation radius to the original inner radius
@@ -1171,7 +1181,7 @@ def test_sublimation_hydrostatic():
         return next(i for i, l in enumerate(lines) if text in l)
     assert first_line("Reading sublimation file") < first_line("Restoring hydrostatic density") \
         < first_line("Reading sublimation mask")
-    assert os.path.isfile(root_dir+"/data_1.0/RT.fits.gz")
+    assert os.path.isfile(output_file(root_dir+"/data_1.0/RT.fits.gz"))
 
 
 def test_sublimation_sed_only():
@@ -1424,19 +1434,20 @@ def test_dust_prop_cache():
     assert "Reading dust properties from previous run" in out[2], "identical run did not reuse the dust properties"
 
 
-def test_no_gzip():
-    # -no_gzip: images and line cubes written uncompressed (.fits): same data as the default .fits.gz
-    # (gzip is serial and done in memory on close: 40-60 % of the line phase for large cubes)
+def test_gzip_option():
+    # Images and line cubes are written uncompressed (.fits) by default, compressed (.fits.gz) with
+    # -gzip: same data (gzip is serial and done in memory on close: 40-60 % of the line phase for
+    # large cubes)
     if not compute_models:
         pytest.skip("Only run when computing models")
-    run_dir = "ref3.0_no_gzip"
+    run_dir = "ref3.0_gzip_option"
     clean_results(run_dir)
     os.makedirs(run_dir)
     make_para("test_data/ref3.0/ref3.0.para", run_dir + "/ref3.0.para",
               {"nbr_photons_eq_th": set_first_value("1.28e4"), "n_rad (log": set_first_values("30 20 1 5")})
     run_mcfost("ref3.0.para", "results", "-no_SED", cwd=run_dir, timeout=300)
     cube = {}
-    for ext, opt in ((".fits.gz", ""), (".fits", "-no_gzip")):
+    for ext, opt in ((".fits", ""), (".fits.gz", "-gzip")):
         # 1 thread: the populations use random rays, identical runs only on one thread
         run_mcfost("ref3.0.para", "results", "-mol -no_T " + opt, cwd=run_dir, threads=1, timeout=300)
         files = os.listdir(run_dir + "/results/data_CO")

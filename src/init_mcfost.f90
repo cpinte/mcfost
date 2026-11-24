@@ -1253,9 +1253,9 @@ subroutine initialisation_mcfost()
      case("-no_SED")
         i_arg = i_arg + 1
         lno_SED=.true.
-     case("-no_gzip")
+     case("-gzip")
         i_arg = i_arg + 1
-        lgzip_cubes=.false.
+        lgzip_cubes=.true.
      case("-ISM_heating")
         i_arg = i_arg + 1
         lISM_heating=.true.
@@ -2053,8 +2053,8 @@ subroutine display_help()
   write(*,*) "        : -no_backup  : stops if directory data_XX already exists"
   write(*,*) "                        without attempting to backup existing directory"
   write(*,*) "        : -timing : prints the wall-clock time of each phase of the run"
-  write(*,*) "        : -no_gzip : images and line cubes written as .fits instead of .fits.gz (faster"
-  write(*,*) "                     for large outputs: the gzip compression is serial)"
+  write(*,*) "        : -gzip : images and line cubes written as .fits.gz instead of .fits (2-30x smaller,"
+  write(*,*) "                  but the compression is serial; or compress afterwards with pigz)"
   write(*,*) "        : -prodimo_input_dir <dir> : input files for ProDiMo"
   write(*,*) " "
   write(*,*) " Options related to images"
