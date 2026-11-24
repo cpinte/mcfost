@@ -1432,8 +1432,10 @@ def dhs_edit(vmax):
 def test_dhs_phase_function():
     # DHS grains: the hollow spheres of the distribution scatter incoherently. Their complex
     # amplitudes were added before forming the Mueller matrix (review B6 / MM1): the phase function
-    # then integrated to 0.7-0.8 of the scattering cross section, instead of 1 (Mie, and DHS since
-    # the fix) at the wavelengths where the 1 degree sampling resolves the diffraction peak
+    # then integrated to 0.7-0.97 of the scattering cross section, instead of 1 (Mie, and DHS since
+    # the fix) at the wavelengths where the 1 degree sampling resolves the diffraction peak.
+    # Grains up to 10 um only: the default 1 mm grains take minutes per DHS run (timeout of the
+    # serial debug builds), and the bug is largest for size parameters of a few to a few tens
     if not compute_models:
         pytest.skip("Only run when computing models")
     phase = {}
@@ -1442,13 +1444,14 @@ def test_dhs_phase_function():
         clean_results(run_dir)
         os.makedirs(run_dir)
         make_para("test_data/ref3.0/ref3.0.para", run_dir + "/ref3.0.para",
-                  dict(edits, **{"n_rad (log": set_first_values("30 20 1 5")}))
+                  dict(edits, **{"n_rad (log": set_first_values("30 20 1 5"),
+                                 "amin, amax": set_first_values("0.03 10.0 3.5 20")}))
         run_mcfost("ref3.0.para", "results", "-dust_prop", cwd=run_dir, timeout=300)
         phase[name] = fits.getdata(run_dir + "/results/data_dust/phase_function.fits.gz").astype(float).T  # lambda, theta
         lam = fits.getdata(run_dir + "/results/data_dust/lambda.fits.gz")
     theta = np.radians(np.arange(phase["mie"].shape[1]))
     integral = {k: 2 * np.pi * (v * np.sin(theta)).sum(axis=1) for k, v in phase.items()}
-    long = lam > 100   # diffraction peak resolved
+    long = lam > 1   # diffraction peak resolved (amax = 10 um): DHS integral >= 0.997 (0.97 before the fix)
     assert np.all(abs(integral["mie"][long] - 1) < 0.01)
     assert np.all(abs(integral["dhs08"][long] - 1) < 0.01), f"DHS phase function integral {integral['dhs08'][long]}"
     # nearly solid hollow spheres: Mie
