@@ -47,6 +47,20 @@ module output
 
   contains
 
+!**********************************************************************
+
+function cube_ext()
+  ! Extension of the images and line cubes: .fits (default), or .fits.gz with -gzip (lgzip_cubes)
+  character(len=8) :: cube_ext
+
+  if (lgzip_cubes) then
+     cube_ext = ".fits.gz"
+  else
+     cube_ext = ".fits"
+  endif
+
+end function cube_ext
+
 subroutine allocate_mc_images()
 
   integer :: alloc_status
@@ -687,7 +701,7 @@ subroutine write_stokes_fits()
 
 
 
-  filename = trim(data_dir)//"/MC.fits.gz"
+  filename = trim(data_dir)//"/MC"//trim(cube_ext())
 
   stoke_io(:,:,:,:,:)=0.0
   do id=1, nb_proc
@@ -853,7 +867,7 @@ subroutine ecriture_map_ray_tracing()
   sin_disk_x2 = sin(2.* ang_disque * deg_to_rad)
 
   lambda=1
-  filename = trim(data_dir)//"/RT.fits.gz"
+  filename = trim(data_dir)//"/RT"//trim(cube_ext())
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
@@ -3434,7 +3448,7 @@ subroutine ecriture_spectre(imol)
 
   real :: pixel_scale_x, pixel_scale_y, W2m2_to_Jy, factor
 
-  filename = trim(data_dir2(imol))//'/lines.fits.gz'
+  filename = trim(data_dir2(imol))//'/lines'//trim(cube_ext())
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
@@ -3797,7 +3811,7 @@ subroutine write_atomic_maps(atom)
 
 
                call ftinit(unit,fits_overwrite(trim(data_dir_atom)//"/"//trim(atom%ID)//"_line_"//trim(adjustl(transition))//&
-                                    trim(adjustl(im_ori))//".fits.gz"),blocksize,status)
+                                    trim(adjustl(im_ori))//trim(cube_ext())),blocksize,status)
 
                call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
                if (status > 0) call print_error(status)
@@ -3880,7 +3894,7 @@ subroutine write_atomic_maps(atom)
          write(transition, '(1F6.4)') lam0*m_to_km !line j that we follow among all lines.
          ! write(transition, '(1I6)') nint(lam0*10)
          call ftinit(unit,fits_overwrite(trim(data_dir_atom)//"/"//trim(atom%ID)//"_line_"// &
-              trim(adjustl(transition))//".fits.gz"),blocksize,status)
+              trim(adjustl(transition))//trim(cube_ext())),blocksize,status)
 
          !In image mode, Nblue and Nred (so Nlambda) takes into account possible velocity shifts
          ! naxes(3) = atom%lines(kr)%Nred+dk_max - atom%lines(kr)%Nblue-dk_min +1
@@ -3995,7 +4009,7 @@ subroutine write_total_flux()
 
     !  Create the new empty FITS file.
 
-   call ftinit(unit,fits_overwrite(trim(data_dir_atom)//"/flux.fits.gz"),blocksize,status)
+   call ftinit(unit,fits_overwrite(trim(data_dir_atom)//"/flux"//trim(cube_ext())),blocksize,status)
 
    naxis = 3
    naxes(1) = N_lambda
