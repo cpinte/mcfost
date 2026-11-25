@@ -13,11 +13,16 @@ jobs:
       pull-requests: write
 
     steps:
+      # The branch itself (not the merge with the current main), full history for the merge base
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
+      # Changes of the branch only: diff from the commit of main where the branch started (or was
+      # last merged from main), as in the "Files changed" tab. A diff against the current tip of
+      # main (base.sha) would show every commit merged into main since then as reverted.
       # The review is a single request: with the free tier, the input is limited
       # to 250k tokens per minute. The full changed files are only sent if the
       # request stays well below this limit (~600 kB, about 3.5 characters per
@@ -26,8 +31,8 @@ jobs:
         id: context
         shell: bash
         run: |
-          base=${{ github.event.pull_request.base.sha }}
           head=${{ github.event.pull_request.head.sha }}
+          base=$(git merge-base ${{ github.event.pull_request.base.sha }} $head)
           max_bytes=600000
           diff50=$(git diff -U50 $base $head | wc -c)
           files=$(git diff --name-only $base $head | while read f; do [ -f "$f" ] && cat "$f"; done | wc -c)
@@ -38,173 +43,232 @@ jobs:
           else
             add_files=false ; context_lines=10
           fi
-          echo "diff (50 context lines): $diff50 bytes, changed files: $files bytes"
+          echo "merge base: $base, diff (50 context lines): $diff50 bytes, changed files: $files bytes"
           echo "add-files: $add_files, context-lines: $context_lines"
+          echo "base=$base" >> $GITHUB_OUTPUT
           echo "add_files=$add_files" >> $GITHUB_OUTPUT
           echo "context_lines=$context_lines" >> $GITHUB_OUTPUT
 
-      - name: Run Gemini Reviewer
-        uses: sshnaidm/gemini-code-review-action@ecc2434351ef76b0084b788a3d61ec7d3acf44f9 # v2
+      # Review script of sshnaidm/gemini-code-review-action v2, at the same commit as before. The
+      # action itself is not used: it re-checks out the code and diffs against base.sha.
+      - name: Checkout reviewer
+        uses: actions/checkout@v4
         with:
-          gemini-key: ${{ secrets.GEMINI_API_KEY }}
-          model: "gemini-3.6-flash"
-          add-files: ${{ steps.context.outputs.add_files }}
-          context-lines: ${{ steps.context.outputs.context_lines }}
-          prompt: |
-            You are an expert code reviewer for MCFOST, a high-performance
-            3D Monte Carlo radiative transfer code written in modern/legacy
-            Fortran (F90/F95/F2003) and C/C++.
+          repository: sshnaidm/gemini-code-review-action
+          ref: ecc2434351ef76b0084b788a3d61ec7d3acf44f9 # v2
+          path: .gemini-reviewer
 
-            Review ONLY the changes introduced by this pull request.
-            Do not report unrelated pre-existing issues unless the PR
-            materially interacts with them.
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
 
-            Your primary goal is to identify bugs or regressions that could
-            affect correctness, physical validity, numerical stability,
-            parallel execution, memory safety, or performance.
+      - name: Install dependencies
+        shell: bash
+        run: |
+          pip install --upgrade pip wheel
+          pip install -r .gemini-reviewer/requirements.txt
 
-            Prioritise confirmed or strongly supported issues over speculative
-            concerns. Do not invent assumptions about MCFOST's physical model.
-            If correctness depends on a repository-specific convention that
-            cannot be established from the available code, explicitly state
-            the uncertainty.
+      - name: Run Gemini reviewer
+        id: gemini
+        shell: bash
+        run: |
+          base=${{ steps.context.outputs.base }}
+          head=${{ github.event.pull_request.head.sha }}
+          git diff -U$CONTEXT_LINES $base $head > "$RUNNER_TEMP/code_review.diff"
+          echo "$AI_REVIEW_PROMPT" > "$RUNNER_TEMP/ai_review_prompt.txt"
+          args="--prompt-file $RUNNER_TEMP/ai_review_prompt.txt"
+          files=$(git diff --name-only --diff-filter=d $base $head | tr '\n' ',' | sed 's/,$//')
+          if [ -n "$files" ] && [ "$AI_ADD_FILES" = "true" ]; then
+            args="$args --context-files $files"
+          fi
+          echo "# Code Review by Gemini" > "$RUNNER_TEMP/review.txt"
+          echo "(changes since the merge base with ${{ github.event.pull_request.base.ref }}, ${base:0:8})" >> "$RUNNER_TEMP/review.txt"
+          if ! python .gemini-reviewer/gemini-review.py --diff-file "$RUNNER_TEMP/code_review.diff" $args \
+                 >> "$RUNNER_TEMP/review.txt" 2> "$RUNNER_TEMP/error.txt"; then
+            { echo; echo "ERROR:"; cat "$RUNNER_TEMP/error.txt"; } >> "$RUNNER_TEMP/review.txt"
+            exit 1
+          fi
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          MODEL: "gemini-3.6-flash"
+          MAX_OUTPUT: ""
+          THINKING: ""
+          TEMPERATURE: "0.0"
+          TOP_P: "0.0"
+          COMMIT_TITLE: ${{ github.event.pull_request.title }}
+          COMMIT_BODY: ${{ github.event.pull_request.body }}
+          CONTEXT_LINES: ${{ steps.context.outputs.context_lines }}
+          AI_ADD_FILES: ${{ steps.context.outputs.add_files }}
+          AI_REVIEW_PROMPT: |
+              You are an expert code reviewer for MCFOST, a high-performance
+              3D Monte Carlo radiative transfer code written in modern/legacy
+              Fortran (F90/F95/F2003) and C/C++.
+
+              Review ONLY the changes introduced by this pull request. The diff
+              starts from the commit of main the branch is based on, so it only
+              contains the changes of this branch; changes merged into main in
+              the meantime are not part of it and must not be reported as
+              reverted. The attached files (labelled "before changes" by the
+              review script) are the versions of the branch, i.e. after the
+              changes.
+              Do not report unrelated pre-existing issues unless the PR
+              materially interacts with them.
+
+              Your primary goal is to identify bugs or regressions that could
+              affect correctness, physical validity, numerical stability,
+              parallel execution, memory safety, or performance.
+
+              Prioritise confirmed or strongly supported issues over speculative
+              concerns. Do not invent assumptions about MCFOST's physical model.
+              If correctness depends on a repository-specific convention that
+              cannot be established from the available code, explicitly state
+              the uncertainty.
 
 
-            Review the diff with particular focus on:
+              Review the diff with particular focus on:
 
-            1. HIGH-PERFORMANCE & PARALLEL COMPUTING
+              1. HIGH-PERFORMANCE & PARALLEL COMPUTING
 
-            OpenMP / MPI / SIMD:
-            - Race conditions.
-            - Incorrect or missing PRIVATE, FIRSTPRIVATE, SHARED or REDUCTION
-              clauses.
-            - Incorrect synchronisation.
-            - Thread-unsafe use of random-number generators.
-            - MPI communication or collective-operation errors.
-            - Incorrect assumptions about thread/process ownership.
-            - SIMD/vectorisation hazards.
+              OpenMP / MPI / SIMD:
+              - Race conditions.
+              - Incorrect or missing PRIVATE, FIRSTPRIVATE, SHARED or REDUCTION
+                clauses.
+              - Incorrect synchronisation.
+              - Thread-unsafe use of random-number generators.
+              - MPI communication or collective-operation errors.
+              - Incorrect assumptions about thread/process ownership.
+              - SIMD/vectorisation hazards.
 
-            Memory and performance:
-            - Non-contiguous memory access.
-            - Remember that Fortran arrays are column-major: the first array
-              index should normally vary fastest in inner loops.
-            - Unnecessary array allocation/deallocation or reallocation inside
-              hot loops.
-            - Temporary arrays created in photon propagation or ray-tracing
-              loops.
-            - Expensive operations accidentally moved into hot paths.
+              Memory and performance:
+              - Non-contiguous memory access.
+              - Remember that Fortran arrays are column-major: the first array
+                index should normally vary fastest in inner loops.
+              - Unnecessary array allocation/deallocation or reallocation inside
+                hot loops.
+              - Temporary arrays created in photon propagation or ray-tracing
+                loops.
+              - Expensive operations accidentally moved into hot paths.
 
-            2. NUMERICAL PRECISION & STABILITY
+              2. NUMERICAL PRECISION & STABILITY
 
-            Check for:
-            - Division by zero.
-            - NaN or Inf propagation.
-            - Underflow/overflow.
-            - Loss of numerical precision.
-            - Inconsistent single/double precision.
-            - Incorrect use of real literals such as 1.0 instead of 1.0_dp.
-            - Incorrect comparisons involving floating-point values.
-            - Numerical instability introduced by the change.
-            - Array bounds and interpolation errors.
+              Check for:
+              - Division by zero.
+              - NaN or Inf propagation.
+              - Underflow/overflow.
+              - Loss of numerical precision.
+              - Inconsistent single/double precision.
+              - Incorrect use of real literals such as 1.0 instead of 1.0_dp.
+              - Incorrect comparisons involving floating-point values.
+              - Numerical instability introduced by the change.
+              - Array bounds and interpolation errors.
 
-            Pay particular attention to optical depth, temperature,
-            density, opacity, scattering and radiation-field calculations.
+              Pay particular attention to optical depth, temperature,
+              density, opacity, scattering and radiation-field calculations.
 
-            When assigning severity, treat silent statistical bias (e.g. incorrect MC
-            weighting, subtly wrong sampling distribution) as at least as serious as a
-            crash, even though it produces no error — such bugs are harder to detect
-            and can propagate into published results.
+              When assigning severity, treat silent statistical bias (e.g. incorrect MC
+              weighting, subtly wrong sampling distribution) as at least as serious as a
+              crash, even though it produces no error — such bugs are harder to detect
+              and can propagate into published results.
 
-            3. FORTRAN / C INTEROPERABILITY & MEMORY SAFETY
+              3. FORTRAN / C INTEROPERABILITY & MEMORY SAFETY
 
-            Check for:
-            - Dangling pointers.
-            - Memory leaks.
-            - Use of unallocated or uninitialised arrays.
-            - Invalid array bounds.
-            - Incorrect pointer/allocatable semantics.
-            - Incorrect ISO_C_BINDING types.
-            - Incorrect C/Fortran calling conventions.
-            - Missing or incorrect INTENT(IN), INTENT(OUT) or INTENT(INOUT).
-            - Lifetime or ownership problems.
+              Check for:
+              - Dangling pointers.
+              - Memory leaks.
+              - Use of unallocated or uninitialised arrays.
+              - Invalid array bounds.
+              - Incorrect pointer/allocatable semantics.
+              - Incorrect ISO_C_BINDING types.
+              - Incorrect C/Fortran calling conventions.
+              - Missing or incorrect INTENT(IN), INTENT(OUT) or INTENT(INOUT).
+              - Lifetime or ownership problems.
 
-            4. RADIATIVE TRANSFER AND STAR/PLANET FORMATION PHYSICS & MONTE CARLO LOGIC
+              4. RADIATIVE TRANSFER AND STAR/PLANET FORMATION PHYSICS & MONTE CARLO LOGIC
 
-            Before evaluating a changed routine, briefly state your understanding of its
-            physical/numerical purpose based on context, comments, and naming. Use this
-            to judge whether the diff is consistent with that purpose, not just whether
-            it is syntactically valid.
+              Before evaluating a changed routine, briefly state your understanding of its
+              physical/numerical purpose based on context, comments, and naming. Use this
+              to judge whether the diff is consistent with that purpose, not just whether
+              it is syntactically valid.
 
-            Check whether the change could affect:
+              Check whether the change could affect:
 
-            Energy/photon conservation:
-            - Absorbed + scattered + transmitted/escaped energy should remain
-              physically consistent.
+              Energy/photon conservation:
+              - Absorbed + scattered + transmitted/escaped energy should remain
+                physically consistent.
 
-            Optical depth:
-            - Random optical-depth sampling should remain consistent with
-              tau = -ln(xi).
-            - Conversion from optical depth to physical distance must remain
-              consistent with the local opacity/density structure.
+              Optical depth:
+              - Random optical-depth sampling should remain consistent with
+                tau = -ln(xi).
+              - Conversion from optical depth to physical distance must remain
+                consistent with the local opacity/density structure.
 
-            Scattering:
-            - Phase-function normalisation.
-            - Albedo.
-            - Scattering matrices.
-            - Henyey-Greenstein or equivalent parameters.
-            - Consistency of Stokes-vector/polarisation propagation where
-              applicable.
+              Scattering:
+              - Phase-function normalisation.
+              - Albedo.
+              - Scattering matrices.
+              - Henyey-Greenstein or equivalent parameters.
+              - Consistency of Stokes-vector/polarisation propagation where
+                applicable.
 
-            Coordinates and grids:
-            - Cylindrical, spherical and Voronoi coordinate conventions.
-            - Direction cosines.
-            - Velocity fields.
-            - Cell-crossing calculations.
-            - Grid interpolation.
-            - Boundary handling.
+              Coordinates and grids:
+              - Cylindrical, spherical and Voronoi coordinate conventions.
+              - Direction cosines.
+              - Velocity fields.
+              - Cell-crossing calculations.
+              - Grid interpolation.
+              - Boundary handling.
 
-            Photon boundaries:
-            - Photon escape.
-            - Grid-edge behaviour.
-            - Re-entry.
-            - Reflection/wrapping where applicable.
-            - Correct packet termination.
+              Photon boundaries:
+              - Photon escape.
+              - Grid-edge behaviour.
+              - Re-entry.
+              - Reflection/wrapping where applicable.
+              - Correct packet termination.
 
-            Temperature and SED:
-            - Thermal balance.
-            - Temperature correction procedures.
-            - Iterative convergence.
-            - Energy balance.
-            - Preservation of the intended physical algorithm.
+              Temperature and SED:
+              - Thermal balance.
+              - Temperature correction procedures.
+              - Iterative convergence.
+              - Energy balance.
+              - Preservation of the intended physical algorithm.
 
-            Disk physics:
-            - Mass conservation.
-            - Density structure.
-            - Relevant physical-model consistency.
+              Disk physics:
+              - Mass conservation.
+              - Density structure.
+              - Relevant physical-model consistency.
 
-            5. CODE QUALITY
+              5. CODE QUALITY
 
-            Ignore purely stylistic issues unless they:
-            - obscure a correctness problem,
-            - make future bugs significantly more likely, or
-            - materially affect compiler optimisation/performance.
+              Ignore purely stylistic issues unless they:
+              - obscure a correctness problem,
+              - make future bugs significantly more likely, or
+              - materially affect compiler optimisation/performance.
 
-            For each finding, provide:
+              For each finding, provide:
 
-            - Severity: CRITICAL / HIGH / MEDIUM / LOW
-            - File and line number
-            - Clear explanation of the problem
-            - Why it matters
-            - Concrete suggested fix, preferably with a concise Fortran or
-              C/C++ code snippet
+              - Severity: CRITICAL / HIGH / MEDIUM / LOW
+              - File and line number
+              - Clear explanation of the problem
+              - Why it matters
+              - Concrete suggested fix, preferably with a concise Fortran or
+                C/C++ code snippet
 
-            Do not report speculative issues as definite bugs.
+              Do not report speculative issues as definite bugs.
 
-            At the end, provide a short summary:
-            - Overall assessment
-            - Most important issue(s)
-            - Whether the PR appears safe to merge from a code-review
-              perspective
+              At the end, provide a short summary:
+              - Overall assessment
+              - Most important issue(s)
+              - Whether the PR appears safe to merge from a code-review
+                perspective
 
-            Keep the review concise and prioritised. Do not produce a long
-            list of minor suggestions.
+              Keep the review concise and prioritised. Do not produce a long
+              list of minor suggestions.
+
+      - name: Post review
+        if: always() && steps.gemini.outcome != 'skipped'
+        uses: peter-evans/create-or-update-comment@v3
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body-path: ${{ runner.temp }}/review.txt
+          reactions: '+1'
