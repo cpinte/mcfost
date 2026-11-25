@@ -58,9 +58,14 @@ Outputs from Image calculations
    end of this file, recording any command line options given in the
    call to MCFOST.
 
--  ``RT.fits.gz``: ray-traced output image
+-  ``RT.fits``: ray-traced output image
 
--  ``MC.fits.gz``: Monte-Carlo output image (if -mc option is used)
+-  ``MC.fits``: Monte-Carlo output image (if -mc option is used)
+
+Images and line cubes are written uncompressed (``.fits``). Option ``-gzip`` writes them as
+``.fits.gz`` (2 to 30 times smaller, but cfitsio compresses the file in a single thread, which can
+dominate the run time of large cubes on many cores). Alternatively, compress afterwards in parallel,
+e.g. ``pigz RT.fits``. Up to version 4.1.17, these files were always ``.fits.gz``.
 
 Units for the images are W.m\ :sup:`-2`.pixel\ :sup:`-1`. These images
 have at least 3 dimensions, two spatial dimensions and one for
@@ -117,7 +122,7 @@ Outputs from Molecular Line calculations
    end of this file, recording any command line options given in the
    call to MCFOST.
 
--  ``lines.fits.gz``: ray-traced data cube
+-  ``lines.fits``: ray-traced data cube (``lines.fits.gz`` with ``-gzip``)
 
 Units are in  W.m\ :sup:`-2`.pixel\ :sup:`-1`. These images have 6 dimensions, 2 for spatial dimensions,
 1 for velocity, 1 for the transition number, and 2 for the system inclination and azimuth.
@@ -141,7 +146,7 @@ parameter file, e.g. ``data_H`` (or ``data_H_Ca`` for several atoms):
 
 -  ``<atom>.fits.gz``: level populations of each atom, and ``ne.fits.gz``: electron density.
 
--  ``<atom>_line_*.fits.gz``: line maps (ray-traced images) and ``flux.fits.gz``: total flux.
+-  ``<atom>_line_*.fits``: line maps (ray-traced images) and ``flux.fits``: total flux (``.fits.gz`` with ``-gzip``).
 
 -  ``<atom>_colrate.fits.gz``, ``<atom>_radrate.fits.gz`` (``-output_rates``) and the other optional outputs.
 
