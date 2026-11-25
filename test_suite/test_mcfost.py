@@ -1484,7 +1484,7 @@ def test_dhs_polarisation():
                                  "nbr_photons_eq_th": set_first_value("1.28e5")}))
         run_mcfost("ref3.0.para", "results", "-no_SED -seed 1", cwd=run_dir, timeout=300)
         run_mcfost("ref3.0.para", "results", "-img 1.0 -seed 1", cwd=run_dir, timeout=300)
-        rt = fits.getdata(run_dir + "/results/seed=1/data_1.0/RT.fits.gz").astype(float)[:, 0]  # Stokes, incl, y, x
+        rt = fits.getdata(run_dir + "/results/seed=1/data_1.0/RT.fits").astype(float)[:, 0]  # Stokes, incl, y, x
         pol[name] = np.sqrt(rt[1] ** 2 + rt[2] ** 2).sum(axis=(-1, -2)) / rt[0].sum(axis=(-1, -2))
     ok = pol["mie"] > 0.01   # inclined views, where the polarised flux is significant
     rel = pol["dhs001"][ok] / pol["mie"][ok] - 1
