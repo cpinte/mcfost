@@ -166,27 +166,43 @@ contains
 
   !----------------------------------------------
 
-  pure real(dp) function exit_peak_fraction(gam) result(f)
-    ! Fraction of 9 mu^8 in the exit law of the walks that interact in a sphere of gam transport
-    ! mean free paths, fitted to <mu> of the exact walk for gam = 2-20 (mrw_study: <mu> within
-    ! 0.0015, <mu^2> within 0.005); tends to 1.06 / gam
-    real(dp), intent(in) :: gam
+  pure real(dp) function exit_cosine(gam, xi) result(mu)
+    ! Exit cosine (to the outward normal) of a packet that interacts in a sphere of gam transport
+    ! mean free paths, for a cumulative probability xi: exact law of the walk from the centre with
+    ! isotropic scattering (emergent intensity of a point source at the centre of the sphere,
+    ! mrw_exit_law.py), tabulated in MRW_exit_table.f90 and interpolated in log(gam) and
+    ! u = 2/pi asin(sqrt(xi)). Tends to the Milne law mu H(mu) (<mu> = 0.7104) for large spheres,
+    ! more forward-peaked for small ones (<mu> = 0.81 at gam = 2, 0.76 at 5, 0.73 at 10).
+    ! gam is clamped to the table, 2-100 (at gam = 100 the law is within 0.003 of the Milne law)
+    use MRW_exit_table, only : mu_exit_table, n_u_exit, n_gam_exit, gam_min_exit, gam_max_exit
+    real(dp), intent(in) :: gam, xi
 
-    f = min(1.063_dp * gam / (gam * gam - 1.284_dp * gam + 2.702_dp), 1.0_dp)
+    real(dp) :: t, w, s, a
+    integer :: i, j
 
-  end function exit_peak_fraction
+    t = log(min(max(gam, gam_min_exit), gam_max_exit) / gam_min_exit) / log(gam_max_exit / gam_min_exit) &
+         * real(n_gam_exit - 1, dp)
+    j = min(int(t), n_gam_exit - 2)
+    w = t - real(j, dp)
+    j = j + 1
+    s = 2.0_dp / pi * asin(sqrt(min(max(xi, 0.0_dp), 1.0_dp))) * real(n_u_exit - 1, dp)
+    i = min(int(s), n_u_exit - 2)
+    a = s - real(i, dp)
+    i = i + 1
+    mu = (1.0_dp - w) * ((1.0_dp - a) * mu_exit_table(i, j) + a * mu_exit_table(i + 1, j)) &
+         + w * ((1.0_dp - a) * mu_exit_table(i, j + 1) + a * mu_exit_table(i + 1, j + 1))
+    mu = min(max(mu, 0.0_dp), 1.0_dp)
+
+  end function exit_cosine
 
   !----------------------------------------------
 
   subroutine sample_exit_direction(id, un, vn, wn, u, v, w, gam)
     ! Sample the direction of a packet leaving the MRW sphere, around the unit outward normal
-    ! (un, vn, wn), phi = 2*pi*xi_2. Large spheres: mu = cos(psi) from p(mu) = mu (1 + 1.5 mu)
-    ! on [0,1], the emergent flux of an optically thick medium in the Eddington approximation
-    ! (limb darkening, <mu> = 0.71). A Lambertian exit (p = 2 mu, <mu> = 2/3, Min et al. 2009) is
-    ! too oblique. Sphere of gam transport mean free paths (optional): the exact walk also
-    ! escapes without interaction (probability exp(-gam), mu = 1), and its diffuse part is more
-    ! forward-peaked: mu (1 + 1.5 mu) mixed with 9 mu^8 in proportion exit_peak_fraction(gam)
-    ! (<mu> = 0.83 at gam 2, 0.76 at 5, 0.73 at 10)
+    ! (un, vn, wn), phi = 2*pi*xi_2. Sphere of gam transport mean free paths: the packet leaves
+    ! without interaction with probability exp(-gam) (mu = 1), otherwise mu is drawn from the exact
+    ! exit law (exit_cosine). Without gam: large sphere (Milne limit). A Lambertian exit
+    ! (p = 2 mu, <mu> = 2/3, Min et al. 2009) is too oblique.
     use naleat, only : stream
 #include "sprng_f.h"
 
@@ -195,37 +211,20 @@ contains
     real(dp), intent(out) :: u, v, w
     real(dp), intent(in), optional :: gam
 
-    real(dp) :: rand1, rand2, rand3, p_ball, p_peak, cpsi, spsi, phi, a, b, c, inv_c, f
-    integer :: k
+    real(dp) :: rand1, rand2, rand3, cpsi, spsi, phi, a, b, c, inv_c
 
     rand1 = real(sprng(stream(id)), kind=dp)
     rand2 = real(sprng(stream(id)), kind=dp)
 
-    rand3 = 1.0_dp
-    p_ball = 0.0_dp
-    p_peak = 0.0_dp
     if (present(gam)) then
        rand3 = real(sprng(stream(id)), kind=dp)
-       p_ball = exp(-gam)
-       p_peak = p_ball + (1.0_dp - p_ball) * exit_peak_fraction(gam)
-    endif
-
-    if (rand3 < p_ball) then
-       cpsi = 1.0_dp
-    else if (rand3 < p_peak) then
-       cpsi = rand1**(1.0_dp / 9.0_dp)
-    else if (rand1 <= 0.0_dp) then
-       cpsi = 0.0_dp
+       if (rand3 < exp(-gam)) then
+          cpsi = 1.0_dp
+       else
+          cpsi = exit_cosine(gam, rand1)
+       endif
     else
-       ! Solve the CDF (mu^2 + mu^3) / 2 = xi_1 by Newton: the function is convex and the start
-       ! point is above the root, so the iterations decrease monotonically
-       cpsi = min(sqrt(2.0_dp * rand1), 1.0_dp)
-       do k = 1, 50
-          f = cpsi * cpsi * (1.0_dp + cpsi) - 2.0_dp * rand1
-          if (f <= 1.0e-15_dp) exit
-          cpsi = cpsi - f / (cpsi * (2.0_dp + 3.0_dp * cpsi))
-       enddo
-       cpsi = min(max(cpsi, 0.0_dp), 1.0_dp)
+       cpsi = exit_cosine(huge(1.0_dp), rand1)
     endif
     spsi = sqrt(max(0.0_dp, 1.0_dp - cpsi * cpsi))
     phi = 2.0_dp * pi * rand2

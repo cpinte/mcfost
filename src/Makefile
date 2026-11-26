@@ -254,7 +254,7 @@ SOURCES = mcfost_env.f90 parameters.f90 numa.f90 constants.f90 healpix_mod.f90 s
           occupation_probability.f90 lte.f90 \
           radiation_field.f90 thermal_emission.f90 diffusion.f90 \
           io_prodimo.f90 disk_physics.f90 gas_contopac.f90 \
-          opacity_atom.f90 MRW.f90 optical_depth.f90 ML_prodimo.f90 \
+          opacity_atom.f90 MRW_exit_table.f90 MRW.f90 optical_depth.f90 ML_prodimo.f90 \
           output.f90 mem.f90  io_phantom_infiles.f90 \
           io_phantom_utils.f90 mess_up_SPH.f90 read_phantom.f90 \
 	  init_mcfost.f90 \
