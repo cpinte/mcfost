@@ -29,7 +29,7 @@ program test_mrw
   use naleat, only : init_random_streams
   use MRW, only : n, zeta, y_MRW, gamma_MRW, cumulative_zeta_from_y, &
        initialize_cumulative_zeta, interp_y_from_zeta, make_MRW_step, &
-       sample_exit_direction, exit_peak_fraction, z_extrap_MRW, mrw_wall_safety, n_min_interactions_MRW, n_mrw_step_max
+       sample_exit_direction, exit_cosine, z_extrap_MRW, mrw_wall_safety, n_min_interactions_MRW, n_mrw_step_max
   use cylindrical_grid, only : build_cylindrical_cell_mapping, define_cylindrical_grid, &
        cross_cylindrical_cell, index_cell_cyl, distance_to_closest_wall_cyl, &
        cell2cylindrical, cell_map, cell_map_i, cell_map_j, cell_map_k, lexit_cell, &
@@ -128,7 +128,7 @@ contains
     real(dp) :: quad_mean, exact_mean_lny
     real(dp) :: x0, y0, z0, x, y, z, u, v, w, ct, R0, chi
     real(dp) :: dx, dy, dz, step_r, norm_u, mu
-    real(dp) :: sum_ct, sum_mu, sum_mu2, sum_dx, sum_dy, sum_dz, f_peak
+    real(dp) :: sum_ct, sum_mu, sum_mu2, sum_dx, sum_dy, sum_dz, mu_q, mu2_q
     real(dp) :: R_macro, d_rem, r_cur, sum_r2_stop, sum_R02, sum_ct_exp, ct_exp
     real(dp) :: max_r_err, max_u_err, min_mu
     logical :: all_finite
@@ -194,8 +194,8 @@ contains
 
     ! Monte Carlo verification of make_MRW_step (catches A11 y-coordinate overwrite,
     ! verifies <ct> = 0.5 * (R0 + z_extrap/chi)^2 * chi, isotropic sphere displacement, exit
-    ! direction moments: gamma = R0 chi = 240, fraction exit_peak_fraction(240) of 9 mu^8
-    ! (<mu> = 0.9, <mu^2> = 9/11), the rest from mu (1 + 1.5 mu) (<mu> = 17/24, <mu^2> = 0.55))
+    ! direction moments: gamma = R0 chi = 240, exit law at the end of its table (gamma = 100), moments
+    ! from a quadrature of exit_cosine over the cumulative probability: <mu> = 0.712, <mu^2> = 0.554)
     x0 = 1.5_dp ; y0 = -7.25_dp ; z0 = 3.1_dp
     R0 = 2.4_dp ; chi = 100.0_dp
 
@@ -240,15 +240,23 @@ contains
     call check("MRW step isotropic <dr> ~ 0", &
          max(abs(sum_dx), abs(sum_dy), abs(sum_dz)) / (n_mc * R0) < 0.015_dp)
     write(msg,'(a,f7.4,a,f7.4)') "<mu> = ", sum_mu / n_mc, " <mu^2> = ", sum_mu2 / n_mc
-    f_peak = exit_peak_fraction(R0 * chi)
+    mu_q = 0.0_dp ; mu2_q = 0.0_dp
+    do i = 1, n_quad
+       xi = (real(i, dp) - 0.5_dp) / real(n_quad, dp)
+       mu_q = mu_q + exit_cosine(R0 * chi, xi)
+       mu2_q = mu2_q + exit_cosine(R0 * chi, xi)**2
+    enddo
+    mu_q = mu_q / real(n_quad, dp) ; mu2_q = mu2_q / real(n_quad, dp)
+    write(msg,'(a,f7.4,a,f7.4,a,f7.4,a,f7.4,a)') "<mu> = ", sum_mu / n_mc, " (", mu_q, "), <mu^2> = ", &
+         sum_mu2 / n_mc, " (", mu2_q, ")"
     call check("MRW step exit direction <mu> and <mu^2> (large sphere)", &
-         (abs(sum_mu / n_mc - (f_peak * 0.9_dp + (1.0_dp - f_peak) * 17.0_dp/24.0_dp)) < 0.005_dp) .and. &
-         (abs(sum_mu2 / n_mc - (f_peak * 9.0_dp/11.0_dp + (1.0_dp - f_peak) * 0.55_dp)) < 0.005_dp), trim(msg))
+         (abs(sum_mu / n_mc - mu_q) < 0.005_dp) .and. (abs(sum_mu2 / n_mc - mu2_q) < 0.005_dp) .and. &
+         (abs(mu_q - 0.7120_dp) < 0.002_dp) .and. (abs(mu2_q - 0.5543_dp) < 0.002_dp), trim(msg))
 
     ! Exact transport walk (isotropic interactions, unit mean free path) from the centre of a
     ! sphere of radius gamma, until it crosses the surface: its mean path is reproduced by the
     ! MRW step with the extrapolated boundary (16.3 at gamma = 5), not without (12.5), and its
-    ! mean exit cosine by the gamma-dependent exit law (0.83 at gamma = 2, 0.76 at 5)
+    ! exit cosine moments by the exact exit law (<mu> = 0.83 at gamma = 2, 0.76 at 5)
     call check_exact_walk(2.0_dp)
     call check_exact_walk(5.0_dp)
     call check_exact_walk(10.0_dp)
@@ -292,10 +300,11 @@ contains
     integer, parameter :: n_walk = 20000, n_step = 200000
     real(dp) :: p(3), d(3), rnd(3), b, c, s_exit, l, path, sum_path, sum_ct, sum_ct2, ct
     real(dp) :: x, y, z, u, v, w, mean_exact, err_exact, mean_mrw, sum_mu_exact, sum_mu_mrw
+    real(dp) :: sum_mu2_exact, sum_mu2_mrw, mu_e
     integer :: i
     character(len=128) :: msg
 
-    sum_path = 0.0_dp ; sum_ct2 = 0.0_dp ; sum_mu_exact = 0.0_dp
+    sum_path = 0.0_dp ; sum_ct2 = 0.0_dp ; sum_mu_exact = 0.0_dp ; sum_mu2_exact = 0.0_dp
     do i = 1, n_walk
        p = 0.0_dp ; path = 0.0_dp
        do
@@ -308,7 +317,9 @@ contains
           s_exit = -b + sqrt(b * b - c)
           if (l >= s_exit) then
              path = path + s_exit
-             sum_mu_exact = sum_mu_exact + dot_product(p + s_exit * d, d) / gam
+             mu_e = dot_product(p + s_exit * d, d) / gam
+             sum_mu_exact = sum_mu_exact + mu_e
+             sum_mu2_exact = sum_mu2_exact + mu_e * mu_e
              exit
           endif
           p = p + l * d ; path = path + l
@@ -318,12 +329,14 @@ contains
     mean_exact = sum_path / n_walk
     err_exact = sqrt(max(sum_ct2 / n_walk - mean_exact**2, 0.0_dp) / n_walk)
 
-    sum_ct = 0.0_dp ; sum_mu_mrw = 0.0_dp
+    sum_ct = 0.0_dp ; sum_mu_mrw = 0.0_dp ; sum_mu2_mrw = 0.0_dp
     do i = 1, n_step
        x = 0.0_dp ; y = 0.0_dp ; z = 0.0_dp
        call make_MRW_step(1, x, y, z, u, v, w, gam, 1.0_dp, ct)
        sum_ct = sum_ct + ct
-       sum_mu_mrw = sum_mu_mrw + (x * u + y * v + z * w) / gam
+       mu_e = (x * u + y * v + z * w) / gam
+       sum_mu_mrw = sum_mu_mrw + mu_e
+       sum_mu2_mrw = sum_mu2_mrw + mu_e * mu_e
     enddo
     mean_mrw = sum_ct / n_step
 
@@ -331,10 +344,12 @@ contains
          ", MRW", mean_mrw
     call check("MRW step <ct> matches the exact walk out of the sphere", &
          abs(mean_mrw - mean_exact) < 0.02_dp * mean_exact, trim(msg))
-    write(msg,'(a,f6.1,a,f7.4,a,f7.4)') "gamma =", gam, ": exact <mu>", sum_mu_exact / n_walk, &
-         ", MRW", sum_mu_mrw / n_step
-    call check("MRW step <mu> at exit matches the exact walk", &
-         abs(sum_mu_mrw / n_step - sum_mu_exact / n_walk) < 0.01_dp, trim(msg))
+    ! 20000 exact walks: sigma(<mu>) ~ 0.0015, sigma(<mu^2>) ~ 0.0017
+    write(msg,'(a,f6.1,a,f7.4,a,f7.4,a,f7.4,a,f7.4)') "gamma =", gam, ": exact <mu>", sum_mu_exact / n_walk, &
+         ", MRW", sum_mu_mrw / n_step, "; exact <mu^2>", sum_mu2_exact / n_walk, ", MRW", sum_mu2_mrw / n_step
+    call check("MRW step <mu> and <mu^2> at exit match the exact walk", &
+         abs(sum_mu_mrw / n_step - sum_mu_exact / n_walk) < 0.006_dp .and. &
+         abs(sum_mu2_mrw / n_step - sum_mu2_exact / n_walk) < 0.007_dp, trim(msg))
   end subroutine check_exact_walk
 
   !======================================================================
